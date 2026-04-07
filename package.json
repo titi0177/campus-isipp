@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
-    "start": "node .output/server/index.mjs"
+  "dev": "vite dev",
+  "build": "vite build",
+  "start": "node .output/server/index.mjs"
+}
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
