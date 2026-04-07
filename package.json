@@ -8,7 +8,7 @@
     "start": "node .output/server/index.mjs"
   },
   "dependencies": {
-    "nitro": "latest",
+   "nitro": "^2.8.1",
     "@supabase/supabase-js": "^2.49.4",
     "@tanstack/react-query": "^5.74.4",
     "@tanstack/react-router": "^1.163.3",
