@@ -30,10 +30,8 @@ export function DataTable<T extends Record<string, unknown>>({
 
   const filtered = searchable
     ? data.filter((row) =>
-        Object.values(row).some((val) =>
-          String(val).toLowerCase().includes(search.toLowerCase())
+        JSON.stringify(row).toLowerCase().includes(search.toLowerCase())
         )
-      )
     : data
 
   const totalPages = Math.ceil(filtered.length / pageSize)

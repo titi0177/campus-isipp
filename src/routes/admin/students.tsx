@@ -6,6 +6,7 @@ import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Student, Program } from '@/types'
+import { Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/admin/students')({
   component: StudentsPage,
@@ -89,6 +90,13 @@ function StudentsPage() {
           searchPlaceholder="Buscar por nombre, legajo, DNI..."
           actions={(row: any) => (
             <div className="flex items-center gap-2 justify-end">
+              <Link
+  to="/admin/student-record/$id"
+  params={{ id: row.id }}
+  className="text-blue-600"
+>
+Historial
+</Link>
               <button onClick={() => openEdit(row)} className="p-1.5 text-gray-500 hover:text-[#7A1E2C] hover:bg-red-50 rounded-lg transition-colors">
                 <Pencil size={15} />
               </button>

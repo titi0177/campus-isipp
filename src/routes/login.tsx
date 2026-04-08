@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useState } from 'react'
 import { GraduationCap, Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useNavigate } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/login')({
   beforeLoad: async () => {
@@ -12,6 +13,7 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
+  const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -30,7 +32,7 @@ function LoginPage() {
       setLoading(false)
       return
     }
-    window.location.href = '/'
+    navigate({ to: '/' })
   }
 
   const handleReset = async (e: React.FormEvent) => {

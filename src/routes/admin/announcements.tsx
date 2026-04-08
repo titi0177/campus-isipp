@@ -70,7 +70,7 @@ function AnnouncementsAdminPage() {
           </div>
           <div>
             <label className="form-label">Descripción *</label>
-            <textarea className="form-input" rows={4} required value={editing.description || ''} onChange={e => setEditing(p => ({ ...p, description: e.target.value }))} />
+            <textarea className="form-input" rows={4} required value={editing.content || ''} onChange={e => setEditing(p => ({ ...p, content: e.target.value }))} />
           </div>
           <div>
             <label className="form-label">Fecha *</label>

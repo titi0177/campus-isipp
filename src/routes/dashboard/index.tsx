@@ -1,159 +1,239 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { StatCard } from '@/components/StatCard'
-import { StatusBadge } from '@/components/StatusBadge'
-import { BookOpen, Star, CheckCircle, Clock, Award, Bell } from 'lucide-react'
-import type { Announcement, CalendarEvent } from '@/types'
+import { generateRegularCertificate } from '@/utils/generateRegularCertificate'
+import { FileText, GraduationCap, CalendarCheck, BookOpen } from 'lucide-react'
+import StatCard from '@/components/StatCard'
 
 export const Route = createFileRoute('/dashboard/')({
-  component: StudentDashboard,
+  component: DashboardPage,
 })
 
-function StudentDashboard() {
-  const [stats, setStats] = useState({ passed: 0, inProgress: 0, gpa: '0.00', attendance: '0%', credits: 0 })
-  const [enrollments, setEnrollments] = useState<any[]>([])
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [loading, setLoading] = useState(true)
+function DashboardPage() {
+
+  const [student, setStudent] = useState<any>(null)
+  const [subjects, setSubjects] = useState<any[]>([])
+  const [attendancePercent, setAttendancePercent] = useState<number>(0)
 
   useEffect(() => {
     loadData()
   }, [])
 
   async function loadData() {
+
     const { data: { user } } = await supabase.auth.getUser()
+
     if (!user) return
 
-    const { data: student } = await supabase
-      .from('students').select('id').eq('user_id', user.id).single()
+    const { data: studentData } = await supabase
+      .from('students')
+      .select(`
+        *,
+        program:programs(name)
+      `)
+      .eq('user_id', user.id)
+      .single()
 
-    if (student) {
-      const { data: enrs } = await supabase
-        .from('enrollments')
-        .select('*, subject:subjects(name, code, credits), grade:grades(*), attendance:attendance(*)')
-        .eq('student_id', student.id)
-      setEnrollments(enrs || [])
+    setStudent(studentData)
 
-      const grades = (enrs || []).map(e => e.grade?.[0]).filter(Boolean)
-      const passed = grades.filter((g: any) => ['promoted', 'passed'].includes(g?.status)).length
-      const inProgress = grades.filter((g: any) => g?.status === 'in_progress').length
-      const finalGrades = grades.filter((g: any) => g?.final_grade != null).map((g: any) => g.final_grade)
-      const gpa = finalGrades.length ? (finalGrades.reduce((a: number, b: number) => a + b, 0) / finalGrades.length).toFixed(2) : '0.00'
-      const attValues = (enrs || []).map((e: any) => e.attendance?.[0]?.percentage).filter((v: any) => v != null)
-      const attendance = attValues.length ? `${Math.round(attValues.reduce((a: number, b: number) => a + b, 0) / attValues.length)}%` : '0%'
-      const credits = (enrs || [])
-        .filter((e: any) => ['promoted', 'passed'].includes(e.grade?.[0]?.status))
-        .reduce((sum: number, e: any) => sum + (e.subject?.credits || 0), 0)
+    const { data: grades } = await supabase
+      .from('grades')
+      .select(`
+        final_grade,
+        enrollment:enrollments(
+          subject:subjects(name)
+        )
+      `)
+      .eq('enrollment.student_id', studentData.id)
 
-      setStats({ passed, inProgress, gpa, attendance, credits })
+    setSubjects(grades || [])
+
+    const { data: attendance } = await supabase
+      .from('attendance')
+      .select('present, enrollment:enrollments(student_id)')
+      .eq('enrollment.student_id', studentData.id)
+
+    if (attendance) {
+
+      const total = attendance.length
+      const present = attendance.filter(a => a.present).length
+      const percent = total ? Math.round((present / total) * 100) : 0
+
+      setAttendancePercent(percent)
+
     }
 
-    const { data: ann } = await supabase.from('announcements').select('*').order('date', { ascending: false }).limit(5)
-    setAnnouncements(ann || [])
-
-    const { data: ev } = await supabase.from('calendar_events').select('*').gte('date', new Date().toISOString().slice(0, 10)).order('date').limit(5)
-    setEvents(ev || [])
-
-    setLoading(false)
   }
 
-  if (loading) return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, i) => <div key={i} className="card h-24 animate-pulse bg-gray-100" />)}
-      </div>
-    </div>
-  )
+  if (!student) return null
+
+  const approved = subjects.filter((s:any) => s.final_grade >= 4).length
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Mi Panel Académico</h1>
-        <p className="text-gray-500 text-sm mt-1">Bienvenido al Sistema de Gestión Académica ISIPP</p>
+
+    <div className="space-y-8">
+
+      {/* HEADER */}
+
+      <div className="flex justify-between items-center">
+
+        <div>
+
+          <h1 className="text-3xl font-bold text-gray-900">
+            Panel del Alumno
+          </h1>
+
+          <p className="text-gray-500 text-sm">
+            {student.first_name} {student.last_name} • {student.program?.name}
+          </p>
+
+        </div>
+
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard title="Promedio General" value={stats.gpa} subtitle="Escala 1-10" icon={<Star size={22} />} color="bordeaux" />
-        <StatCard title="Materias Aprobadas" value={stats.passed} icon={<CheckCircle size={22} />} color="green" />
-        <StatCard title="En Cursada" value={stats.inProgress} icon={<Clock size={22} />} color="blue" />
-        <StatCard title="Asistencia Prom." value={stats.attendance} icon={<BookOpen size={22} />} color="orange" />
-        <StatCard title="Créditos" value={stats.credits} icon={<Award size={22} />} color="purple" />
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Current enrollments */}
-        <div className="lg:col-span-2 card">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Materias en Cursada</h2>
-          {enrollments.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-6">No tiene materias inscriptas actualmente.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-                    <th className="pb-2 pr-4">Materia</th>
-                    <th className="pb-2 pr-4">Nota Parcial</th>
-                    <th className="pb-2 pr-4">Asistencia</th>
-                    <th className="pb-2">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {enrollments.slice(0, 8).map((enr: any) => (
-                    <tr key={enr.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="py-2 pr-4 font-medium text-gray-800">{enr.subject?.name || '-'}</td>
-                      <td className="py-2 pr-4 text-gray-600">{enr.grade?.[0]?.partial_grade ?? '-'}</td>
-                      <td className="py-2 pr-4 text-gray-600">{enr.attendance?.[0]?.percentage != null ? `${enr.attendance[0].percentage}%` : '-'}</td>
-                      <td className="py-2"><StatusBadge status={enr.grade?.[0]?.status || 'in_progress'} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* ESTADISTICAS */}
+
+      <div className="grid md:grid-cols-4 gap-6">
+
+        <StatCard
+          icon={GraduationCap}
+          title="Materias aprobadas"
+          value={approved}
+          color="bg-blue-100 text-blue-600"
+        />
+
+        <StatCard
+          icon={CalendarCheck}
+          title="Asistencia"
+          value={`${attendancePercent}%`}
+          color="bg-green-100 text-green-600"
+        />
+
+        <StatCard
+          icon={BookOpen}
+          title="Materias cursadas"
+          value={subjects.length}
+          color="bg-purple-100 text-purple-600"
+        />
+
+        <div className="bg-white rounded-xl shadow-sm border p-5">
+
+          <div className="flex items-center gap-4">
+
+            <div className="bg-red-100 p-3 rounded-lg">
+              <FileText className="text-red-600" size={22}/>
             </div>
-          )}
-        </div>
 
-        {/* Announcements and calendar */}
-        <div className="space-y-4">
-          <div className="card">
-            <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Bell size={16} className="text-[#7A1E2C]" /> Anuncios
-            </h2>
-            {announcements.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-3">Sin anuncios.</p>
-            ) : (
-              <div className="space-y-3">
-                {announcements.map(ann => (
-                  <div key={ann.id} className="border-l-2 border-[#7A1E2C] pl-3">
-                    <p className="text-sm font-medium text-gray-800">{ann.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{new Date(ann.date).toLocaleDateString('es-AR')}</p>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-1">
+
+              <p className="text-gray-500 text-sm">
+                Certificados
+              </p>
+
+              <button
+                onClick={() => generateRegularCertificate(student, student.program)}
+                className="text-xs bg-[#7A1E2C] text-white px-3 py-1 rounded"
+              >
+                Alumno Regular
+              </button>
+
+              <Link
+                to="/dashboard/certificates"
+                className="block text-xs text-blue-600 hover:underline"
+              >
+                Ver todos
+              </Link>
+
+            </div>
+
           </div>
 
-          <div className="card">
-            <h2 className="text-base font-semibold text-gray-900 mb-3">Próximos Eventos</h2>
-            {events.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center py-3">Sin eventos próximos.</p>
-            ) : (
-              <div className="space-y-2">
-                {events.map(ev => (
-                  <div key={ev.id} className="flex items-start gap-2">
-                    <div className="w-2 h-2 bg-[#7A1E2C] rounded-full mt-1.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{ev.title}</p>
-                      <p className="text-xs text-gray-500">{new Date(ev.date).toLocaleDateString('es-AR')}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
+
       </div>
+
+
+      {/* TABLA MATERIAS */}
+
+      <div className="bg-white rounded-xl shadow-sm border p-6">
+
+        <h2 className="text-lg font-semibold mb-4">
+          Mis materias
+        </h2>
+
+        <table className="w-full text-sm">
+
+          <thead>
+
+            <tr className="border-b text-gray-600">
+
+              <th className="text-left py-3">
+                Materia
+              </th>
+
+              <th className="text-left py-3">
+                Nota
+              </th>
+
+              <th className="text-left py-3">
+                Estado
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {subjects.map((s:any, i:number) => {
+
+              let status = "Desaprobado"
+              let color = "bg-red-100 text-red-700"
+
+              if (s.final_grade >= 7) {
+                status = "Promocionado"
+                color = "bg-green-100 text-green-700"
+              }
+              else if (s.final_grade >= 4) {
+                status = "Aprobado"
+                color = "bg-blue-100 text-blue-700"
+              }
+
+              return (
+
+                <tr key={i} className="border-b hover:bg-gray-50">
+
+                  <td className="py-3">
+                    {s.enrollment?.subject?.name}
+                  </td>
+
+                  <td>
+                    {s.final_grade}
+                  </td>
+
+                  <td>
+
+                    <span className={`px-2 py-1 text-xs rounded ${color}`}>
+                      {status}
+                    </span>
+
+                  </td>
+
+                </tr>
+
+              )
+
+            })}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
     </div>
+
   )
+
 }

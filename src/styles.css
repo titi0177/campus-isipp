@@ -66,3 +66,27 @@ body {
 .modal-content {
   @apply bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto;
 }
+.btn-primary{
+background:#7A1E2C;
+color:white;
+padding:8px 14px;
+border-radius:6px;
+font-size:14px;
+font-weight:500;
+}
+
+.btn-primary:hover{
+opacity:0.9;
+}
+
+.btn-secondary{
+background:#f3f4f6;
+color:#111827;
+padding:8px 14px;
+border-radius:6px;
+font-size:14px;
+}
+
+.btn-secondary:hover{
+background:#e5e7eb;
+}
