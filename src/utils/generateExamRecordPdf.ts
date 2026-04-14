@@ -1,12 +1,14 @@
-import jsPDF from 'jspdf'
-
 export type ExamRecordStudentRow = {
   legajo: string
+  dni?: string
   nombre: string
   nota: string | number | null
 }
 
-export function generateExamRecordPdf(params: {
+/**
+ * Lazy-loaded PDF generation - imported dynamically to reduce initial bundle
+ */
+export async function generateExamRecordPdf(params: {
   title: string
   institution: string
   career?: string
@@ -16,6 +18,9 @@ export function generateExamRecordPdf(params: {
   professorName?: string
   students: ExamRecordStudentRow[]
 }) {
+  // Lazy load jsPDF only when needed
+  const { default: jsPDF } = await import('jspdf')
+  
   const doc = new jsPDF()
   let y = 22
 
@@ -41,23 +46,41 @@ export function generateExamRecordPdf(params: {
   doc.text('Alumnos inscriptos y calificación final registrada', 14, y)
   y += 6
 
+  // Tabla header
   doc.setFillColor(240, 240, 240)
-  doc.rect(14, y - 4, 182, 7, 'F')
+  const headerHeight = 7
+  doc.rect(14, y - 4, 182, headerHeight, 'F')
+  
+  doc.setFontSize(8)
   doc.text('Legajo', 16, y)
-  doc.text('Apellido y nombre', 40, y)
-  doc.text('Nota final', 170, y)
-  y += 8
+  doc.text('Apellido y nombre', 35, y)
+  doc.text('DNI', 145, y)
+  doc.text('Nota', 175, y)
+  y += headerHeight + 2
 
+  doc.setFontSize(9)
   for (const s of params.students) {
-    if (y > 270) {
+    const rowHeight = 6
+    
+    if (y + rowHeight > 270) {
       doc.addPage()
       y = 20
     }
+    
+    // Legajo
     doc.text(String(s.legajo), 16, y)
-    const name = doc.splitTextToSize(s.nombre, 120)
-    doc.text(name, 40, y)
-    doc.text(s.nota != null && s.nota !== '' ? String(s.nota) : '—', 170, y)
-    y += Math.max(6, name.length * 5)
+    
+    // Nombre (puede ocupar múltiples líneas)
+    const nameText = doc.splitTextToSize(s.nombre, 105)
+    doc.text(nameText, 35, y)
+    
+    // DNI
+    doc.text(s.dni ? String(s.dni) : '—', 145, y)
+    
+    // Nota
+    doc.text(s.nota != null && s.nota !== '' ? String(s.nota) : '—', 175, y)
+    
+    y += Math.max(rowHeight, nameText.length * 4) + 1
   }
 
   y += 14

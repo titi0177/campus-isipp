@@ -2,15 +2,28 @@ import { useEffect } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
-/** Refresca datos cuando cambia cualquier fila en `grades` (alumno debe volver a cargar su vista). */
+/**
+ * Debounced realtime grades subscription - prevents excessive re-renders
+ */
 export function useRealtimeGrades(onChange: (() => void) | null) {
   useEffect(() => {
     if (!onChange) return
+
+    let timeoutId: NodeJS.Timeout | null = null
+
     const ch: RealtimeChannel = supabase
       .channel('grades_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, () => onChange())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'grades' }, () => {
+        // Debounce onChange to prevent excessive updates
+        if (timeoutId) clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          onChange()
+        }, 500)
+      })
       .subscribe()
+
     return () => {
+      if (timeoutId) clearTimeout(timeoutId)
       void supabase.removeChannel(ch)
     }
   }, [onChange])

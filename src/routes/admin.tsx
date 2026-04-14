@@ -10,28 +10,31 @@ export const Route = createFileRoute('/admin')({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw redirect({ to: '/login' })
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (!isStaffRole(profile?.role)) throw redirect({ to: homePathForRole(profile?.role) })
+    if (!isStaffRole(profile?.role)) {
+      throw redirect({ to: homePathForRole(profile?.role) })
+    }
   },
   component: AdminLayout,
 })
 
 function AdminLayout() {
   const [userName, setUserName] = useState('')
+  
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase.from('profiles').select('full_name').eq('id', user.id).single()
-          .then(({ data }) => setUserName(data?.full_name || user.email || ''))
-      }
+      if (user) setUserName(user.user_metadata?.full_name || user.email || '')
     })
   }, [])
+
   return (
-    <div className="flex min-h-screen siu-main-bg">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Sidebar role="admin" />
       <div className="ml-64 flex min-h-screen flex-1 flex-col">
         <TopNav userName={userName} role="admin" />
-        <main className="flex-1 overflow-auto border-t border-[var(--siu-border-light)] p-6 shadow-inner">
-          <Outlet />
+        <main className="flex-1 overflow-auto border-t border-slate-200 p-8">
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

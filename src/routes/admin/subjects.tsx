@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
 import type { Subject, Program, Professor } from '@/types'
 
 export const Route = createFileRoute('/admin/subjects')({
@@ -12,12 +12,18 @@ export const Route = createFileRoute('/admin/subjects')({
 })
 
 function SubjectsPage() {
-  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
   const [professors, setProfessors] = useState<Professor[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Subject>>({})
   const { showToast } = useToast()
+
+  // Filtros
+  const [filterYear, setFilterYear] = useState<number | null>(null)
+  const [filterProgram, setFilterProgram] = useState<string>('')
+  const [filterDictation, setFilterDictation] = useState<string>('')
+  const [filterSearch, setFilterSearch] = useState<string>('')
 
   useEffect(() => { load() }, [])
 
@@ -27,10 +33,32 @@ function SubjectsPage() {
       supabase.from('programs').select('*').order('name'),
       supabase.from('professors').select('*').order('name'),
     ])
-    setSubjects(s || [])
+    setAllSubjects(s || [])
     setPrograms(p || [])
     setProfessors(pr || [])
   }
+
+  const filteredSubjects = allSubjects.filter(s => {
+    // Filtro por año
+    if (filterYear !== null && s.year !== filterYear) return false
+    
+    // Filtro por programa
+    if (filterProgram && (s as any).program_id !== filterProgram) return false
+    
+    // Filtro por tipo de dictado
+    if (filterDictation && s.dictation_type !== filterDictation) return false
+    
+    // Filtro por búsqueda (nombre, código)
+    if (filterSearch) {
+      const search = filterSearch.toLowerCase()
+      return (
+        s.name?.toLowerCase().includes(search) ||
+        s.code?.toLowerCase().includes(search)
+      )
+    }
+    
+    return true
+  })
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,13 +74,92 @@ function SubjectsPage() {
     showToast('Materia eliminada.', 'info'); load()
   }
 
+  const getDictationLabel = (row: any) => {
+    if (row.dictation_type === 'cuatrimestral') {
+      return `${row.semester === 1 ? '1er' : '2do'} C.`
+    }
+    return 'Anual'
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Materias</h1>
-        <button onClick={() => { setEditing({ year: 1, credits: 4 }); setModalOpen(true) }} className="btn-primary flex items-center gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Materias</h1>
+          <p className="mt-1 text-sm text-gray-500">Gestión de asignaturas ({filteredSubjects.length} resultados)</p>
+        </div>
+        <button onClick={() => { setEditing({ year: 1, credits: 4, allows_promotion: false, dictation_type: 'anual', semester: 1 }); setModalOpen(true) }} className="btn-primary flex items-center gap-2">
           <Plus size={16} /> Nueva Materia
         </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={18} className="text-slate-600" />
+          <h3 className="font-semibold text-slate-900">Filtros</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div>
+            <label className="form-label text-xs">Buscar</label>
+            <input 
+              type="text"
+              placeholder="Nombre, código..."
+              className="form-input text-sm"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Año</label>
+            <select 
+              className="form-input text-sm"
+              value={filterYear === null ? '' : filterYear}
+              onChange={(e) => setFilterYear(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Todos</option>
+              {[1, 2, 3, 4, 5, 6].map(y => <option key={y} value={y}>{y}° Año</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Carrera</label>
+            <select 
+              className="form-input text-sm"
+              value={filterProgram}
+              onChange={(e) => setFilterProgram(e.target.value)}
+            >
+              <option value="">Todas</option>
+              {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Dictado</label>
+            <select 
+              className="form-input text-sm"
+              value={filterDictation}
+              onChange={(e) => setFilterDictation(e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="anual">Anual</option>
+              <option value="cuatrimestral">Cuatrimestral</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">&nbsp;</label>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterYear(null)
+                setFilterProgram('')
+                setFilterDictation('')
+                setFilterSearch('')
+              }}
+              className="btn-secondary w-full text-sm"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
       </div>
 
       <DataTable
@@ -61,10 +168,12 @@ function SubjectsPage() {
           { key: 'name', label: 'Nombre' },
           { key: 'program', label: 'Carrera', render: (r: any) => r.program?.name || '-' },
           { key: 'year', label: 'Año' },
+          { key: 'dictation_type', label: 'Dictado', render: (r: any) => getDictationLabel(r) },
           { key: 'professor', label: 'Profesor', render: (r: any) => r.professor?.name || '-' },
           { key: 'credits', label: 'Créditos' },
+          { key: 'allows_promotion', label: 'Promocional', render: (r: any) => r.allows_promotion ? '✓' : '-' },
         ]}
-        data={subjects as any}
+        data={filteredSubjects as any}
         actions={(row: any) => (
           <div className="flex items-center gap-2 justify-end">
             <button onClick={() => { setEditing(row); setModalOpen(true) }} className="siu-table-action"><Pencil size={15} /></button>
@@ -98,6 +207,35 @@ function SubjectsPage() {
               <input type="number" min={1} max={6} className="form-input" value={editing.year || 1} onChange={e => setEditing(p => ({ ...p, year: +e.target.value }))} />
             </div>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Tipo de Dictado</label>
+              <select 
+                className="form-input" 
+                value={editing.dictation_type || 'anual'} 
+                onChange={e => setEditing(p => ({ ...p, dictation_type: e.target.value }))}
+              >
+                <option value="anual">Anual</option>
+                <option value="cuatrimestral">Cuatrimestral</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">
+                {(editing as any).dictation_type === 'cuatrimestral' ? 'Cuatrimestre' : 'Semestre'}
+              </label>
+              <select 
+                className="form-input" 
+                value={editing.semester || 1} 
+                onChange={e => setEditing(p => ({ ...p, semester: +e.target.value }))}
+                disabled={(editing as any).dictation_type === 'anual'}
+              >
+                <option value={1}>{(editing as any).dictation_type === 'cuatrimestral' ? '1er Cuatrimestre' : 'Primer Semestre'}</option>
+                <option value={2}>{(editing as any).dictation_type === 'cuatrimestral' ? '2do Cuatrimestre' : 'Segundo Semestre'}</option>
+              </select>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Profesor</label>
@@ -111,6 +249,20 @@ function SubjectsPage() {
               <input type="number" min={1} className="form-input" value={editing.credits || 4} onChange={e => setEditing(p => ({ ...p, credits: +e.target.value }))} />
             </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="allows_promotion"
+              className="rounded border-gray-300"
+              checked={editing.allows_promotion || false}
+              onChange={e => setEditing(p => ({ ...p, allows_promotion: e.target.checked }))}
+            />
+            <label htmlFor="allows_promotion" className="form-label mb-0 cursor-pointer">
+              Permite promoción (mostrar "Promocionado" si cumple requisitos)
+            </label>
+          </div>
+
           <div className="flex gap-3 pt-2">
             <button type="submit" className="btn-primary flex-1">Guardar</button>
             <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary flex-1">Cancelar</button>

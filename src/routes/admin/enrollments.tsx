@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, AlertCircle, Shield } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/enrollments')({
   component: EnrollmentsPage,
@@ -15,12 +15,15 @@ function EnrollmentsPage() {
   const [students, setStudents] = useState<any[]>([])
   const [subjects, setSubjects] = useState<any[]>([])
   const [modalOpen, setModalOpen] = useState(false)
+  const [filterStudent, setFilterStudent] = useState('')
+  const [filterSubject, setFilterSubject] = useState('')
 
   const [form, setForm] = useState({
     student_id: '',
     subject_id: '',
     year: new Date().getFullYear(),
-    semester: 1
+    attempt: 1,
+    status: 'active'
   })
 
   const { showToast } = useToast()
@@ -35,19 +38,19 @@ function EnrollmentsPage() {
         .from('enrollments')
         .select(`
           *,
-          student:students(first_name, last_name, legajo),
-          subject:subjects(name, code)
+          student:students(id, first_name, last_name, legajo),
+          subject:subjects(id, name, code)
         `)
         .order('created_at', { ascending: false }),
 
       supabase
         .from('students')
-        .select('id, first_name, last_name, legajo')
+        .select('id, first_name, last_name, legajo, year')
         .order('last_name'),
 
       supabase
         .from('subjects')
-        .select('id, name, code')
+        .select('id, name, code, year')
         .order('name'),
     ])
 
@@ -59,31 +62,46 @@ function EnrollmentsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Verificar que no exista ya
+    const { data: existing } = await supabase
+      .from('enrollments')
+      .select('id')
+      .eq('student_id', form.student_id)
+      .eq('subject_id', form.subject_id)
+      .eq('academic_year', form.year)
+      .single()
+
+    if (existing) {
+      showToast('Este alumno ya está inscripto en esta materia en este año.', 'error')
+      return
+    }
+
     const { error } = await supabase.from('enrollments').insert({
       student_id: form.student_id,
       subject_id: form.subject_id,
       academic_year: form.year,
-      attempt: 1,
-      status: 'active'
+      attempt: form.attempt,
+      status: form.status
     })
 
     if (error) {
       console.error(error)
-      showToast('Error al inscribir. Verifique que no exista ya.', 'error')
+      showToast('Error al inscribir: ' + error.message, 'error')
       return
     }
 
-    showToast('Inscripción creada.')
+    showToast('Inscripción creada exitosamente (sin restricciones).', 'info')
 
     setForm({
       student_id: '',
       subject_id: '',
       year: new Date().getFullYear(),
-      semester: 1
+      attempt: 1,
+      status: 'active'
     })
 
     setModalOpen(false)
-    load()
+    await load()
   }
 
   const handleDelete = async (id: string) => {
@@ -92,14 +110,33 @@ function EnrollmentsPage() {
     await supabase.from('enrollments').delete().eq('id', id)
 
     showToast('Inscripción eliminada.', 'info')
-    load()
+    await load()
   }
+
+  // Filtrados
+  const filteredEnrollments = enrollments.filter(e => {
+    const studentMatch = 
+      !filterStudent || 
+      `${e.student?.last_name} ${e.student?.first_name}`.toLowerCase().includes(filterStudent.toLowerCase())
+    
+    const subjectMatch = 
+      !filterSubject || 
+      e.subject?.name.toLowerCase().includes(filterSubject.toLowerCase()) ||
+      e.subject?.code.toLowerCase().includes(filterSubject.toLowerCase())
+    
+    return studentMatch && subjectMatch
+  })
+
+  const selectedStudent = students.find(s => s.id === form.student_id)
+  const selectedSubject = subjects.find(s => s.id === form.subject_id)
 
   return (
     <div className="space-y-6">
-
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Inscripciones</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Inscripciones</h1>
+          <p className="text-sm text-slate-600 mt-1">Gestiona inscripciones sin restricciones académicas</p>
+        </div>
 
         <button
           onClick={() => setModalOpen(true)}
@@ -109,113 +146,219 @@ function EnrollmentsPage() {
         </button>
       </div>
 
-      <DataTable
-        columns={[
-          {
-            key: 'student',
-            label: 'Estudiante',
-            render: (r: any) => `${r.student?.last_name}, ${r.student?.first_name}`
-          },
-          {
-            key: 'legajo',
-            label: 'Legajo',
-            render: (r: any) => r.student?.legajo
-          },
-          {
-            key: 'subject',
-            label: 'Materia',
-            render: (r: any) => r.subject?.name
-          },
-          {
-            key: 'code',
-            label: 'Código',
-            render: (r: any) => r.subject?.code
-          },
-          {
-            key: 'academic_year',
-            label: 'Año'
-          },
-          {
-            key: 'attempt',
-            label: 'Intento'
-          },
-        ]}
-        data={enrollments}
-        actions={(row: any) => (
-          <button
-            onClick={() => handleDelete(row.id)}
-            className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-          >
-            <Trash2 size={15} />
-          </button>
-        )}
-      />
+      {/* Alerta de permisos */}
+      <div className="card p-4 border-l-4 border-l-blue-500 bg-blue-50 border border-blue-200">
+        <div className="flex items-start gap-3">
+          <Shield size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-blue-900">Permisos de Administrador</h3>
+            <p className="text-sm text-blue-800 mt-1">
+              Como administrador, puedes inscribir a alumnos en cualquier materia <strong>sin validar restricciones</strong> de:
+            </p>
+            <ul className="text-sm text-blue-800 mt-2 space-y-1 ml-4">
+              <li>✓ Correlativas (materias requisito)</li>
+              <li>✓ Año/nivel del alumno</li>
+              <li>✓ Períodos cuatrimestrales</li>
+              <li>✓ Inscripciones duplicadas</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
+      {/* Filtros */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="form-label">Filtrar por estudiante</label>
+          <input
+            type="text"
+            placeholder="Nombre o legajo..."
+            value={filterStudent}
+            onChange={e => setFilterStudent(e.target.value)}
+            className="form-input"
+          />
+        </div>
+        <div>
+          <label className="form-label">Filtrar por materia</label>
+          <input
+            type="text"
+            placeholder="Nombre o código..."
+            value={filterSubject}
+            onChange={e => setFilterSubject(e.target.value)}
+            className="form-input"
+          />
+        </div>
+      </div>
+
+      {/* Tabla */}
+      {filteredEnrollments.length === 0 ? (
+        <div className="card p-6 text-center">
+          <AlertCircle className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <p className="text-slate-600 font-medium">No hay inscripciones que coincidan</p>
+        </div>
+      ) : (
+        <DataTable
+          columns={[
+            {
+              key: 'student',
+              label: 'Estudiante',
+              render: (r: any) => (
+                <div>
+                  <div className="font-medium">{r.student?.last_name}, {r.student?.first_name}</div>
+                  <div className="text-xs text-slate-500">Legajo: {r.student?.legajo}</div>
+                </div>
+              )
+            },
+            {
+              key: 'subject',
+              label: 'Materia',
+              render: (r: any) => (
+                <div>
+                  <div className="font-medium">{r.subject?.name}</div>
+                  <div className="text-xs text-slate-500">{r.subject?.code}</div>
+                </div>
+              )
+            },
+            {
+              key: 'academic_year',
+              label: 'Año',
+              render: (r: any) => r.academic_year
+            },
+            {
+              key: 'attempt',
+              label: 'Intento',
+              render: (r: any) => `${r.attempt}°`
+            },
+            {
+              key: 'status',
+              label: 'Estado',
+              render: (r: any) => (
+                <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                  r.status === 'active' ? 'bg-green-100 text-green-800' :
+                  r.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {r.status === 'active' ? 'Activa' : 
+                   r.status === 'completed' ? 'Completada' : 
+                   r.status}
+                </span>
+              )
+            }
+          ]}
+          data={filteredEnrollments}
+          actions={(row: any) => (
+            <button
+              onClick={() => handleDelete(row.id)}
+              className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Eliminar inscripción"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        />
+      )}
+
+      {/* Modal */}
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Nueva Inscripción"
+        title="Nueva Inscripción (Sin Restricciones)"
       >
-
         <form onSubmit={handleSave} className="space-y-4">
-
+          {/* Estudiante */}
           <div>
             <label className="form-label">Estudiante *</label>
             <select
               className="form-input"
               required
               value={form.student_id}
-              onChange={e =>
-                setForm(p => ({ ...p, student_id: e.target.value }))
-              }
+              onChange={e => setForm(p => ({ ...p, student_id: e.target.value }))}
             >
-              <option value="">Seleccionar...</option>
-
+              <option value="">Seleccionar estudiante...</option>
               {students.map(s => (
                 <option key={s.id} value={s.id}>
-                  {s.last_name}, {s.first_name} ({s.legajo})
+                  {s.last_name}, {s.first_name} ({s.legajo}) - Año {s.year}
                 </option>
               ))}
             </select>
+            {selectedStudent && (
+              <p className="text-xs text-slate-500 mt-1">
+                Año actual del estudiante: {selectedStudent.year}
+              </p>
+            )}
           </div>
 
+          {/* Materia */}
           <div>
             <label className="form-label">Materia *</label>
             <select
               className="form-input"
               required
               value={form.subject_id}
-              onChange={e =>
-                setForm(p => ({ ...p, subject_id: e.target.value }))
-              }
+              onChange={e => setForm(p => ({ ...p, subject_id: e.target.value }))}
             >
-              <option value="">Seleccionar...</option>
-
+              <option value="">Seleccionar materia...</option>
               {subjects.map(s => (
                 <option key={s.id} value={s.id}>
-                  {s.name} ({s.code})
+                  {s.name} ({s.code}) - Año {s.year}
                 </option>
               ))}
             </select>
+            {selectedSubject && (
+              <p className="text-xs text-slate-500 mt-1">
+                Materia del año {selectedSubject.year}
+              </p>
+            )}
           </div>
 
+          {/* Año lectivo */}
           <div>
-            <label className="form-label">Año lectivo</label>
+            <label className="form-label">Año lectivo *</label>
             <input
               type="number"
               className="form-input"
               value={form.year}
-              onChange={e =>
-                setForm(p => ({ ...p, year: +e.target.value }))
-              }
+              onChange={e => setForm(p => ({ ...p, year: +e.target.value }))}
             />
           </div>
 
+          {/* Intento */}
+          <div>
+            <label className="form-label">Intento</label>
+            <input
+              type="number"
+              min="1"
+              className="form-input"
+              value={form.attempt}
+              onChange={e => setForm(p => ({ ...p, attempt: +e.target.value }))}
+            />
+          </div>
+
+          {/* Estado */}
+          <div>
+            <label className="form-label">Estado</label>
+            <select
+              className="form-input"
+              value={form.status}
+              onChange={e => setForm(p => ({ ...p, status: e.target.value }))}
+            >
+              <option value="active">Activa</option>
+              <option value="completed">Completada</option>
+              <option value="dropped">Abandonada</option>
+            </select>
+          </div>
+
+          {/* Advertencia */}
+          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-sm text-yellow-800">
+              <strong>⚠️ Nota:</strong> Esta inscripción se realiza sin validar restricciones académicas. Asegúrate de que sea apropiada.
+            </p>
+          </div>
+
+          {/* Botones */}
           <div className="flex gap-3 pt-2">
             <button type="submit" className="btn-primary flex-1">
               Inscribir
             </button>
-
             <button
               type="button"
               onClick={() => setModalOpen(false)}
@@ -224,11 +367,8 @@ function EnrollmentsPage() {
               Cancelar
             </button>
           </div>
-
         </form>
-
       </Modal>
-
     </div>
   )
 }

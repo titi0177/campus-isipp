@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
 import type { Student, Program } from '@/types'
 import { Link } from '@tanstack/react-router'
 import { provisionStudentWithAuth } from '@/server/provisionAuthUsers'
@@ -16,7 +16,7 @@ export const Route = createFileRoute('/admin/students')({
 const EMPTY: Partial<Student> = { first_name: '', last_name: '', dni: '', legajo: '', email: '', year: 1, status: 'active' }
 
 function StudentsPage() {
-  const [students, setStudents] = useState<Student[]>([])
+  const [allStudents, setAllStudents] = useState<Student[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Student>>(EMPTY)
@@ -24,6 +24,12 @@ function StudentsPage() {
   const [createWithAuth, setCreateWithAuth] = useState(true)
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
+
+  // Filtros
+  const [filterYear, setFilterYear] = useState<number | null>(null)
+  const [filterProgram, setFilterProgram] = useState<string>('')
+  const [filterStatus, setFilterStatus] = useState<string>('')
+  const [filterSearch, setFilterSearch] = useState<string>('')
 
   useEffect(() => {
     void loadData()
@@ -34,10 +40,35 @@ function StudentsPage() {
       supabase.from('students').select('*, program:programs(name)').order('last_name'),
       supabase.from('programs').select('*'),
     ])
-    setStudents(s || [])
+    setAllStudents(s || [])
     setPrograms(p || [])
     setLoading(false)
   }
+
+  const filteredStudents = allStudents.filter(s => {
+    // Filtro por año
+    if (filterYear !== null && s.year !== filterYear) return false
+    
+    // Filtro por programa
+    if (filterProgram && (s as any).program_id !== filterProgram) return false
+    
+    // Filtro por estado
+    if (filterStatus && s.status !== filterStatus) return false
+    
+    // Filtro por búsqueda (nombre, apellido, legajo, DNI, email)
+    if (filterSearch) {
+      const search = filterSearch.toLowerCase()
+      return (
+        s.first_name?.toLowerCase().includes(search) ||
+        s.last_name?.toLowerCase().includes(search) ||
+        s.legajo?.toLowerCase().includes(search) ||
+        s.dni?.toLowerCase().includes(search) ||
+        s.email?.toLowerCase().includes(search)
+      )
+    }
+    
+    return true
+  })
 
   const openNew = () => {
     setEditing(EMPTY)
@@ -148,11 +179,82 @@ function StudentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Estudiantes</h1>
-          <p className="mt-1 text-sm text-gray-500">Gestión del padrón de alumnos</p>
+          <p className="mt-1 text-sm text-gray-500">Gestión del padrón de alumnos ({filteredStudents.length} resultados)</p>
         </div>
         <button type="button" onClick={openNew} className="btn-primary flex items-center gap-2">
           <Plus size={16} /> Nuevo estudiante
         </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={18} className="text-slate-600" />
+          <h3 className="font-semibold text-slate-900">Filtros</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div>
+            <label className="form-label text-xs">Buscar</label>
+            <input 
+              type="text"
+              placeholder="Nombre, legajo, DNI..."
+              className="form-input text-sm"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Año</label>
+            <select 
+              className="form-input text-sm"
+              value={filterYear === null ? '' : filterYear}
+              onChange={(e) => setFilterYear(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Todos</option>
+              {[1, 2, 3, 4, 5, 6].map(y => <option key={y} value={y}>{y}° Año</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Carrera</label>
+            <select 
+              className="form-input text-sm"
+              value={filterProgram}
+              onChange={(e) => setFilterProgram(e.target.value)}
+            >
+              <option value="">Todas</option>
+              {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Estado</label>
+            <select 
+              className="form-input text-sm"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="active">Activo</option>
+              <option value="inactive">Inactivo</option>
+              <option value="graduated">Egresado</option>
+              <option value="suspended">Suspendido</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">&nbsp;</label>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterYear(null)
+                setFilterProgram('')
+                setFilterStatus('')
+                setFilterSearch('')
+              }}
+              className="btn-secondary w-full text-sm"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -160,8 +262,8 @@ function StudentsPage() {
       ) : (
         <DataTable
           columns={columns}
-          data={students as any}
-          searchPlaceholder="Buscar por nombre, legajo, DNI..."
+          data={filteredStudents as any}
+          searchPlaceholder="Buscar en resultados..."
           actions={(row: any) => (
             <div className="flex items-center justify-end gap-2">
               <Link to="/admin/student-record/$id" params={{ id: row.id }} className="text-blue-600">

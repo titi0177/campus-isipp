@@ -8,7 +8,26 @@ export default defineConfig({
   plugins: [
     tsconfigPaths(),
     tanstackStart(),
-    react(),
+    react({
+      jsxImportSource: 'react',
+    }),
     tailwindcss(),
   ],
+  build: {
+    minify: 'esbuild',
+    target: 'ES2020',
+    chunkSizeWarningLimit: 800,
+    cssMinify: true,
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      '@tanstack/react-router',
+      'zod',
+      'lucide-react',
+    ],
+    // Mark heavy libraries to load on-demand
+    exclude: ['jspdf', 'xlsx', '@supabase/supabase-js'],
+  },
 })

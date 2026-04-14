@@ -1,0 +1,575 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/Toast'
+import { Trash2, Plus, Clock } from 'lucide-react'
+
+export const Route = createFileRoute('/admin/schedules')({
+  component: AdminSchedulesPage,
+})
+
+type Schedule = {
+  id: string
+  subject_id: string
+  subject_name: string
+  subject_code: string
+  professor_id?: string
+  professor_name?: string
+  program_id?: string
+  program_name?: string
+  day: string
+  start_time: string
+  end_time: string
+  classroom: string
+  year: number
+}
+
+type Professor = {
+  id: string
+  name: string
+}
+
+type Subject = {
+  id: string
+  name: string
+  code: string
+  year: number
+}
+
+type Program = {
+  id: string
+  name: string
+}
+
+const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+
+const SCHEDULE_BLOCKS: Record<string, Record<string, Array<{ start: string; end: string }>>> = {
+  'seguridad': {
+    'manana': [
+      { start: '07:00', end: '07:45' },
+      { start: '07:45', end: '08:30' },
+      { start: '08:30', end: '09:15' },
+      { start: '09:30', end: '10:15' },
+      { start: '10:15', end: '11:00' },
+      { start: '11:00', end: '11:45' },
+    ],
+    'tarde': [
+      { start: '17:40', end: '18:25' },
+      { start: '18:25', end: '19:10' },
+      { start: '19:20', end: '20:05' },
+      { start: '20:05', end: '20:50' },
+      { start: '20:50', end: '21:35' },
+      { start: '21:40', end: '22:25' },
+    ],
+  },
+  'other': {
+    'tarde': [
+      { start: '17:40', end: '18:25' },
+      { start: '18:25', end: '19:10' },
+      { start: '19:20', end: '20:05' },
+      { start: '20:05', end: '20:50' },
+      { start: '20:50', end: '21:35' },
+      { start: '21:40', end: '22:25' },
+    ],
+  },
+}
+
+function getProgramType(programName: string): string {
+  const lower = programName.toLowerCase()
+  if (lower.includes('seguridad')) return 'seguridad'
+  return 'other'
+}
+
+function AdminSchedulesPage() {
+  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [professors, setProfessors] = useState<Professor[]>([])
+  const [programs, setPrograms] = useState<Program[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+
+  const [formData, setFormData] = useState({
+    professor_id: '',
+    program_id: '',
+    year: '',
+    subject_id: '',
+    day: '',
+    shift: '',
+    start_time: '',
+    end_time: '',
+    classroom: '',
+  })
+
+  const { showToast } = useToast()
+
+  useEffect(() => {
+    void loadData()
+  }, [])
+
+  useEffect(() => {
+    if (formData.program_id && formData.year) {
+      void loadSubjectsForProgramYear(formData.program_id, parseInt(formData.year))
+    }
+  }, [formData.program_id, formData.year])
+
+  useEffect(() => {
+    if (formData.program_id && formData.shift) {
+      const program = programs.find(p => p.id === formData.program_id)
+      if (program) {
+        const programType = getProgramType(program.name)
+        const blocks = SCHEDULE_BLOCKS[programType][formData.shift]
+        if (blocks && blocks.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            start_time: blocks[0].start,
+            end_time: blocks[0].end,
+          }))
+        }
+      }
+    } else if (formData.program_id && !formData.shift) {
+      // Auto-select shift if only one is available
+      const shifts = getAvailableShifts(formData.program_id)
+      if (shifts.length === 1) {
+        const program = programs.find(p => p.id === formData.program_id)
+        if (program) {
+          const programType = getProgramType(program.name)
+          const blocks = SCHEDULE_BLOCKS[programType][shifts[0]]
+          if (blocks && blocks.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              shift: shifts[0],
+              start_time: blocks[0].start,
+              end_time: blocks[0].end,
+            }))
+          }
+        }
+      }
+    }
+  }, [formData.program_id, formData.shift, programs])
+
+  async function loadData() {
+    try {
+      const { data: profsData } = await supabase
+        .from('professors')
+        .select('id, name')
+        .order('name')
+      setProfessors(profsData || [])
+
+      const { data: progsData } = await supabase
+        .from('programs')
+        .select('id, name')
+        .order('name')
+      setPrograms(progsData || [])
+
+      const { data } = await supabase
+        .from('schedules')
+        .select(`
+          id,
+          subject_id,
+          subject:subjects(name, code, year),
+          professor_id,
+          professor:professors(name),
+          program_id,
+          program:programs(name),
+          day,
+          start_time,
+          end_time,
+          classroom
+        `)
+        .order('day')
+        .order('start_time')
+
+      if (data) {
+        const formatted: Schedule[] = data.map((s: any) => ({
+          id: s.id,
+          subject_id: s.subject_id,
+          subject_name: s.subject?.name,
+          subject_code: s.subject?.code,
+          year: s.subject?.year,
+          professor_id: s.professor_id,
+          professor_name: s.professor?.name,
+          program_id: s.program_id,
+          program_name: s.program?.name,
+          day: s.day,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          classroom: s.classroom,
+        }))
+        setSchedules(formatted)
+      }
+
+      setLoading(false)
+    } catch (err) {
+      console.error('Error loading data:', err)
+      showToast('Error cargando datos', 'error')
+      setLoading(false)
+    }
+  }
+
+  async function loadSubjectsForProgramYear(programId: string, year: number) {
+    try {
+      const { data } = await supabase
+        .from('subjects')
+        .select('id, name, code, year')
+        .eq('program_id', programId)
+        .eq('year', year)
+        .order('name')
+      setSubjects(data || [])
+    } catch (err) {
+      console.error('Error loading subjects:', err)
+      showToast('Error cargando materias', 'error')
+    }
+  }
+
+  async function handleAddSchedule(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!formData.professor_id || !formData.program_id || !formData.year || !formData.subject_id || !formData.day || !formData.start_time || !formData.end_time || !formData.classroom) {
+      showToast('Completa todos los campos requeridos', 'error')
+      return
+    }
+
+    try {
+      const { error } = await supabase.from('schedules').insert({
+        program_id: formData.program_id,
+        subject_id: formData.subject_id,
+        professor_id: formData.professor_id,
+        day: formData.day,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        classroom: formData.classroom,
+      })
+
+      if (error) throw error
+
+      showToast('Horario agregado correctamente')
+      setFormData({
+        professor_id: '',
+        program_id: '',
+        year: '',
+        subject_id: '',
+        day: '',
+        shift: '',
+        start_time: '',
+        end_time: '',
+        classroom: '',
+      })
+      setShowForm(false)
+      await loadData()
+    } catch (err) {
+      console.error('Error:', err)
+      showToast('Error al agregar horario', 'error')
+    }
+  }
+
+  async function deleteSchedule(id: string) {
+    if (!confirm('¿Eliminar este horario?')) return
+
+    try {
+      const { error } = await supabase
+        .from('schedules')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
+      showToast('Horario eliminado')
+      await loadData()
+    } catch (err) {
+      console.error('Error:', err)
+      showToast('Error al eliminar', 'error')
+    }
+  }
+
+  const byProfessor: Record<string, Schedule[]> = {}
+  schedules.forEach(s => {
+    const prof = s.professor_name || 'Sin asignar'
+    if (!byProfessor[prof]) byProfessor[prof] = []
+    byProfessor[prof].push(s)
+  })
+
+  const getAvailableShifts = (programId?: string) => {
+    const pId = programId || formData.program_id
+    if (!pId) return []
+    const program = programs.find(p => p.id === pId)
+    if (!program) return []
+    const programType = getProgramType(program.name)
+    return Object.keys(SCHEDULE_BLOCKS[programType])
+  }
+
+  const getScheduleBlocks = () => {
+    if (!formData.program_id || !formData.shift) return []
+    const program = programs.find(p => p.id === formData.program_id)
+    if (!program) return []
+    const programType = getProgramType(program.name)
+    return SCHEDULE_BLOCKS[programType][formData.shift] || []
+  }
+
+  if (loading) {
+    return <p className="text-slate-600">Cargando...</p>
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Clock size={28} />
+          Gestión de Horarios
+        </h1>
+        <p className="text-slate-600 text-sm mt-1">Carga horarios por profesor, materia y carrera</p>
+      </div>
+
+      <button
+        onClick={() => setShowForm(!showForm)}
+        className="btn-primary flex items-center gap-2"
+      >
+        <Plus size={18} />
+        Agregar horario
+      </button>
+
+      {showForm && (
+        <div className="card p-4 bg-blue-50 border-l-4 border-l-blue-600">
+          <h3 className="font-semibold text-gray-900 mb-4">Nuevo horario</h3>
+          <form onSubmit={handleAddSchedule} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="professor-select" className="form-label">Profesor *</label>
+                <select
+                  id="professor-select"
+                  name="professor"
+                  value={formData.professor_id}
+                  onChange={(e) => setFormData({ ...formData, professor_id: e.target.value })}
+                  className="form-input"
+                >
+                  <option value="">-- Selecciona profesor --</option>
+                  {professors.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="program-select" className="form-label">Carrera *</label>
+                <select
+                  id="program-select"
+                  name="program"
+                  value={formData.program_id}
+                  onChange={(e) => {
+                    setFormData({ ...formData, program_id: e.target.value, year: '', subject_id: '', shift: '', start_time: '', end_time: '' })
+                    setSubjects([])
+                  }}
+                  className="form-input"
+                >
+                  <option value="">-- Selecciona carrera --</option>
+                  {programs.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {formData.program_id && (getAvailableShifts().length > 1 || formData.shift) && (
+                <div>
+                  <label htmlFor="shift-select" className="form-label">Turno {getAvailableShifts().length === 1 ? '(Único)' : ''} *</label>
+                  <select
+                    id="shift-select"
+                    name="shift"
+                    value={formData.shift}
+                    onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">-- Selecciona turno --</option>
+                    {getAvailableShifts().map(shift => (
+                      <option key={shift} value={shift}>
+                        {shift === 'manana' ? 'Mañana' : 'Tarde'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formData.program_id && (
+                <div>
+                  <label htmlFor="year-select" className="form-label">Año *</label>
+                  <select
+                    id="year-select"
+                    name="year"
+                    value={formData.year}
+                    onChange={(e) => setFormData({ ...formData, year: e.target.value, subject_id: '' })}
+                    className="form-input"
+                  >
+                    <option value="">-- Selecciona año --</option>
+                    <option value="1">1° Año</option>
+                    <option value="2">2° Año</option>
+                    <option value="3">3° Año</option>
+                    <option value="4">4° Año</option>
+                    <option value="5">5° Año</option>
+                  </select>
+                </div>
+              )}
+
+              {formData.year && subjects.length > 0 && (
+                <div>
+                  <label htmlFor="subject-select" className="form-label">Materia *</label>
+                  <select
+                    id="subject-select"
+                    name="subject"
+                    value={formData.subject_id}
+                    onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">-- Selecciona materia --</option>
+                    {subjects.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.code} - {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formData.year && subjects.length === 0 && (
+                <div className="col-span-2">
+                  <p className="text-sm text-yellow-700 bg-yellow-50 p-3 rounded">
+                    No hay materias disponibles para {formData.year}° año en esta carrera
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="day-select" className="form-label">Día *</label>
+                <select
+                  id="day-select"
+                  name="day"
+                  value={formData.day}
+                  onChange={(e) => setFormData({ ...formData, day: e.target.value })}
+                  className="form-input"
+                >
+                  <option value="">-- Selecciona día --</option>
+                  {DAYS.map(d => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {formData.program_id && formData.shift && getScheduleBlocks().length > 0 && (
+                <div>
+                  <label htmlFor="time-block-select" className="form-label">Bloque de horario *</label>
+                  <select
+                    id="time-block-select"
+                    name="timeBlock"
+                    value={`${formData.start_time}-${formData.end_time}`}
+                    onChange={(e) => {
+                      const [start, end] = e.target.value.split('-')
+                      setFormData({ ...formData, start_time: start, end_time: end })
+                    }}
+                    className="form-input"
+                  >
+                    <option value="">-- Selecciona horario --</option>
+                    {getScheduleBlocks().map((block, idx) => (
+                      <option key={idx} value={`${block.start}-${block.end}`}>
+                        {block.start} - {block.end}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="classroom-input" className="form-label">Aula/Salón *</label>
+                <input
+                  id="classroom-input"
+                  name="classroom"
+                  type="text"
+                  value={formData.classroom}
+                  onChange={(e) => setFormData({ ...formData, classroom: e.target.value })}
+                  placeholder="ej: 101"
+                  className="form-input"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button type="submit" className="btn-primary">
+                Guardar horario
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="btn-secondary"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {Object.keys(byProfessor).length > 0 ? (
+        <div className="space-y-6">
+          {Object.keys(byProfessor)
+            .sort()
+            .map(professor => (
+              <div key={professor} className="card p-0 overflow-hidden">
+                <div className="siu-band-header">
+                  <h3 className="text-sm font-bold tracking-wide text-white">
+                    {professor} - {byProfessor[professor].length} horarios
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-xs text-gray-600 border-b">
+                        <th className="px-4 py-2 text-left font-medium">Materia</th>
+                        <th className="px-4 py-2 text-left font-medium">Código</th>
+                        <th className="px-4 py-2 text-left font-medium">Carrera</th>
+                        <th className="px-4 py-2 text-left font-medium">Año</th>
+                        <th className="px-4 py-2 text-left font-medium">Día</th>
+                        <th className="px-4 py-2 text-center font-medium">Horario</th>
+                        <th className="px-4 py-2 text-left font-medium">Aula</th>
+                        <th className="px-4 py-2 text-center font-medium">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byProfessor[professor].map(s => (
+                        <tr key={s.id} className="border-b hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium">{s.subject_name}</td>
+                          <td className="px-4 py-3 text-slate-600">{s.subject_code}</td>
+                          <td className="px-4 py-3 text-slate-600">{s.program_name}</td>
+                          <td className="px-4 py-3">{s.year}°</td>
+                          <td className="px-4 py-3">{s.day}</td>
+                          <td className="px-4 py-3 text-center">
+                            {s.start_time} - {s.end_time}
+                          </td>
+                          <td className="px-4 py-3">{s.classroom}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => void deleteSchedule(s.id)}
+                              className="text-red-600 hover:text-red-800 font-medium text-sm"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={16} className="inline" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+        </div>
+      ) : (
+        <div className="card p-6 text-center">
+          <p className="text-slate-500">No hay horarios cargados. Agrega uno usando el formulario arriba.</p>
+        </div>
+      )}
+    </div>
+  )
+}

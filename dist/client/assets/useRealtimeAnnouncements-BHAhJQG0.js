@@ -1,0 +1,1 @@
+import{r as u,s as n}from"./main-CXqQa1NE.js";function a(t){u.useEffect(()=>{if(!t)return;let e=null;const s=n.channel("announcements_changes").on("postgres_changes",{event:"*",schema:"public",table:"announcements"},()=>{e&&clearTimeout(e),e=setTimeout(()=>{t()},500)}).subscribe();return()=>{e&&clearTimeout(e),n.removeChannel(s)}},[t])}export{a as u};

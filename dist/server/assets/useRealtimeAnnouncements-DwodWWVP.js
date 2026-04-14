@@ -1,0 +1,1 @@
+import{useEffect as u}from"react";import{s as t}from"./router-CGXilZDG.js";function i(n){u(()=>{if(!n)return;let e=null;const s=t.channel("announcements_changes").on("postgres_changes",{event:"*",schema:"public",table:"announcements"},()=>{e&&clearTimeout(e),e=setTimeout(()=>{n()},500)}).subscribe();return()=>{e&&clearTimeout(e),t.removeChannel(s)}},[n])}export{i as u};

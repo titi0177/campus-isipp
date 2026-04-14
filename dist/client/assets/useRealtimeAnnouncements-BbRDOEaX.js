@@ -1,1 +1,0 @@
-import{r as a,s}from"./main-CmAgtKaP.js";function u(e){a.useEffect(()=>{if(e==null)return;let n=s.channel("announcements_public").on("postgres_changes",{event:"*",schema:"public",table:"announcements"},()=>e()).subscribe();return()=>{n&&s.removeChannel(n)}},[e])}export{u};

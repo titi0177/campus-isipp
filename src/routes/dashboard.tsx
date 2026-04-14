@@ -19,21 +19,22 @@ export const Route = createFileRoute('/dashboard')({
 
 function DashboardLayout() {
   const [userName, setUserName] = useState('')
+  
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase.from('profiles').select('full_name').eq('id', user.id).single()
-          .then(({ data }) => setUserName(data?.full_name || user.email || ''))
-      }
+      if (user) setUserName(user.user_metadata?.full_name || user.email || '')
     })
   }, [])
+
   return (
-    <div className="flex min-h-screen siu-main-bg">
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <Sidebar role="student" />
       <div className="ml-64 flex min-h-screen flex-1 flex-col">
         <TopNav userName={userName} role="student" />
-        <main className="flex-1 overflow-auto border-t border-[var(--siu-border-light)] p-6 pb-24 shadow-inner md:pb-6">
-          <Outlet />
+        <main className="flex-1 overflow-auto border-t border-slate-200 p-8 pb-24 md:pb-8">
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </main>
         <StudentBottomNav />
       </div>

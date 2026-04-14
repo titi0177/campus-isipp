@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
 import type { Professor } from '@/types'
 import { provisionProfessorWithAuth } from '@/server/provisionAuthUsers'
 
@@ -13,12 +13,17 @@ export const Route = createFileRoute('/admin/professors')({
 })
 
 function ProfessorsPage() {
-  const [professors, setProfessors] = useState<Professor[]>([])
+  const [allProfessors, setAllProfessors] = useState<Professor[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Professor & { dni?: string }>>({})
   const [createWithAuth, setCreateWithAuth] = useState(true)
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
+
+  // Filtros
+  const [filterSearch, setFilterSearch] = useState<string>('')
+  const [filterDepartment, setFilterDepartment] = useState<string>('')
+  const [filterStatus, setFilterStatus] = useState<string>('')
 
   useEffect(() => {
     void load()
@@ -26,8 +31,32 @@ function ProfessorsPage() {
 
   const load = async () => {
     const { data } = await supabase.from('professors').select('*').order('name')
-    setProfessors(data || [])
+    setAllProfessors(data || [])
   }
+
+  const departments = Array.from(
+    new Set(allProfessors.map(p => p.department).filter(Boolean))
+  ).sort()
+
+  const filteredProfessors = allProfessors.filter(p => {
+    // Filtro por búsqueda (nombre, email)
+    if (filterSearch) {
+      const search = filterSearch.toLowerCase()
+      return (
+        p.name?.toLowerCase().includes(search) ||
+        p.email?.toLowerCase().includes(search)
+      )
+    }
+    
+    // Filtro por departamento
+    if (filterDepartment && p.department !== filterDepartment) return false
+    
+    // Filtro por estado (con cuenta o sin)
+    if (filterStatus === 'with_account' && !p.user_id) return false
+    if (filterStatus === 'without_account' && p.user_id) return false
+    
+    return true
+  })
 
   const openNew = () => {
     setEditing({})
@@ -120,11 +149,68 @@ function ProfessorsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Profesores</h1>
-          <p className="mt-1 text-sm text-gray-500">Docentes y acceso al módulo /professor</p>
+          <p className="mt-1 text-sm text-gray-500">Docentes y acceso al módulo /professor ({filteredProfessors.length} resultados)</p>
         </div>
         <button type="button" onClick={openNew} className="btn-primary flex items-center gap-2">
           <Plus size={16} /> Nuevo profesor
         </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={18} className="text-slate-600" />
+          <h3 className="font-semibold text-slate-900">Filtros</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="form-label text-xs">Buscar</label>
+            <input 
+              type="text"
+              placeholder="Nombre, email..."
+              className="form-input text-sm"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Departamento</label>
+            <select 
+              className="form-input text-sm"
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Acceso</label>
+            <select 
+              className="form-input text-sm"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="with_account">Con cuenta</option>
+              <option value="without_account">Sin cuenta</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">&nbsp;</label>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterSearch('')
+                setFilterDepartment('')
+                setFilterStatus('')
+              }}
+              className="btn-secondary w-full text-sm"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
       </div>
 
       <DataTable
@@ -145,7 +231,7 @@ function ProfessorsPage() {
               ),
           },
         ]}
-        data={professors as any}
+        data={filteredProfessors as any}
         actions={(row: any) => (
           <div className="flex items-center justify-end gap-2">
             <button

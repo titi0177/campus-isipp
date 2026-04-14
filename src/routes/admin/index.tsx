@@ -2,324 +2,172 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { StatCard } from '@/components/StatCard'
-
-import {
-Users,
-BookOpen,
-GraduationCap,
-UserCheck,
-TrendingUp,
-Award,
-ClipboardList
-} from 'lucide-react'
-
+import { Users, BookOpen, GraduationCap, UserCheck, TrendingUp, Award } from 'lucide-react'
 import { Bar, Doughnut } from 'react-chartjs-2'
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js'
 
-import {
-Chart as ChartJS,
-CategoryScale,
-LinearScale,
-BarElement,
-ArcElement,
-Title,
-Tooltip,
-Legend
-} from 'chart.js'
-
-ChartJS.register(
-CategoryScale,
-LinearScale,
-BarElement,
-ArcElement,
-Title,
-Tooltip,
-Legend
-)
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend)
 
 export const Route = createFileRoute('/admin/')({
-component: AdminDashboard,
+  component: AdminDashboard,
 })
 
 function AdminDashboard() {
-
-const [stats,setStats] = useState<any>({})
-const [gradeData,setGradeData] = useState<any>(null)
-const [statusData,setStatusData] = useState<any>(null)
-const [topSubjects,setTopSubjects] = useState<any[]>([])
-const [recentEnrollments,setRecentEnrollments] = useState<any[]>([])
-const [recentGrades,setRecentGrades] = useState<any[]>([])
-const [loading,setLoading] = useState(true)
-
-useEffect(()=>{
-loadData()
-},[])
-
-async function loadData(){
-
-const [
-{count:students},
-{count:subjects},
-{count:programs},
-{count:professors},
-{count:enrollments},
-{data:grades}
-] = await Promise.all([
-
-supabase.from("students").select("*",{count:"exact",head:true}),
-supabase.from("subjects").select("*",{count:"exact",head:true}),
-supabase.from("programs").select("*",{count:"exact",head:true}),
-supabase.from("professors").select("*",{count:"exact",head:true}),
-supabase.from("enrollments").select("*",{count:"exact",head:true}),
-supabase.from("grades").select("final_grade,status")
-
-])
-
-setStats({
-students:students || 0,
-subjects:subjects || 0,
-programs:programs || 0,
-professors:professors || 0,
-enrollments:enrollments || 0
-})
-
-/* ---------- PROMEDIO GENERAL ---------- */
-
-let avg = 0
-if(grades?.length){
-avg = grades.reduce((a,b)=>a+(b.final_grade || 0),0)/grades.length
-}
-
-setStats((s:any)=>({...s,avg:avg.toFixed(2)}))
-
-/* ---------- ESTADO ACADEMICO ---------- */
-
-if(grades){
-
-const statusCounts:any={}
-
-grades.forEach(g=>{
-statusCounts[g.status]=(statusCounts[g.status]||0)+1
-})
-
-setStatusData({
-labels:["Promocionado","Aprobado","Desaprobado","En Curso"],
-datasets:[{
-data:[
-statusCounts["promoted"]||0,
-statusCounts["passed"]||0,
-statusCounts["failed"]||0,
-statusCounts["in_progress"]||0
-],
-backgroundColor:[
-"#16a34a",
-"#2563eb",
-"#dc2626",
-"#d97706"
-]
-}]
-})
-
-}
-
-/* ---------- DISTRIBUCION DE NOTAS ---------- */
-
-if(grades){
-
-const dist = Array(10).fill(0)
-
-grades.forEach((g:any)=>{
-
-if(g.final_grade){
-
-const i=Math.min(Math.floor(g.final_grade)-1,9)
-
-if(i>=0) dist[i]++
-
-}
-
-})
-
-setGradeData({
-labels:["1","2","3","4","5","6","7","8","9","10"],
-datasets:[{
-label:"Cantidad de alumnos",
-data:dist,
-backgroundColor:"#582c31",
-borderRadius:4
-}]
-})
-
-}
-
-/* ---------- MATERIAS MAS CURSADAS ---------- */
-
-const {data:top} = await supabase
-.from("enrollments")
-.select(`
-subject:subjects(name)
-`)
-limit(50)
-
-if(top){
-
-const count:any={}
-
-top.forEach((e:any)=>{
-const n=e.subject?.name
-count[n]=(count[n]||0)+1
-})
-
-const sorted = Object.entries(count)
-.sort((a:any,b:any)=>b[1]-a[1])
-.slice(0,5)
-
-setTopSubjects(sorted)
-
-}
-
-/* ---------- ULTIMAS INSCRIPCIONES ---------- */
-
-const {data:recent} = await supabase
-.from("enrollments")
-.select(`
-id,
-created_at,
-student:students(first_name,last_name),
-subject:subjects(name)
-`)
-.order("created_at",{ascending:false})
-.limit(5)
-
-setRecentEnrollments(recent||[])
-
-/* ---------- ULTIMAS NOTAS ---------- */
-
-const {data:recentG} = await supabase
-.from("grades")
-.select(`
-final_grade,
-student:enrollments(
-student:students(first_name,last_name)
-),
-subject:enrollments(
-subject:subjects(name)
-)
-`)
-.order("created_at",{ascending:false})
-.limit(5)
-
-setRecentGrades(recentG||[])
-
-setLoading(false)
-
-}
-
-return (
-
-<div className="space-y-6">
-
-<div>
-<h1 className="siu-page-title text-2xl">
-Panel de administración
-</h1>
-<p className="siu-page-subtitle mt-1">
-Resumen operativo del sistema (estilo autogestión)
-</p>
-</div>
-
-{/* STATS */}
-
-<div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-
-<StatCard title="Estudiantes" value={stats.students} icon={<Users size={22}/>} color="bordeaux"/>
-<StatCard title="Materias" value={stats.subjects} icon={<BookOpen size={22}/>} color="blue"/>
-<StatCard title="Carreras" value={stats.programs} icon={<GraduationCap size={22}/>} color="green"/>
-<StatCard title="Profesores" value={stats.professors} icon={<UserCheck size={22}/>} color="orange"/>
-<StatCard title="Inscripciones" value={stats.enrollments} icon={<TrendingUp size={22}/>} color="purple"/>
-<StatCard title="Promedio" value={stats.avg} icon={<Award size={22}/>} color="bordeaux"/>
-
-</div>
-
-{/* CHARTS */}
-
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-<div className="card">
-<h2 className="font-semibold mb-4">
-Distribución de Notas
-</h2>
-
-{gradeData
-? <Bar data={gradeData}/>
-: <p className="text-gray-400">Sin datos</p>
-}
-
-</div>
-
-<div className="card">
-
-<h2 className="font-semibold mb-4">
-Estado Académico
-</h2>
-
-{statusData
-? <Doughnut data={statusData}/>
-: <p className="text-gray-400">Sin datos</p>
-}
-
-</div>
-
-</div>
-
-{/* MATERIAS MAS CURSADAS */}
-
-<div className="card">
-
-<h2 className="font-semibold mb-4">
-Materias con más alumnos
-</h2>
-
-<ul className="space-y-2">
-
-{topSubjects.map((s:any,i:number)=>(
-<li key={i} className="flex justify-between">
-
-<span>{s[0]}</span>
-<span className="font-semibold">{s[1]}</span>
-
-</li>
-))}
-
-</ul>
-
-</div>
-
-{/* ULTIMAS INSCRIPCIONES */}
-
-<div className="card">
-
-<h2 className="font-semibold mb-4">
-Últimas Inscripciones
-</h2>
-
-<ul className="space-y-2">
-
-{recentEnrollments.map((e:any)=>(
-<li key={e.id}>
-
-{e.student?.first_name} {e.student?.last_name}
-{" → "}
-{e.subject?.name}
-
-</li>
-))}
-
-</ul>
-
-</div>
-
-</div>
-
-)
-
+  const [stats, setStats] = useState({ students: 0, subjects: 0, programs: 0, professors: 0, enrollments: 0, avg: 0 })
+  const [gradeData, setGradeData] = useState(null)
+  const [statusData, setStatusData] = useState(null)
+  const [topSubjects, setTopSubjects] = useState([])
+  const [recentEnrollments, setRecentEnrollments] = useState([])
+  const [recentGrades, setRecentGrades] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    try {
+      const [[s1, s2, s3, s4, s5, s6]] = await Promise.all([
+        Promise.all([
+          supabase.from('students').select('*', { count: 'exact', head: true }),
+          supabase.from('subjects').select('*', { count: 'exact', head: true }),
+          supabase.from('programs').select('*', { count: 'exact', head: true }),
+          supabase.from('professors').select('*', { count: 'exact', head: true }),
+          supabase.from('enrollments').select('*', { count: 'exact', head: true }),
+          supabase.from('grades').select('final_grade, status'),
+        ]),
+      ])
+
+      const counts = {
+        students: s1.count || 0,
+        subjects: s2.count || 0,
+        programs: s3.count || 0,
+        professors: s4.count || 0,
+        enrollments: s5.count || 0,
+      }
+
+      const grades = s6.data || []
+      const avg = grades.length ? (grades.reduce((a, b) => a + (b.final_grade || 0), 0) / grades.length).toFixed(2) : 0
+
+      setStats({ ...counts, avg: parseFloat(avg) })
+
+      // Estado académico
+      if (grades.length) {
+        const statusCounts = grades.reduce((acc, g) => {
+          acc[g.status] = (acc[g.status] || 0) + 1
+          return acc
+        }, {})
+
+        setStatusData({
+          labels: ['Promocionado', 'Aprobado', 'Desaprobado', 'En Curso'],
+          datasets: [{
+            data: [statusCounts['promoted'] || 0, statusCounts['passed'] || 0, statusCounts['failed'] || 0, statusCounts['in_progress'] || 0],
+            backgroundColor: ['#16a34a', '#2563eb', '#dc2626', '#d97706'],
+          }],
+        })
+
+        // Distribución de notas
+        const dist = Array(10).fill(0)
+        grades.forEach((g) => {
+          if (g.final_grade) {
+            const i = Math.min(Math.floor(g.final_grade) - 1, 9)
+            if (i >= 0) dist[i]++
+          }
+        })
+
+        setGradeData({
+          labels: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'],
+          datasets: [{ label: 'Cantidad de alumnos', data: dist, backgroundColor: '#582c31', borderRadius: 4 }],
+        })
+      }
+
+      // Materias más cursadas
+      const { data: topData } = await supabase.from('enrollments').select('subject:subjects(name)').limit(50)
+      if (topData) {
+        const count = topData.reduce((acc, e) => {
+          const n = e.subject?.name
+          acc[n] = (acc[n] || 0) + 1
+          return acc
+        }, {})
+
+        setTopSubjects(Object.entries(count).sort((a, b) => b[1] - a[1]).slice(0, 5))
+      }
+
+      // Últimas inscripciones
+      const { data: recentEnr } = await supabase
+        .from('enrollments')
+        .select('id, created_at, student:students(first_name, last_name), subject:subjects(name)')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      setRecentEnrollments(recentEnr || [])
+
+      // Últimas notas
+      const { data: recentGr } = await supabase
+        .from('grades')
+        .select('final_grade, student:enrollments(student:students(first_name, last_name)), subject:enrollments(subject:subjects(name))')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      setRecentGrades(recentGr || [])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-4xl font-bold text-slate-900">Panel de Administración</h1>
+        <p className="text-slate-600 mt-2">Resumen operativo del sistema académico</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        <StatCard title="Estudiantes" value={stats.students} icon={<Users size={24} />} color="bordeaux" />
+        <StatCard title="Materias" value={stats.subjects} icon={<BookOpen size={24} />} color="blue" />
+        <StatCard title="Carreras" value={stats.programs} icon={<GraduationCap size={24} />} color="green" />
+        <StatCard title="Profesores" value={stats.professors} icon={<UserCheck size={24} />} color="orange" />
+        <StatCard title="Inscripciones" value={stats.enrollments} icon={<TrendingUp size={24} />} color="purple" />
+        <StatCard title="Promedio" value={stats.avg.toFixed(2)} icon={<Award size={24} />} color="bordeaux" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Distribución de Notas</h2>
+          {gradeData ? <Bar data={gradeData} options={{ maintainAspectRatio: true }} /> : <p className="text-slate-400">Sin datos</p>}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Estado Académico</h2>
+          {statusData ? <Doughnut data={statusData} /> : <p className="text-slate-400">Sin datos</p>}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Materias con más alumnos</h2>
+          <ul className="space-y-3">
+            {topSubjects.map((s, i) => (
+              <li key={i} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded transition">
+                <span className="text-slate-700">{s[0]}</span>
+                <span className="font-bold text-[var(--siu-blue)] bg-blue-100 px-3 py-1 rounded-full text-sm">{s[1]}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-md p-6 border border-slate-200">
+          <h2 className="text-lg font-bold text-slate-900 mb-4">Últimas Inscripciones</h2>
+          <ul className="space-y-3">
+            {recentEnrollments.map((e) => (
+              <li key={e.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded transition">
+                <span className="text-slate-700 text-sm">{e.student?.first_name} {e.student?.last_name}</span>
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">{e.subject?.name}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  )
 }

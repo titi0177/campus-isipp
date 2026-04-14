@@ -3,22 +3,28 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
 /**
- * Subscribe to new or updated rows in `announcements`.
- * Pass `null` for onEvent to only subscribe without a callback (testing / future use).
+ * Debounced realtime announcements subscription - prevents excessive re-renders
  */
-export function useRealtimeAnnouncements(onEvent?: (() => void) | null) {
+export function useRealtimeAnnouncements(onChange: (() => void) | null) {
   useEffect(() => {
-    if (onEvent == null) return
-    let ch: RealtimeChannel | null = supabase
-      .channel('announcements_public')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'announcements' },
-        () => onEvent(),
-      )
+    if (!onChange) return
+
+    let timeoutId: NodeJS.Timeout | null = null
+
+    const ch: RealtimeChannel = supabase
+      .channel('announcements_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        // Debounce onChange to prevent excessive updates
+        if (timeoutId) clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          onChange()
+        }, 500)
+      })
       .subscribe()
+
     return () => {
-      if (ch) void supabase.removeChannel(ch)
+      if (timeoutId) clearTimeout(timeoutId)
+      void supabase.removeChannel(ch)
     }
-  }, [onEvent])
+  }, [onChange])
 }

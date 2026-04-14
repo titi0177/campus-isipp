@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { BookOpen, Star, ClipboardCheck, Users } from 'lucide-react'
+import { BookOpen, Star, ClipboardCheck, Users, MessageCircle } from 'lucide-react'
 import { StatCard } from '@/components/StatCard'
 
 export const Route = createFileRoute('/professor/')({
@@ -10,6 +10,7 @@ export const Route = createFileRoute('/professor/')({
 
 function ProfessorHome() {
   const [professorId, setProfessorId] = useState<string | null>(null)
+  const [professorName, setProfessorName] = useState<string>('')
   const [subjectCount, setSubjectCount] = useState(0)
   const [enrollmentCount, setEnrollmentCount] = useState(0)
 
@@ -23,7 +24,7 @@ function ProfessorHome() {
 
     const { data: prof } = await supabase
       .from('professors')
-      .select('id')
+      .select('id, name')
       .eq('user_id', user.id)
       .maybeSingle()
 
@@ -33,6 +34,7 @@ function ProfessorHome() {
     }
 
     setProfessorId(prof.id)
+    setProfessorName(prof.name || '')
 
     const { data: subjects } = await supabase
       .from('subjects')
@@ -72,7 +74,7 @@ function ProfessorHome() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Portal docente</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Bienvenido, {professorName}</h1>
         <p className="mt-1 text-slate-600">Resumen de tus asignaturas a cargo</p>
       </div>
 
@@ -81,7 +83,7 @@ function ProfessorHome() {
         <StatCard title="Inscriptos (total)" value={enrollmentCount} icon={Users} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link to="/professor/subjects" className="card siu-hover-card flex items-center gap-3 p-4">
           <BookOpen className="h-8 w-8 text-[var(--siu-burgundy)]" />
           <div>
@@ -101,6 +103,13 @@ function ProfessorHome() {
           <div>
             <div className="font-semibold">Asistencia</div>
             <div className="text-sm text-slate-500">Por cursada</div>
+          </div>
+        </Link>
+        <Link to="/professor/messages" className="card siu-hover-card flex items-center gap-3 p-4">
+          <MessageCircle className="h-8 w-8 text-[var(--siu-burgundy)]" />
+          <div>
+            <div className="font-semibold">Mensajes</div>
+            <div className="text-sm text-slate-500">Chatear con estudiantes</div>
           </div>
         </Link>
       </div>

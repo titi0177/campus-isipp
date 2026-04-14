@@ -1,0 +1,2 @@
+-- Esta migración fue reemplazada por 20250104000000_fix_class_attendance_rls.sql
+-- No ejecutar, solo dejar como referencia histórica

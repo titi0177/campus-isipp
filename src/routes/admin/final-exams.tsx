@@ -28,8 +28,7 @@ function FinalExamsPage() {
         .from('final_exams')
         .select(`
           *,
-          subject:subjects(name, code),
-          professor:professors(name)
+          subject:subjects(name, code)
         `)
         .order('exam_date', { ascending: false })
 
@@ -69,11 +68,15 @@ function FinalExamsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const { id, created_at, subject, professor, date, exam_date, ...rest } = editing
+    const { id, created_at, subject, professor, president, vocal1, vocal2, date, exam_date, exam_time, ...rest } = editing
     const when = exam_date ?? date
     const payload: Record<string, unknown> = {
       ...rest,
       exam_date: when,
+      exam_time: editing.exam_time || '09:00',
+      president_id: editing.president_id || null,
+      vocal1_id: editing.vocal1_id || null,
+      vocal2_id: editing.vocal2_id || null,
     }
     delete payload.date
 
@@ -129,7 +132,7 @@ function FinalExamsPage() {
 
         <button
           onClick={() => {
-            setEditing({ location: '' })
+            setEditing({ location: '', exam_time: '09:00' })
             setModalOpen(true)
           }}
           className="btn-primary flex items-center gap-2"
@@ -160,9 +163,9 @@ function FinalExamsPage() {
             }
           },
           {
-            key: 'professor',
-            label: 'Profesor',
-            render: (r: any) => r.professor?.name || '-'
+            key: 'exam_time',
+            label: 'Hora',
+            render: (r: any) => r.exam_time || '-'
           },
           {
             key: 'location',
@@ -244,6 +247,26 @@ function FinalExamsPage() {
             </div>
 
             <div>
+              <label className="form-label">Horario *</label>
+              <input
+                type="time"
+                className="form-input"
+                required
+                value={editing.exam_time || '09:00'}
+                onChange={e =>
+                  setEditing((p: any) => ({
+                    ...p,
+                    exam_time: e.target.value
+                  }))
+                }
+              />
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+
+            <div>
               <label className="form-label">Lugar *</label>
               <input
                 className="form-input"
@@ -258,27 +281,92 @@ function FinalExamsPage() {
               />
             </div>
 
+            <div>
+              <label className="form-label">Cupos máximos</label>
+              <input
+                type="number"
+                min={1}
+                className="form-input"
+                value={editing.max_students || ''}
+                onChange={e =>
+                  setEditing((p: any) => ({
+                    ...p,
+                    max_students: e.target.value === '' ? null : +e.target.value
+                  }))
+                }
+                placeholder="Sin límite"
+              />
+            </div>
+
           </div>
 
-          <div>
-            <label className="form-label">Profesor</label>
-            <select
-              className="form-input"
-              value={editing.professor_id || ''}
-              onChange={e =>
-                setEditing((p: any) => ({
-                  ...p,
-                  professor_id: e.target.value
-                }))
-              }
-            >
-              <option value="">Sin asignar</option>
-              {professors.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+          <div className="space-y-3 border-t pt-4">
+            <h3 className="font-semibold text-gray-900">Composición de Mesa</h3>
+
+            <div>
+              <label className="form-label">Presidente de Mesa *</label>
+              <select
+                className="form-input"
+                required
+                value={editing.president_id || ''}
+                onChange={e =>
+                  setEditing((p: any) => ({
+                    ...p,
+                    president_id: e.target.value
+                  }))
+                }
+              >
+                <option value="">Seleccionar...</option>
+                {professors.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">Vocal 1</label>
+              <select
+                className="form-input"
+                value={editing.vocal1_id || ''}
+                onChange={e =>
+                  setEditing((p: any) => ({
+                    ...p,
+                    vocal1_id: e.target.value
+                  }))
+                }
+              >
+                <option value="">Sin asignar</option>
+                {professors.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">Vocal 2</label>
+              <select
+                className="form-input"
+                value={editing.vocal2_id || ''}
+                onChange={e =>
+                  setEditing((p: any) => ({
+                    ...p,
+                    vocal2_id: e.target.value
+                  }))
+                }
+              >
+                <option value="">Sin asignar</option>
+                {professors.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
           </div>
 
           <div className="flex gap-3 pt-2">

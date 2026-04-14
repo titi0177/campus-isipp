@@ -2,12 +2,13 @@ import { Bell, User, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
+import { NotificationBell } from '@/components/NotificationCenter'
 
 const LOGO_SRC = '/logo-isipp.png'
 
 interface TopNavProps {
   userName?: string
-  role?: 'admin' | 'student' | 'professor'
+  role?: 'admin' | 'student' | 'professor' | 'treasurer'
 }
 
 export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
@@ -15,7 +16,7 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/login'
+    window.location.href = '/'
   }
 
   const moduleLine =
@@ -23,7 +24,45 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
       ? 'Módulo de administración del sistema'
       : role === 'professor'
         ? 'Módulo docente — cursadas y evaluaciones'
-        : 'Módulo de autogestión y consultas académicas'
+        : role === 'treasurer'
+          ? 'Módulo de tesorería — gestión de pagos'
+          : 'Módulo de autogestión y consultas académicas'
+
+  const announcementsPath =
+    role === 'admin'
+      ? '/admin/announcements'
+      : role === 'professor'
+        ? '/professor/announcements'
+        : role === 'treasurer'
+          ? '/treasurer'
+          : '/dashboard/announcements'
+
+  const settingsPath =
+    role === 'admin'
+      ? '/admin/settings'
+      : role === 'professor'
+        ? '/professor/settings'
+        : role === 'treasurer'
+          ? '/treasurer/settings'
+          : '/dashboard/profile'
+
+  const settingsLabel =
+    role === 'admin'
+      ? 'Parámetros y contraseña'
+      : role === 'professor'
+        ? 'Seguridad y contraseña'
+        : role === 'treasurer'
+          ? 'Seguridad y contraseña'
+          : 'Mis datos personales'
+
+  const roleLabel =
+    role === 'admin'
+      ? 'Administración'
+      : role === 'professor'
+        ? 'Docente'
+        : role === 'treasurer'
+          ? 'Tesorería'
+          : 'Alumno'
 
   return (
     <header className="siu-topnav">
@@ -38,16 +77,13 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        <NotificationBell />
         <Link
-          to={role === 'admin' ? '/admin/announcements' : '/dashboard/announcements'}
+          to={announcementsPath}
           className="relative rounded-sm p-2 text-white/90 transition-colors hover:bg-white/10"
           title="Novedades"
         >
           <Bell size={20} />
-          <span
-            className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-white ring-2 ring-[var(--isipp-bordo-deep)]"
-            aria-hidden
-          />
         </Link>
 
         <div className="relative">
@@ -64,7 +100,7 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
                 {userName}
               </div>
               <div className="text-[11px] font-medium uppercase tracking-wide text-white/70">
-                {role === 'admin' ? 'Administración' : role === 'professor' ? 'Docente' : 'Alumno'}
+                {roleLabel}
               </div>
             </div>
             <ChevronDown size={14} className="text-white/60" />
@@ -73,15 +109,11 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
           {showMenu && (
             <div className="absolute right-0 top-full z-50 mt-1 w-52 border border-[var(--siu-border)] bg-white py-1 shadow-lg">
               <Link
-                to={role === 'admin' ? '/admin/settings' : role === 'professor' ? '/professor/settings' : '/dashboard/profile'}
+                to={settingsPath}
                 className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--siu-blue-soft)]"
                 onClick={() => setShowMenu(false)}
               >
-                {role === 'admin'
-                  ? 'Parámetros y contraseña'
-                  : role === 'professor'
-                    ? 'Seguridad y contraseña'
-                    : 'Mis datos personales'}
+                {settingsLabel}
               </Link>
               <hr className="my-1 border-[var(--siu-border-light)]" />
               <button
