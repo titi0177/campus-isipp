@@ -1,11 +1,6 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "functions": {
-    "dist/server/server.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",
