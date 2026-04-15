@@ -8,9 +8,10 @@ import { Menu, X } from 'lucide-react'
 interface AppLayoutProps {
   role?: 'admin' | 'student' | 'professor' | 'treasurer'
   userName?: string
+  children?: React.ReactNode
 }
 
-export function AppLayout({ role = 'student', userName = 'Usuario' }: AppLayoutProps) {
+export function AppLayout({ role = 'student', userName = 'Usuario', children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const router = useRouterState()
@@ -49,7 +50,7 @@ export function AppLayout({ role = 'student', userName = 'Usuario' }: AppLayoutP
           {/* Scrollable Content */}
           <main className="app-main-scrollable">
             <div className="app-main-padding">
-              <Outlet />
+              {children || <Outlet />}
             </div>
           </main>
         </div>
@@ -90,7 +91,7 @@ export function AppLayout({ role = 'student', userName = 'Usuario' }: AppLayoutP
       {/* Scrollable Content - Takes remaining space */}
       <main className="app-main-mobile">
         <div className="app-main-padding-mobile">
-          <Outlet />
+          {children || <Outlet />}
         </div>
       </main>
 

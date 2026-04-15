@@ -1,6 +1,5 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
-import { Sidebar } from '@/components/Sidebar'
-import { TopNav } from '@/components/TopNav'
+import { AppLayout } from '@/components/AppLayout'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { homePathForRole, isStaffRole } from '@/lib/roles'
@@ -27,16 +26,8 @@ function AdminLayout() {
   }, [])
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <Sidebar role="admin" />
-      <div className="ml-64 flex min-h-screen flex-1 flex-col">
-        <TopNav userName={userName} role="admin" />
-        <main className="flex-1 overflow-auto border-t border-slate-200 p-8">
-          <div className="max-w-7xl mx-auto">
-            <Outlet />
-          </div>
-        </main>
-      </div>
-    </div>
+    <AppLayout role="admin" userName={userName}>
+      <Outlet />
+    </AppLayout>
   )
 }
