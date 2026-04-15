@@ -343,6 +343,16 @@ function ProfessorGradesPage() {
               <strong>Importante:</strong> La nota PARCIAL solo AUTORIZA rendir examen final (mínimo 6/10).
               La nota que determina aprobado/desaprobado/promocionado es la NOTA FINAL (después de rendir examen).
             </p>
+            {!selectedDivision && subjects.find(s => s.id === selectedSubject)?.year === 1 && (
+              <p className="text-sm text-blue-900 mt-2">
+                <strong>📌 Divisiones:</strong> Estás viendo alumnos de <strong>AMBAS divisiones</strong>. Usa el selector de División para filtrar por A o B.
+              </p>
+            )}
+            {selectedDivision && (
+              <p className="text-sm text-blue-900 mt-2">
+                <strong>🔍 Filtrado:</strong> Mostrando solo alumnos de la <strong>División {selectedDivision}</strong>.
+              </p>
+            )}
           </div>
 
           <div className="card p-0 overflow-x-auto">
@@ -350,7 +360,7 @@ function ProfessorGradesPage() {
               <thead>
                 <tr className="bg-slate-700 text-white border-b">
                   <th className="px-3 py-2 text-left min-w-32">Alumno</th>
-                  {selectedDivision && <th className="px-3 py-2 text-center bg-slate-800 min-w-12">Div.</th>}
+                  {!selectedDivision && <th className="px-3 py-2 text-center bg-slate-800 min-w-12">Div.</th>}
                   {schemaReady && (
                     <>
                       <th colSpan={3} className="px-3 py-2 text-center bg-blue-700">Parciales</th>
@@ -384,7 +394,7 @@ function ProfessorGradesPage() {
                 {students.map((student) => (
                   <tr key={student.enrollmentId} className="border-b hover:bg-slate-50">
                     <td className="px-3 py-2 font-medium">{student.studentName}</td>
-                    {selectedDivision && <td className="px-3 py-2 text-center font-bold text-blue-600">{student.division}</td>}
+                    {!selectedDivision && <td className="px-3 py-2 text-center font-bold text-blue-600">{student.division}</td>}
                     {schemaReady && (
                       <>
                         <td className="px-2 py-2">
