@@ -18,6 +18,7 @@ export class ChatRealtimeManager {
   private channels: Map<string, RealtimeChannel> = new Map()
   private typingTimers: Map<string, NodeJS.Timeout> = new Map()
   private subscribedChannels: Set<string> = new Set()
+  private channelSubscriptions: Map<string, boolean> = new Map() // Track subscription status
 
   /**
    * Create or get a channel for a specific subject
@@ -37,12 +38,14 @@ export class ChatRealtimeManager {
     })
 
     this.channels.set(channelName, channel)
+    this.channelSubscriptions.set(channelName, false) // Mark as not subscribed
     return channel
   }
 
   /**
    * Subscribe to message updates for a subject
    * Register ALL .on() handlers BEFORE calling .subscribe()
+   * FIX: Check subscription status to prevent double-subscribing
    */
   subscribeToMessages(
     subjectId: string,
@@ -54,70 +57,96 @@ export class ChatRealtimeManager {
     const channelName = `chat:${subjectId}`
     const channel = this.getOrCreateChannel(subjectId)
 
-    // Only subscribe once per channel
-    if (!this.subscribedChannels.has(channelName)) {
-      // Register ALL handlers BEFORE subscribe
-      channel
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: `subject_id=eq.${subjectId}`,
-          },
-          onMessageInsert,
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'messages',
-            filter: `subject_id=eq.${subjectId}`,
-          },
-          onMessageUpdate,
-        )
-        .on('broadcast', { event: 'typing' }, onTyping)
-        .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState()
-          const presenceList: PresenceState[] = []
+    // Check if this channel is already subscribed
+    if (this.channelSubscriptions.get(channelName) === true) {
+      // Channel already subscribed, just return unsubscribe function
+      return () => {
+        this.unsubscribeFromMessages(subjectId)
+      }
+    }
 
-          Object.values(state).forEach((presences: any) => {
-            if (Array.isArray(presences)) {
-              presences.forEach((presence) => {
-                presenceList.push(presence)
-              })
-            }
-          })
+    // Register ALL handlers BEFORE subscribe (THIS IS CRITICAL)
+    channel
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `subject_id=eq.${subjectId}`,
+        },
+        onMessageInsert,
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `subject_id=eq.${subjectId}`,
+        },
+        onMessageUpdate,
+      )
+      .on('broadcast', { event: 'typing' }, onTyping)
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        const presenceList: PresenceState[] = []
 
-          onPresenceChange(presenceList)
-        })
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            // Track user presence after subscribe
-            const userId = supabase.auth.user()?.id
-            if (userId) {
-              channel.track({
-                userId,
-                subjectId,
-                online: true,
-                lastSeen: Date.now(),
-              })
-            }
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error(`Failed to subscribe to messages for subject ${subjectId}`)
+        Object.values(state).forEach((presences: any) => {
+          if (Array.isArray(presences)) {
+            presences.forEach((presence) => {
+              presenceList.push(presence)
+            })
           }
         })
 
-      this.subscribedChannels.add(channelName)
-    }
+        onPresenceChange(presenceList)
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          // Mark as subscribed
+          this.channelSubscriptions.set(channelName, true)
+          
+          // Track user presence after subscribe
+          const user = supabase.auth.user()
+          if (user?.id) {
+            channel.track({
+              userId: user.id,
+              subjectId,
+              online: true,
+              lastSeen: Date.now(),
+            })
+          }
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error(`Failed to subscribe to messages for subject ${subjectId}`)
+          // Mark as failed subscription
+          this.channelSubscriptions.set(channelName, false)
+        }
+      })
 
     // Return unsubscribe function
     return () => {
-      channel.unsubscribe()
+      this.unsubscribeFromMessages(subjectId)
+    }
+  }
+
+  /**
+   * Unsubscribe from a channel safely
+   */
+  private unsubscribeFromMessages(subjectId: string): void {
+    const channelName = `chat:${subjectId}`
+    const channel = this.channels.get(channelName)
+
+    if (channel) {
+      try {
+        channel.unsubscribe()
+      } catch (err) {
+        console.warn(`Error unsubscribing from ${channelName}:`, err)
+      }
+
       this.channels.delete(channelName)
       this.subscribedChannels.delete(channelName)
+      this.channelSubscriptions.set(channelName, false)
     }
   }
 
@@ -136,23 +165,31 @@ export class ChatRealtimeManager {
       clearTimeout(this.typingTimers.get(subjectId)!)
     }
 
-    // Send typing event
-    await channel.send({
-      type: 'broadcast',
-      event: 'typing',
-      payload: { subjectId, userId, senderType },
-    })
-
-    // Auto-stop typing after 2 seconds of inactivity
-    const timer = setTimeout(async () => {
+    try {
+      // Send typing event
       await channel.send({
         type: 'broadcast',
-        event: 'typing-stop',
-        payload: { subjectId, userId },
+        event: 'typing',
+        payload: { subjectId, userId, senderType },
       })
-    }, 2000)
 
-    this.typingTimers.set(subjectId, timer)
+      // Auto-stop typing after 2 seconds of inactivity
+      const timer = setTimeout(async () => {
+        try {
+          await channel.send({
+            type: 'broadcast',
+            event: 'typing-stop',
+            payload: { subjectId, userId },
+          })
+        } catch (err) {
+          console.warn('Error sending typing-stop event:', err)
+        }
+      }, 2000)
+
+      this.typingTimers.set(subjectId, timer)
+    } catch (err) {
+      console.warn('Error sending typing indicator:', err)
+    }
   }
 
   /**
@@ -160,11 +197,16 @@ export class ChatRealtimeManager {
    */
   cleanup(): void {
     this.channels.forEach((channel) => {
-      channel.untrack()
-      channel.unsubscribe()
+      try {
+        channel.untrack()
+        channel.unsubscribe()
+      } catch (err) {
+        console.warn('Error cleaning up channel:', err)
+      }
     })
     this.channels.clear()
     this.subscribedChannels.clear()
+    this.channelSubscriptions.clear()
 
     this.typingTimers.forEach((timer) => {
       clearTimeout(timer)
