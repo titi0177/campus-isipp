@@ -77,7 +77,6 @@ function EnrollSubjectsPage() {
         .from('subjects')
         .select('id, name, code, year, division, professor_id, professor:professors(name), dictation_type, semester')
         .eq('program_id', studentData.program_id)
-        .eq('year', studentData.year)
         .order('year')
         .order('code')
 
