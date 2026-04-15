@@ -245,14 +245,14 @@ function ProfessorGradesPage() {
             practical_3: student.practical3 || null,
             partial_grade: partialGrade,
             final_grade_exam: student.finalGradeExam || null,
-            final_grade: student.finalGradeExam || partialGrade,
+            final_grade: student.finalGradeExam || null,
             status,
           }
         } else {
           gradeData = {
             partial_grade: student.partialGrade || null,
             final_grade_exam: student.finalGradeExam || null,
-            final_grade: student.finalGradeExam || student.partialGrade || null,
+            final_grade: student.finalGradeExam || null,
             status: student.status || 'in_progress',
           }
         }

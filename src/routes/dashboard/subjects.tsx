@@ -229,7 +229,7 @@ function SubjectsPage() {
               : null
             const partialToShow = grade?.partial_grade || calculatedPartial
 
-            const finalGrade = grade?.final_grade
+            const finalGrade = grade?.final_grade_exam
             const attendance = att?.percentage
 
             return (
