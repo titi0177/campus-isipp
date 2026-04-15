@@ -635,7 +635,11 @@ function LoginPage() {
             </div>
 
             <p className="mt-6 text-center text-xs text-slate-400">
-              © {new Date().getFullYear()} Instituto Superior de Informática Puerto Piray • Created and developed by **Cristian L. Medina**
+              © {new Date().getFullYear()} Instituto Superior de Informática Puerto Piray 
+              <br />
+  <span className="text-lg">•</span>
+  <br />
+  Created and developed by <strong>Cristian L. Medina</strong>
             </p>
           </div>
         </div>
