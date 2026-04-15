@@ -44,14 +44,14 @@ body {
 
 /* --- Barra lateral (menú tipo Guaraní) --- */
 .sidebar {
-  @apply h-screen w-64 fixed left-0 top-0 z-40 flex flex-col overflow-y-auto border-r shadow-sm;
+  @apply h-screen flex flex-col overflow-y-auto border-r shadow-sm;
   background: var(--siu-sidebar-bg);
   border-color: var(--siu-border);
 }
 
 .siu-sidebar-brand {
   background: linear-gradient(180deg, var(--isipp-bordo) 0%, var(--isipp-bordo-deep) 100%);
-  @apply border-b px-4 py-4 text-white;
+  @apply border-b px-3 md:px-4 py-3 md:py-4 text-white flex-shrink-0;
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 -3px 0 var(--isipp-white);
 }
@@ -61,14 +61,14 @@ body {
 }
 
 .siu-sidebar-section-label {
-  @apply px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider;
+  @apply px-3 md:px-4 py-2 md:py-2.5 text-[10px] md:text-[11px] font-bold uppercase tracking-wider flex-shrink-0;
   color: var(--siu-text-muted);
   background: rgba(88, 44, 49, 0.06);
   border-bottom: 1px solid var(--siu-border-light);
 }
 
 .sidebar-link {
-  @apply mx-2 flex items-center gap-3 rounded-sm px-3 py-2.5 text-sm font-medium transition-colors;
+  @apply mx-2 flex items-center gap-3 rounded-sm px-2 md:px-3 py-2.5 md:py-3 text-sm font-medium transition-colors min-h-[44px];
   color: var(--siu-blue);
 }
 
@@ -92,7 +92,7 @@ body {
 
 /* --- Botones --- */
 .btn-primary {
-  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center px-4 py-2.5 md:py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] md:min-h-auto;
   background: var(--siu-blue);
   color: white;
   border-radius: 2px;
@@ -105,7 +105,7 @@ body {
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center px-4 py-2 text-sm font-semibold transition-colors;
+  @apply inline-flex items-center justify-center px-4 py-2.5 md:py-2 text-sm font-semibold transition-colors min-h-[44px] md:min-h-auto;
   background: var(--siu-panel);
   color: var(--siu-navy);
   border-radius: 2px;
@@ -118,25 +118,24 @@ body {
 
 /* --- Paneles y tarjetas --- */
 .card {
-  @apply border p-5 shadow-sm;
+  @apply border p-4 md:p-5 shadow-sm rounded-lg md:rounded-sm;
   background: var(--siu-panel);
   border-color: var(--siu-border);
-  border-radius: 2px;
   box-shadow: 0 1px 3px rgba(44, 21, 24, 0.06);
 }
 
 .siu-page-title {
-  @apply text-xl font-bold tracking-tight;
+  @apply text-lg md:text-xl font-bold tracking-tight;
   color: var(--siu-navy);
 }
 
 .siu-page-subtitle {
-  @apply text-sm mt-0.5;
+  @apply text-xs md:text-sm mt-0.5;
   color: var(--siu-text-muted);
 }
 
 .siu-panel-header {
-  @apply -mx-5 -mt-5 mb-4 flex items-center border-b px-5 py-3 text-sm font-bold uppercase tracking-wide;
+  @apply -mx-4 md:-mx-5 -mt-4 md:-mt-5 mb-4 flex items-center border-b px-4 md:px-5 py-2 md:py-3 text-xs md:text-sm font-bold uppercase tracking-wide;
   background: linear-gradient(180deg, var(--isipp-bordo-soft) 0%, var(--isipp-bordo-muted) 100%);
   border-color: var(--siu-border);
   color: var(--isipp-bordo-dark);
@@ -164,7 +163,7 @@ body {
 
 /* --- Formularios --- */
 .form-input {
-  @apply w-full px-3 py-2 text-sm transition-shadow;
+  @apply w-full px-3 py-2 md:py-2.5 text-base md:text-sm transition-shadow min-h-[44px] md:min-h-auto;
   border: 1px solid var(--siu-border);
   border-radius: 2px;
   background: #fafbfc;
@@ -179,7 +178,7 @@ body {
 }
 
 .form-label {
-  @apply mb-1 block text-xs font-bold uppercase tracking-wide;
+  @apply mb-1 md:mb-2 block text-xs font-bold uppercase tracking-wide;
   color: var(--isipp-bordo-dark);
 }
 
@@ -198,7 +197,7 @@ body {
 }
 
 .siu-modal-head {
-  @apply flex items-center justify-between border-b px-5 py-3;
+  @apply flex items-center justify-between border-b px-4 md:px-5 py-3;
   background: linear-gradient(180deg, var(--isipp-bordo) 0%, var(--isipp-bordo-deep) 100%);
   border-color: var(--isipp-bordo-deep);
   color: white;
@@ -288,19 +287,19 @@ body {
 
 /* --- Barra superior (cabecera institucional) --- */
 .siu-topnav {
-  @apply sticky top-0 z-30 flex min-h-[52px] shrink-0 items-center justify-between gap-4 px-4 py-2 text-white shadow-md sm:px-5;
+  @apply sticky top-0 z-30 flex min-h-[48px] md:min-h-[52px] shrink-0 items-center justify-between gap-4 px-3 md:px-5 py-2 text-white shadow-md;
   background: linear-gradient(180deg, var(--isipp-bordo) 0%, var(--isipp-bordo-deep) 100%);
   border-bottom: 3px solid var(--isipp-white);
 }
 
 .siu-topnav-logo {
-  @apply hidden h-10 w-auto shrink-0 bg-white object-contain p-1 sm:block sm:h-11;
+  @apply hidden h-10 md:h-11 w-auto shrink-0 bg-white object-contain p-1 md:block;
   border-radius: 2px;
   max-width: 140px;
 }
 
 .siu-topnav-title {
-  @apply text-base font-bold tracking-tight;
+  @apply text-sm md:text-base font-bold tracking-tight;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
 }
 
@@ -310,12 +309,12 @@ body {
 
 /* Botón ícono en grillas (editar / eliminar) */
 .siu-table-action {
-  @apply rounded-sm p-1.5 text-slate-500 transition-colors hover:bg-[var(--isipp-bordo-soft)] hover:text-[var(--isipp-bordo-dark)];
+  @apply rounded-sm p-1.5 text-slate-500 transition-colors hover:bg-[var(--isipp-bordo-soft)] hover:text-[var(--isipp-bordo-dark)] touch-target;
 }
 
 .siu-band-header {
   background: linear-gradient(180deg, var(--isipp-bordo) 0%, var(--isipp-bordo-deep) 100%);
-  @apply px-4 py-2;
+  @apply px-3 md:px-4 py-2;
   border-bottom: 2px solid var(--isipp-white);
 }
 
@@ -326,4 +325,47 @@ body {
 
 .siu-sidebar-logo {
   @apply mx-auto block h-auto max-h-[100px] w-full object-contain object-center;
+}
+
+/* --- OPTIMIZACIONES MOBILE --- */
+
+/* Touch targets: 44x44px mínimo */
+.touch-target {
+  @apply min-h-[44px] min-w-[44px];
+}
+
+/* Responsive helpers */
+@media (max-width: 767px) {
+  html {
+    font-size: 15px;
+  }
+
+  .sidebar {
+    @apply w-64;
+  }
+
+  .form-input,
+  select,
+  textarea {
+    @apply text-base; /* Evita zoom automático */
+  }
+
+  .card {
+    @apply rounded-lg;
+  }
+
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Tablet y arriba */
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+
+  .sidebar {
+    @apply sticky;
+  }
 }

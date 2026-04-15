@@ -78,6 +78,13 @@ export function Sidebar({ role }: SidebarProps) {
   const router = useRouterState()
   const currentPath = router.location.pathname
   const unreadMessages = useUnreadMessages()
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   let navItems: NavItem[] = []
   let menuLabel = 'Menú'
@@ -88,7 +95,6 @@ export function Sidebar({ role }: SidebarProps) {
   } else if (role === 'professor') {
     navItems = [...professorNav]
     menuLabel = 'Menú docente'
-    // Agregar badge de mensajes no leídos al item de mensajes
     const messagesIdx = navItems.findIndex(item => item.href === '/professor/messages')
     if (messagesIdx !== -1 && unreadMessages > 0) {
       navItems[messagesIdx] = { ...navItems[messagesIdx], badge: unreadMessages }
@@ -99,7 +105,6 @@ export function Sidebar({ role }: SidebarProps) {
   } else {
     navItems = [...studentNav]
     menuLabel = 'Menú de autogestión'
-    // Agregar badge de mensajes no leídos al item de mensajes
     const messagesIdx = navItems.findIndex(item => item.href === '/dashboard/messages')
     if (messagesIdx !== -1 && unreadMessages > 0) {
       navItems[messagesIdx] = { ...navItems[messagesIdx], badge: unreadMessages }
@@ -112,27 +117,31 @@ export function Sidebar({ role }: SidebarProps) {
   }
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar h-full flex flex-col overflow-y-auto">
+      {/* Logo Section - Responsive */}
       <div className="siu-sidebar-brand">
         <div className="siu-sidebar-logo-box">
-          <img src={LOGO_SRC} alt={LOGO_ALT} className="siu-sidebar-logo" width={220} height={120} />
+          <img 
+            src={LOGO_SRC} 
+            alt={LOGO_ALT} 
+            className="siu-sidebar-logo" 
+            width={isMobile ? 160 : 220} 
+            height={isMobile ? 88 : 120}
+            loading="lazy"
+          />
         </div>
-        <p className="mt-3 text-center text-[11px] font-semibold uppercase leading-snug tracking-wide text-white/90">
+        <p className="mt-2 md:mt-3 text-center text-[10px] md:text-[11px] font-semibold uppercase leading-snug tracking-wide text-white/90">
           Sistema de gestión académica
         </p>
       </div>
 
-      <div className="siu-sidebar-section-label">
-        {role === 'admin'
-          ? 'Menú de administración'
-          : role === 'professor'
-            ? 'Menú docente'
-            : role === 'treasurer'
-              ? 'Menú de Tesorera'
-              : 'Menú de autogestión'}
+      {/* Menu Label */}
+      <div className="siu-sidebar-section-label text-xs md:text-sm">
+        {menuLabel}
       </div>
 
-      <nav className="flex-1 space-y-0.5 py-3">
+      {/* Navigation - Scrollable */}
+      <nav className="flex-1 space-y-0.5 py-2 md:py-3 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = currentPath === item.href ||
             (item.href !== '/admin' &&
@@ -143,31 +152,32 @@ export function Sidebar({ role }: SidebarProps) {
             <Link
               key={item.href}
               to={item.href}
-              className={`sidebar-link group ${isActive ? 'active' : ''}`}
+              className={`sidebar-link group touch-target ${isActive ? 'active' : ''}`}
             >
-              <span className="relative">
+              <span className="relative flex-shrink-0">
                 {item.icon}
                 {item.badge && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold">
+                  <span className="absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
                     {item.badge > 9 ? '9+' : item.badge}
                   </span>
                 )}
               </span>
-              <span className="flex-1 leading-snug">{item.label}</span>
-              {isActive && <ChevronRight size={14} className="opacity-70" />}
+              <span className="flex-1 leading-snug text-sm md:text-base truncate">{item.label}</span>
+              {isActive && <ChevronRight size={14} className="opacity-70 flex-shrink-0" />}
             </Link>
           )
         })}
       </nav>
 
-      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-white/60 p-3">
+      {/* Logout Button - Fixed at bottom */}
+      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3">
         <button
           type="button"
           onClick={handleLogout}
-          className="sidebar-link w-full text-left text-slate-600 hover:text-red-800"
+          className="sidebar-link w-full text-left text-slate-600 hover:text-red-800 touch-target"
         >
           <LogOut size={18} />
-          <span className="font-semibold">Cerrar sesión</span>
+          <span className="font-semibold text-sm md:text-base">Cerrar sesión</span>
         </button>
       </div>
     </aside>
