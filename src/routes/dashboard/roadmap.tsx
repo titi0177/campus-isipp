@@ -336,9 +336,16 @@ function RoadmapPage() {
                         
                         <span className="font-mono text-sm font-bold text-gray-600">{s.code}</span>
                       </div>
-                      <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-200 text-gray-700">
-                        {getDictationLabel(s)}
-                      </span>
+                      <div className="flex gap-2">
+                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-200 text-gray-700">
+                          {getDictationLabel(s)}
+                        </span>
+                        {s.allowsPromotion && (
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-purple-200 text-purple-700" title="Permite promoción con nota ≥8">
+                            🎓 Promocional
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-1">
                       <h3 className="font-bold text-gray-900 text-sm leading-tight">{s.name}</h3>
@@ -458,7 +465,7 @@ function RoadmapPage() {
             <ul className="space-y-1 text-gray-700">
               <li><strong>Parcial:</strong> Promedio de trabajos y parciales</li>
               <li><strong>Final:</strong> Nota del examen final</li>
-              <li><strong>Promocionado:</strong> Solo si ≥8 Y materia lo permite</li>
+              <li><strong>Promocionado:</strong> Solo si ≥8 Y materia lo permite (badge 🎓)</li>
               <li><strong>Aprobado:</strong> Nota entre 6-7 ó ≥8 sin promoción</li>
               <li><strong>Desaprobado:</strong> Nota menor a 6</li>
             </ul>
