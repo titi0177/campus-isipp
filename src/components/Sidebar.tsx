@@ -128,7 +128,7 @@ export function Sidebar({ role }: SidebarProps) {
   return (
     <aside className="sidebar h-full flex flex-col overflow-y-auto" style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
       {/* Logo Section - Responsive */}
-      <div className="siu-sidebar-brand">
+      <div className="siu-sidebar-brand flex-shrink-0">
         <div className="siu-sidebar-logo-box">
           <img 
             src={LOGO_SRC} 
@@ -145,12 +145,12 @@ export function Sidebar({ role }: SidebarProps) {
       </div>
 
       {/* Menu Label */}
-      <div className="siu-sidebar-section-label text-xs md:text-sm">
+      <div className="siu-sidebar-section-label text-xs md:text-sm flex-shrink-0">
         {menuLabel}
       </div>
 
       {/* Navigation - Scrollable */}
-      <nav className="flex-1 space-y-0.5 py-2 md:py-3 overflow-y-auto px-2">
+      <nav className="flex-1 space-y-0.5 py-2 md:py-3 overflow-y-auto px-2 min-h-0">
         {navItems.map((item) => {
           const active = isActive(item.href)
           return (
@@ -182,15 +182,15 @@ export function Sidebar({ role }: SidebarProps) {
         })}
       </nav>
 
-      {/* Logout Button - Fixed at bottom */}
-      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3 m-2 rounded-sm">
+      {/* Logout Button - Always visible at bottom, not affected by scroll */}
+      <div className="flex-shrink-0 border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3 m-2 rounded-sm">
         <button
           type="button"
           onClick={handleLogout}
-          className="sidebar-link w-full text-left text-slate-600 hover:text-red-800 touch-target transition-colors"
+          className="sidebar-link w-full text-left text-slate-600 hover:text-red-800 active:text-red-900 touch-target transition-colors flex items-center gap-3"
         >
-          <LogOut size={18} />
-          <span className="font-semibold text-sm md:text-base">Cerrar sesión</span>
+          <LogOut size={18} className="flex-shrink-0" />
+          <span className="font-semibold text-sm md:text-base flex-1">Cerrar sesión</span>
         </button>
       </div>
     </aside>
