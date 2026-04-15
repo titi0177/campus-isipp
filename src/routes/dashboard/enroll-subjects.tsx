@@ -182,7 +182,7 @@ function EnrollSubjectsPage() {
         else {
           // EXCEPCIÓN: Si aprobó todas las materias del 1er año el mismo día
           // puede inscribirse a materias del año siguiente (studentData.year + 1)
-          if (isAdvancedStudent && subject.year <= studentData.year + 1) {
+          if (isAdvancedStudent && subject.year === studentData.year + 1) {
             const reqs = requiresMap.get(subject.id) ?? []
             const allReqsPassed = reqs.every(rid => passedSubjectIds.has(rid))
 
@@ -208,11 +208,9 @@ function EnrollSubjectsPage() {
               }
             }
           }
-          // Si ya inscripto en 1er año este año, no puede inscribirse a 2do/3er (excepto recursantes)
-          else if (enrolledIn1stYearThisYear && subject.year > 1) {
-            blockedReason = 'Inscripto en 1er año este año (solo recursantes en otros años)'
-          } else if (subject.year > studentData.year + 1) {
-            blockedReason = `Bloqueada (año ${subject.year}, tu nivel: ${studentData.year})`
+          // Alumno debe estar en su año exacto (a menos que sea avanzado)
+          else if (subject.year !== studentData.year) {
+            blockedReason = `Año ${subject.year} (Tu año actual: ${studentData.year})`
           } else {
             const reqs = requiresMap.get(subject.id) ?? []
             const allReqsPassed = reqs.every(rid => passedSubjectIds.has(rid))
