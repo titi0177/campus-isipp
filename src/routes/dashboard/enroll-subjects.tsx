@@ -289,7 +289,7 @@ function EnrollSubjectsPage() {
       .insert({
         student_id: student.id,
         subject_id: subjectId,
-        year: currentYear,
+        academic_year: currentYear,
         division: division,
         status: 'active',
       })
