@@ -19,6 +19,7 @@ type SubjectWithStatus = {
   semester: number
   professor_id?: string
   professor?: { name: string }
+  division?: 'A' | 'B' | null
   canEnroll: boolean
   blockedReason?: string
   isEnrolled: boolean
@@ -76,6 +77,7 @@ function EnrollSubjectsPage() {
         .from('subjects')
         .select('id, name, code, year, division, professor_id, professor:professors(name), dictation_type, semester')
         .eq('program_id', studentData.program_id)
+        .eq('year', studentData.year)
         .order('year')
         .order('code')
 
@@ -107,6 +109,17 @@ function EnrollSubjectsPage() {
       if (firstYearEnrollments && firstYearEnrollments.length > 0) {
         const division = (firstYearEnrollments[0] as any).division
         setEnrolledDivision(division)
+      } else {
+        // Check if this is first year in Tecnicatura en Analista en Sistemas
+        const { data: program } = await supabase
+          .from('programs')
+          .select('name')
+          .eq('id', studentData.program_id)
+          .single()
+        
+        if (program?.name.includes('Analista') && studentData.year === 1) {
+          setEnrolledDivision(null)
+        }
       }
 
       const enrolledThisYearByAnyYear = new Map<number, boolean>()
@@ -144,9 +157,25 @@ function EnrollSubjectsPage() {
 
       const firstYearSubjectIds = await getFirstYearSubjects(studentData.id)
 
+      // Verificar si es Tecnicatura en Analista en Sistemas
+      const { data: program } = await supabase
+        .from('programs')
+        .select('name')
+        .eq('id', studentData.program_id)
+        .single()
+      
+      const isAnalystProgram = program?.name.includes('Analista')
+      const isFirstYear = studentData.year === 1
+      const shouldFilterByDivision = isAnalystProgram && isFirstYear && enrolledDivision
+
       // Agrupar materias por nombre base (sin división)
       const subjectsByBase = new Map<string, any[]>()
       for (const subject of allSubjects) {
+        // Filtrar por división si es necesario
+        if (shouldFilterByDivision && subject.year === 1 && subject.division !== enrolledDivision) {
+          continue
+        }
+        
         const baseKey = `${subject.name}_${subject.code}`
         if (!subjectsByBase.has(baseKey)) {
           subjectsByBase.set(baseKey, [])
@@ -257,6 +286,7 @@ function EnrollSubjectsPage() {
           name: subject.name,
           code: subject.code,
           year: subject.year,
+          division: subject.division,
           dictation_type: subject.dictation_type || 'anual',
           semester: subject.semester || 1,
           professor_id: subject.professor_id,
@@ -305,16 +335,16 @@ function EnrollSubjectsPage() {
   }
 
   function handleEnrollClick(subject: SubjectWithStatus) {
-    if (subject.year === 1 && subject.hasMultipleDivisions) {
-      // Mostrar modal para elegir división
+    // Mostrar modal de división solo para primer año
+    if (subject.year === 1 && !enrolledDivision) {
       setDivisionModal({
         subjectId: subject.id,
         subjectName: subject.name,
         year: subject.year,
       })
     } else {
-      // Inscribir directamente sin división
-      enrollSubject(subject.id, null)
+      // Inscribir con la división ya seleccionada o sin división
+      enrollSubject(subject.id, enrolledDivision || null)
     }
   }
 
@@ -323,11 +353,7 @@ function EnrollSubjectsPage() {
   }
 
   const filteredSubjects = availableSubjects.filter(subject => {
-    if (subject.year === 1 && subject.hasMultipleDivisions) {
-      if (enrolledDivision) {
-        return false
-      }
-    }
+    // Siempre mostrar todas las materias del año actual
     return true
   })
 

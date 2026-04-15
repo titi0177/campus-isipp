@@ -135,6 +135,9 @@ export interface Database {
           year: number
           credits: number
           division?: 'A' | 'B' | null
+          dictation_type?: string | null
+          semester?: number | null
+          allows_promotion?: boolean | null
           created_at: string
           updated_at: string
         }
@@ -148,6 +151,9 @@ export interface Database {
           year?: number
           credits?: number
           division?: 'A' | 'B' | null
+          dictation_type?: string | null
+          semester?: number | null
+          allows_promotion?: boolean | null
         }
         Update: {
           institution_id?: string | null
@@ -158,6 +164,9 @@ export interface Database {
           year?: number
           credits?: number
           division?: 'A' | 'B' | null
+          dictation_type?: string | null
+          semester?: number | null
+          allows_promotion?: boolean | null
         }
       }
       enrollments: {
@@ -165,11 +174,12 @@ export interface Database {
           id: string
           student_id: string
           subject_id: string
-          academic_period_id?: string | null
+          academic_year: number
           year: number
           semester: number
           division?: 'A' | 'B' | null
           status: string
+          attempt?: number | null
           created_at: string
           updated_at: string
         }
@@ -177,26 +187,34 @@ export interface Database {
           id?: string
           student_id: string
           subject_id: string
-          academic_period_id?: string | null
+          academic_year: number
           year: number
           semester: number
           division?: 'A' | 'B' | null
           status?: string
+          attempt?: number | null
         }
         Update: {
-          academic_period_id?: string | null
+          academic_year?: number
           year?: number
           semester?: number
           division?: 'A' | 'B' | null
           status?: string
+          attempt?: number | null
         }
       }
       grades: {
         Row: {
           id: string
           enrollment_id: string
+          partial_1?: number | null
+          partial_2?: number | null
+          partial_3?: number | null
+          practical_1?: number | null
+          practical_2?: number | null
+          practical_3?: number | null
           partial_grade?: number | null
-          final_exam_grade?: number | null
+          final_grade_exam?: number | null
           final_grade?: number | null
           status: string
           created_at: string
@@ -205,14 +223,26 @@ export interface Database {
         Insert: {
           id?: string
           enrollment_id: string
+          partial_1?: number | null
+          partial_2?: number | null
+          partial_3?: number | null
+          practical_1?: number | null
+          practical_2?: number | null
+          practical_3?: number | null
           partial_grade?: number | null
-          final_exam_grade?: number | null
+          final_grade_exam?: number | null
           final_grade?: number | null
           status?: string
         }
         Update: {
+          partial_1?: number | null
+          partial_2?: number | null
+          partial_3?: number | null
+          practical_1?: number | null
+          practical_2?: number | null
+          practical_3?: number | null
           partial_grade?: number | null
-          final_exam_grade?: number | null
+          final_grade_exam?: number | null
           final_grade?: number | null
           status?: string
         }

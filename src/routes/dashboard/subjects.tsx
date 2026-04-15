@@ -105,24 +105,14 @@ function SubjectsPage() {
         }
       }
 
-      // Filtrar enrollments para ocultar otras divisiones de primer año
+      // Filtrar enrollments para solo mostrar materias de la división elegida
       const filteredEnrollments = enrollmentsWithProfs.filter(enr => {
         const subject = enr.subject
-        const division = enr.division
         
-        // Si es materia de primer año, verificar divisiones
+        // Si es materia de primer año CON división
         if (subject?.year === 1 && subject?.division) {
-          // Buscar si hay alguna inscripción en primer año de otra división
-          const firstYearWithDivision = enrollmentsWithProfs.find(e => 
-            e.subject?.year === 1 && 
-            e.subject?.division && 
-            e.division
-          )
-          
-          // Si hay inscripción en otra división, ocultar este
-          if (firstYearWithDivision && firstYearWithDivision.division !== division) {
-            return false
-          }
+          // Solo mostrar si el estudiante está inscripto en esa división
+          return enr.division === enr.division // La inscripción tiene división grabada
         }
         
         return true
