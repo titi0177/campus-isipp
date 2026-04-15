@@ -54,18 +54,25 @@ export function AppLayout({ role = 'student' }: AppLayoutProps) {
         />
       )}
 
-      {/* Sidebar - Fixed position on mobile, absolute positioning with transform */}
+      {/* Sidebar - Hidden on mobile, visible on desktop */}
       <div
         className={`
-          fixed md:relative z-40 h-screen
-          transform transition-transform duration-300 ease-in-out
-          ${isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}
-          md:translate-x-0
-          w-64 md:w-64 flex-shrink-0
+          ${isMobile ? 'hidden' : 'block'}
+          md:block md:relative md:h-screen md:w-64 md:flex-shrink-0
         `}
       >
         <Sidebar role={role} />
       </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {isMobile && sidebarOpen && (
+        <div className="fixed inset-0 z-40 overflow-hidden">
+          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />
+          <div className="absolute left-0 top-0 h-screen w-64 bg-white shadow-lg overflow-y-auto">
+            <Sidebar role={role} />
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto flex flex-col w-full">
