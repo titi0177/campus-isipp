@@ -1,5 +1,6 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import { Sidebar } from './Sidebar'
+import { BottomNav } from './BottomNav'
 import { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 
@@ -16,7 +17,6 @@ export function AppLayout({ role = 'student' }: AppLayoutProps) {
     const handleResize = () => {
       const mobile = window.innerWidth < 768
       setIsMobile(mobile)
-      // Cerrar sidebar en mobile cuando cambia de ruta
       if (mobile) {
         setSidebarOpen(false)
       }
@@ -26,7 +26,6 @@ export function AppLayout({ role = 'student' }: AppLayoutProps) {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Cerrar sidebar al cambiar de ruta en mobile
   useEffect(() => {
     if (isMobile) {
       setSidebarOpen(false)
@@ -34,7 +33,7 @@ export function AppLayout({ role = 'student' }: AppLayoutProps) {
   }, [router.location.pathname, isMobile])
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">
       {/* Mobile Menu Button */}
       {isMobile && (
         <button
@@ -76,11 +75,14 @@ export function AppLayout({ role = 'student' }: AppLayoutProps) {
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto flex flex-col w-full">
-        {/* Add padding on mobile to account for hamburger menu */}
-        <div className={`flex-1 overflow-auto ${isMobile ? 'pt-16' : ''}`}>
+        {/* Add padding on mobile to account for hamburger menu and bottom nav */}
+        <div className={`flex-1 overflow-auto ${isMobile ? 'pt-16 pb-20' : ''}`}>
           <Outlet />
         </div>
       </div>
+
+      {/* Bottom Navigation - Mobile only */}
+      {isMobile && <BottomNav role={role} />}
     </div>
   )
 }
