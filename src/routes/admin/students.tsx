@@ -7,7 +7,6 @@ import { useToast } from '@/components/Toast'
 import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
 import type { Student, Program } from '@/types'
 import { Link } from '@tanstack/react-router'
-import { provisionStudentWithAuth } from '@/server/provisionAuthUsers'
 
 export const Route = createFileRoute('/admin/students')({
   component: StudentsPage,
@@ -21,11 +20,9 @@ function StudentsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Student>>(EMPTY)
   const [loading, setLoading] = useState(true)
-  const [createWithAuth, setCreateWithAuth] = useState(true)
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
 
-  // Filtros
   const [filterYear, setFilterYear] = useState<number | null>(null)
   const [filterProgram, setFilterProgram] = useState<string>('')
   const [filterStatus, setFilterStatus] = useState<string>('')
@@ -46,16 +43,9 @@ function StudentsPage() {
   }
 
   const filteredStudents = allStudents.filter(s => {
-    // Filtro por año
     if (filterYear !== null && s.year !== filterYear) return false
-    
-    // Filtro por programa
     if (filterProgram && (s as any).program_id !== filterProgram) return false
-    
-    // Filtro por estado
     if (filterStatus && s.status !== filterStatus) return false
-    
-    // Filtro por búsqueda (nombre, apellido, legajo, DNI, email)
     if (filterSearch) {
       const search = filterSearch.toLowerCase()
       return (
@@ -66,13 +56,11 @@ function StudentsPage() {
         s.email?.toLowerCase().includes(search)
       )
     }
-    
     return true
   })
 
   const openNew = () => {
     setEditing(EMPTY)
-    setCreateWithAuth(true)
     setModalOpen(true)
   }
   const openEdit = (s: Student) => {
@@ -83,9 +71,11 @@ function StudentsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     const { id, program, ...rest } = editing as any
+    setSaving(true)
 
     if (id) {
       const { error } = await supabase.from('students').update(rest).eq('id', id)
+      setSaving(false)
       if (error) {
         showToast('Error al actualizar.', 'error')
         return
@@ -96,52 +86,13 @@ function StudentsPage() {
       return
     }
 
-    if (createWithAuth) {
-      setSaving(true)
-      const { data: sessionData } = await supabase.auth.getSession()
-      const token = sessionData.session?.access_token
-      if (!token) {
-        showToast('Sesión expirada. Volvé a iniciar sesión.', 'error')
-        setSaving(false)
-        return
-      }
-
-      const res = await provisionStudentWithAuth({
-        data: {
-          accessToken: token,
-          email: rest.email,
-          dni: rest.dni,
-          first_name: rest.first_name,
-          last_name: rest.last_name,
-          legajo: rest.legajo,
-          program_id: rest.program_id || undefined,
-          year: rest.year ?? 1,
-          status: rest.status ?? 'active',
-        },
-      })
-
-      setSaving(false)
-
-      if (!res.ok) {
-        showToast(res.message, 'error')
-        return
-      }
-
-      showToast(
-        'Estudiante creado con acceso al portal. Usuario: correo · Contraseña inicial: DNI (solo números, mín. 6 dígitos).',
-        'info',
-      )
-      setModalOpen(false)
-      void loadData()
-      return
-    }
-
     const { error } = await supabase.from('students').insert(rest)
+    setSaving(false)
     if (error) {
       showToast('Error al crear estudiante.', 'error')
       return
     }
-    showToast('Estudiante creado (sin cuenta de acceso).')
+    showToast('Estudiante creado.')
     setModalOpen(false)
     void loadData()
   }
@@ -159,16 +110,6 @@ function StudentsPage() {
     { key: 'legajo', label: 'Legajo' },
     { key: 'dni', label: 'DNI' },
     { key: 'email', label: 'Email' },
-    {
-      key: 'user_id',
-      label: 'Portal',
-      render: (r: any) =>
-        r.user_id ? (
-          <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">Activo</span>
-        ) : (
-          <span className="text-xs text-slate-400">Sin cuenta</span>
-        ),
-    },
     { key: 'program', label: 'Carrera', render: (r: any) => r.program?.name || '-' },
     { key: 'year', label: 'Año' },
     { key: 'status', label: 'Estado', render: (r: any) => <span className="capitalize">{r.status}</span> },
@@ -186,7 +127,6 @@ function StudentsPage() {
         </button>
       </div>
 
-      {/* Filtros */}
       <div className="card p-4 space-y-3">
         <div className="flex items-center gap-2 mb-3">
           <Filter size={18} className="text-slate-600" />
@@ -290,24 +230,6 @@ function StudentsPage() {
         title={editing.id ? 'Editar estudiante' : 'Nuevo estudiante'}
       >
         <form onSubmit={(e) => void handleSave(e)} className="space-y-4">
-          {!editing.id && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-950">
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={createWithAuth}
-                  onChange={(e) => setCreateWithAuth(e.target.checked)}
-                />
-                <span>
-                  <strong>Crear cuenta en Supabase Auth</strong> para el portal del alumno. Se usará el{' '}
-                  <strong>correo</strong> como usuario y el <strong>DNI (solo números)</strong> como contraseña
-                  inicial (mínimo 6 dígitos). El alumno podrá cambiarla después desde su perfil.
-                </span>
-              </label>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="form-label">Nombre *</label>
@@ -330,7 +252,7 @@ function StudentsPage() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="form-label">DNI * {!editing.id && createWithAuth && '(contraseña inicial)'}</label>
+              <label className="form-label">DNI *</label>
               <input
                 className="form-input"
                 required
@@ -350,7 +272,7 @@ function StudentsPage() {
             </div>
           </div>
           <div>
-            <label className="form-label">Correo institucional * {!editing.id && createWithAuth && '(usuario de acceso)'}</label>
+            <label className="form-label">Correo institucional *</label>
             <input
               type="email"
               className="form-input"
@@ -402,7 +324,7 @@ function StudentsPage() {
           </div>
           <div className="flex gap-3 pt-2">
             <button type="submit" className="btn-primary flex-1" disabled={saving}>
-              {saving ? 'Creando…' : 'Guardar'}
+              {saving ? 'Guardando…' : 'Guardar'}
             </button>
             <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary flex-1">
               Cancelar

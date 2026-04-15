@@ -6,7 +6,7 @@ import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
 import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
 import type { Professor } from '@/types'
-import { provisionProfessorWithAuth } from '@/server/provisionAuthUsers'
+
 
 export const Route = createFileRoute('/admin/professors')({
   component: ProfessorsPage,
@@ -16,7 +16,7 @@ function ProfessorsPage() {
   const [allProfessors, setAllProfessors] = useState<Professor[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Partial<Professor & { dni?: string }>>({})
-  const [createWithAuth, setCreateWithAuth] = useState(true)
+  const [createWithAuth, setCreateWithAuth] = useState(false)
   const [saving, setSaving] = useState(false)
   const { showToast } = useToast()
 
@@ -60,7 +60,7 @@ function ProfessorsPage() {
 
   const openNew = () => {
     setEditing({})
-    setCreateWithAuth(true)
+    setCreateWithAuth(false)
     setModalOpen(true)
   }
 
