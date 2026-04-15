@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Plus, Check, Lock, AlertCircle, RefreshCw, Zap } from 'lucide-react'
+import { Plus, Check, Lock, AlertCircle, RefreshCw, Zap, X } from 'lucide-react'
 import { checkAdvancedStudentException, getFirstYearSubjects } from '@/lib/advancedStudentUtils'
 
 export const Route = createFileRoute('/dashboard/enroll-subjects')({
@@ -14,7 +14,7 @@ type SubjectWithStatus = {
   name: string
   code: string
   year: number
-  division?: string | null
+  baseSubjectId?: string
   dictation_type: string
   semester: number
   professor_id?: string
@@ -23,7 +23,14 @@ type SubjectWithStatus = {
   blockedReason?: string
   isEnrolled: boolean
   isRecursant?: boolean
+  hasMultipleDivisions?: boolean
 }
+
+type DivisionModalData = {
+  subjectId: string
+  subjectName: string
+  year: number
+} | null
 
 function EnrollSubjectsPage() {
   const [student, setStudent] = useState<any>(null)
@@ -32,6 +39,7 @@ function EnrollSubjectsPage() {
   const [isAdvancedStudent, setIsAdvancedStudent] = useState(false)
   const [advancedExceptionDate, setAdvancedExceptionDate] = useState<string | null>(null)
   const [enrolledDivision, setEnrolledDivision] = useState<string | null>(null)
+  const [divisionModal, setDivisionModal] = useState<DivisionModalData>(null)
   const { showToast } = useToast()
 
   const currentYear = new Date().getFullYear()
@@ -58,7 +66,6 @@ function EnrollSubjectsPage() {
       if (!studentData) return
       setStudent(studentData)
 
-      // Check if student qualifies for advanced exception
       const exceptionDate = await checkAdvancedStudentException(studentData.id)
       if (exceptionDate) {
         setIsAdvancedStudent(true)
@@ -81,20 +88,17 @@ function EnrollSubjectsPage() {
         allSubjects.map((s: any) => [s.id, s.name])
       )
 
-      // Obtener enrollments del año actual
       const { data: currentYearEnrollments } = await supabase
         .from('enrollments')
         .select('subject_id, division, grades(status), academic_year, subject:subjects(year)')
         .eq('student_id', studentData.id)
         .eq('academic_year', currentYear)
 
-      // Obtener todos los enrollments históricos
       const { data: allEnrollments } = await supabase
         .from('enrollments')
         .select('subject_id, grades(status), academic_year')
         .eq('student_id', studentData.id)
 
-      // Detectar si ya está inscripto en alguna división de primer año
       const firstYearEnrollments = currentYearEnrollments?.filter(e => {
         const year = (e as any).subject?.year
         return year === 1 && e.division
@@ -105,7 +109,6 @@ function EnrollSubjectsPage() {
         setEnrolledDivision(division)
       }
 
-      // Sets para control de año actual
       const enrolledThisYearByAnyYear = new Map<number, boolean>()
       const currentYearEnrollmentIds = new Set(currentYearEnrollments?.map(e => e.subject_id) ?? [])
 
@@ -118,7 +121,6 @@ function EnrollSubjectsPage() {
         }
       }
 
-      // Sets para aprobadas (históricas)
       const passedSubjectIds = new Set(
         (allEnrollments ?? [])
           .filter(e => {
@@ -128,7 +130,6 @@ function EnrollSubjectsPage() {
           .map(e => e.subject_id)
       )
 
-      // Obtener correlativas
       const { data: correlatives } = await supabase
         .from('subject_correlatives')
         .select('subject_id, requires_subject_id')
@@ -141,12 +142,23 @@ function EnrollSubjectsPage() {
         requiresMap.set(c.subject_id, arr)
       }
 
-      // Get 1st year subjects for exception check
       const firstYearSubjectIds = await getFirstYearSubjects(studentData.id)
+
+      // Agrupar materias por nombre base (sin división)
+      const subjectsByBase = new Map<string, any[]>()
+      for (const subject of allSubjects) {
+        const baseKey = `${subject.name}_${subject.code}`
+        if (!subjectsByBase.has(baseKey)) {
+          subjectsByBase.set(baseKey, [])
+        }
+        subjectsByBase.get(baseKey)!.push(subject)
+      }
 
       const processed: SubjectWithStatus[] = []
 
-      for (const subject of allSubjects) {
+      for (const [, variants] of subjectsByBase) {
+        // Usar la primera variante como referencia
+        const subject = variants[0]
         const isEnrolledThisYear = currentYearEnrollmentIds.has(subject.id)
         const isPassed = passedSubjectIds.has(subject.id)
         const isRecursant = !isPassed && passedSubjectIds.has(subject.id) === false && 
@@ -155,13 +167,11 @@ function EnrollSubjectsPage() {
         let canEnroll = false
         let blockedReason = ''
 
-        // 1. Si ya está inscripto o pasó
         if (isEnrolledThisYear) {
           blockedReason = 'Ya inscripto este año'
         } else if (isPassed) {
           blockedReason = 'Ya aprobada/promocionada'
         } 
-        // 2. Recursante: puede reinscribirse en materias NO aprobadas
         else if (isRecursant) {
           const reqs = requiresMap.get(subject.id) ?? []
           const allReqsPassed = reqs.every(rid => passedSubjectIds.has(rid))
@@ -174,7 +184,6 @@ function EnrollSubjectsPage() {
               .join(', ')
             blockedReason = `Requiere (recursante): ${missingNames}`
           } else {
-            // Validar cuatrimestre
             if (subject.dictation_type === 'cuatrimestral') {
               if (subject.semester === 1 && !isFirstSemester) {
                 blockedReason = '1er cuatrimestre (hasta julio)'
@@ -184,14 +193,11 @@ function EnrollSubjectsPage() {
                 canEnroll = true
               }
             } else {
-              canEnroll = true // Anual siempre disponible
+              canEnroll = true
             }
           }
         }
-        // 3. Nuevo alumno: restricciones de año
         else {
-          // EXCEPCIÓN: Si aprobó todas las materias del 1er año el mismo día
-          // puede inscribirse a materias del año siguiente (studentData.year + 1)
           if (isAdvancedStudent && subject.year === studentData.year + 1) {
             const reqs = requiresMap.get(subject.id) ?? []
             const allReqsPassed = reqs.every(rid => passedSubjectIds.has(rid))
@@ -204,7 +210,6 @@ function EnrollSubjectsPage() {
                 .join(', ')
               blockedReason = `Requiere: ${missingNames}`
             } else {
-              // Validar cuatrimestre
               if (subject.dictation_type === 'cuatrimestral') {
                 if (subject.semester === 1 && !isFirstSemester) {
                   blockedReason = '1er cuatrimestre (hasta julio)'
@@ -214,11 +219,10 @@ function EnrollSubjectsPage() {
                   canEnroll = true
                 }
               } else {
-                canEnroll = true // Anual siempre disponible
+                canEnroll = true
               }
             }
           }
-          // Alumno debe estar en su año exacto (a menos que sea avanzado)
           else if (subject.year !== studentData.year) {
             blockedReason = `Año ${subject.year} (Tu año actual: ${studentData.year})`
           } else {
@@ -233,7 +237,6 @@ function EnrollSubjectsPage() {
                 .join(', ')
               blockedReason = `Requiere: ${missingNames}`
             } else {
-              // Validar cuatrimestre
               if (subject.dictation_type === 'cuatrimestral') {
                 if (subject.semester === 1 && !isFirstSemester) {
                   blockedReason = '1er cuatrimestre (hasta julio)'
@@ -243,7 +246,7 @@ function EnrollSubjectsPage() {
                   canEnroll = true
                 }
               } else {
-                canEnroll = true // Anual siempre disponible
+                canEnroll = true
               }
             }
           }
@@ -254,7 +257,6 @@ function EnrollSubjectsPage() {
           name: subject.name,
           code: subject.code,
           year: subject.year,
-          division: subject.division,
           dictation_type: subject.dictation_type || 'anual',
           semester: subject.semester || 1,
           professor_id: subject.professor_id,
@@ -263,6 +265,7 @@ function EnrollSubjectsPage() {
           blockedReason,
           isEnrolled: isEnrolledThisYear || isPassed,
           isRecursant: isRecursant && !isEnrolledThisYear && !isPassed,
+          hasMultipleDivisions: variants.length > 1,
         })
       }
 
@@ -298,19 +301,31 @@ function EnrollSubjectsPage() {
     }
 
     showToast('Inscripción completada')
+    setDivisionModal(null)
     void loadData()
+  }
+
+  function handleEnrollClick(subject: SubjectWithStatus) {
+    if (subject.year === 1 && subject.hasMultipleDivisions) {
+      // Mostrar modal para elegir división
+      setDivisionModal({
+        subjectId: subject.id,
+        subjectName: subject.name,
+        year: subject.year,
+      })
+    } else {
+      // Inscribir directamente sin división
+      enrollSubject(subject.id, null)
+    }
   }
 
   if (loading) {
     return <p className="text-slate-600">Cargando materias...</p>
   }
 
-  // Filtrar materias de primer año según división
   const filteredSubjects = availableSubjects.filter(subject => {
-    // Si es materia de primer año con división
-    if (subject.year === 1 && subject.division) {
-      // Si ya está inscripto en una división, solo mostrar esa división
-      if (enrolledDivision && enrolledDivision !== subject.division) {
+    if (subject.year === 1 && subject.hasMultipleDivisions) {
+      if (enrolledDivision) {
         return false
       }
     }
@@ -329,7 +344,6 @@ function EnrollSubjectsPage() {
         </p>
       </div>
 
-      {/* Alerta de división seleccionada */}
       {enrolledDivision && (
         <div className="card p-4 border-l-4 border-l-blue-600 bg-blue-50 border border-blue-200">
           <div className="flex items-start gap-3">
@@ -338,14 +352,12 @@ function EnrollSubjectsPage() {
               <h3 className="font-semibold text-blue-900">División Seleccionada</h3>
               <p className="text-sm text-blue-800 mt-1">
                 Estás inscripto en <strong>División {enrolledDivision}</strong> para materias de primer año.
-                Se ocultan automáticamente las materias de la otra división para evitar confusión.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Alerta de alumno avanzado */}
       {isAdvancedStudent && advancedExceptionDate && (
         <div className="card p-4 border-l-4 border-l-yellow-500 bg-yellow-50 border border-yellow-200">
           <div className="flex items-start gap-3">
@@ -401,9 +413,9 @@ function EnrollSubjectsPage() {
                   <span className="text-xs bg-slate-200 text-slate-700 px-2 py-1 rounded">
                     Año {subject.year}
                   </span>
-                  {subject.division && (
-                    <span className="text-xs bg-blue-200 text-blue-700 px-2 py-1 rounded">
-                      Div. {subject.division}
+                  {subject.hasMultipleDivisions && (
+                    <span className="text-xs bg-purple-200 text-purple-700 px-2 py-1 rounded">
+                      Divisiones A y B
                     </span>
                   )}
                   {subject.dictation_type === 'cuatrimestral' && (
@@ -442,7 +454,7 @@ function EnrollSubjectsPage() {
                 </button>
               ) : subject.canEnroll ? (
                 <button
-                  onClick={() => enrollSubject(subject.id, subject.division || null)}
+                  onClick={() => handleEnrollClick(subject)}
                   className="flex items-center gap-2 px-4 py-2 btn-primary"
                 >
                   <Plus size={18} />
@@ -462,11 +474,55 @@ function EnrollSubjectsPage() {
         )}
       </div>
 
+      {/* Modal de selección de división */}
+      {divisionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card p-8 max-w-md mx-4 rounded-2xl">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Selecciona División</h2>
+                <p className="text-sm text-gray-600 mt-1">{divisionModal.subjectName}</p>
+              </div>
+              <button
+                onClick={() => setDivisionModal(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-700 mb-6">
+              ¿En qué división deseas inscribirte?
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => enrollSubject(divisionModal.subjectId, 'A')}
+                className="w-full p-4 border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg font-semibold text-blue-900 transition-colors"
+              >
+                División A
+              </button>
+              <button
+                onClick={() => enrollSubject(divisionModal.subjectId, 'B')}
+                className="w-full p-4 border-2 border-indigo-300 bg-indigo-50 hover:bg-indigo-100 rounded-lg font-semibold text-indigo-900 transition-colors"
+              >
+                División B
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-500 text-center mt-4">
+              Una vez seleccionada una división, solo verás materias de esa división.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Información */}
       <div className="card p-4 bg-blue-50 border border-blue-200 space-y-2">
         <h3 className="font-semibold text-blue-900">ℹ️ Reglas de inscripción</h3>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• <strong>Divisiones (Año 1):</strong> Una vez inscripto en División A o B, solo verás materias de esa división</li>
+          <li>• <strong>Divisiones (Año 1):</strong> Al inscribirte en una materia de primer año, elige tu división (A o B)</li>
+          <li>• <strong>Una división por vez:</strong> Una vez seleccionada, solo verás materias de esa división</li>
           <li>• <strong>Alumnos nuevos:</strong> Solo pueden inscribirse en su año actual y recursantes en años anteriores</li>
           <li>• <strong>Alumnos avanzados:</strong> Si aprueban todas las materias del primer año el mismo día, pueden inscribirse en años superiores</li>
           <li>• <strong>Correlativas:</strong> Debes haber aprobado las materias requisito antes de inscribirte</li>
