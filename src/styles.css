@@ -36,15 +36,18 @@
   }
 }
 
-body {
-  @apply m-0 antialiased text-slate-800;
+html, body {
+  @apply m-0 p-0 antialiased text-slate-800;
   background: var(--siu-page-bg);
   color: var(--siu-text);
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* --- Barra lateral (menú tipo Guaraní) --- */
 .sidebar {
-  @apply h-screen flex flex-col overflow-y-auto border-r shadow-sm;
+  @apply h-full flex flex-col overflow-y-auto;
   background: var(--siu-sidebar-bg);
   border-color: var(--siu-border);
 }
