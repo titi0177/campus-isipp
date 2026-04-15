@@ -1,5 +1,16 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "outputDirectory": "dist"
+  "outputDirectory": "dist/client",
+  "functions": {
+    "dist/server/server.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/dist/server/server.js"
+    }
+  ]
 }
