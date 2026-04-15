@@ -32,77 +32,69 @@ export function AppLayout({ role = 'student', userName = 'Usuario' }: AppLayoutP
     setSidebarOpen(false)
   }, [router.location.pathname])
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
-  const closeSidebar = () => setSidebarOpen(false)
-
-  // DESKTOP LAYOUT
+  // DESKTOP LAYOUT: Sidebar fijo (w-64) + Content scrolleable
   if (!isMobile) {
     return (
-      <div className="flex h-screen w-full" style={{ backgroundColor: 'var(--siu-page-bg)' }}>
-        {/* Sidebar - Fijo a la izquierda */}
-        <div className="w-64 flex-shrink-0 overflow-y-auto" style={{ backgroundColor: 'var(--siu-sidebar-bg)', borderRight: `1px solid var(--siu-border)` }}>
+      <div className="app-layout-desktop">
+        {/* Fixed Sidebar - Left Column */}
+        <aside className="app-sidebar-desktop">
           <Sidebar role={role} />
-        </div>
+        </aside>
 
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col h-screen">
-          {/* TopNav */}
-          <div className="flex-shrink-0">
-            <TopNav userName={userName} role={role} />
-          </div>
+        {/* Main Content Area - Right Column */}
+        <div className="app-content-desktop">
+          {/* TopNav - Sticky */}
+          <TopNav userName={userName} role={role} />
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4 sm:p-5 md:p-6">
+          <main className="app-main-scrollable">
+            <div className="app-main-padding">
               <Outlet />
             </div>
-          </div>
+          </main>
         </div>
       </div>
     )
   }
 
-  // MOBILE LAYOUT
+  // MOBILE LAYOUT: Header + Drawer Sidebar + Scrollable Content + BottomNav
   return (
-    <div className="flex flex-col h-screen w-full" style={{ backgroundColor: 'var(--siu-page-bg)' }}>
-      {/* Mobile Header */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-3 py-3 border-b" style={{ backgroundColor: 'var(--siu-panel)', borderColor: 'var(--siu-border)' }}>
+    <div className="app-layout-mobile">
+      {/* Header with Menu Button */}
+      <header className="app-header-mobile">
         <button
-          onClick={toggleSidebar}
-          className="p-2.5 rounded-lg transition-all hover:shadow-lg active:scale-95"
-          style={{
-            backgroundColor: 'var(--siu-page-bg)',
-            color: 'var(--isipp-bordo)'
-          }}
-          aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="app-menu-button"
+          aria-label="Abrir menú"
+          aria-expanded={sidebarOpen}
         >
           {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
-        <h2 className="text-sm font-semibold text-slate-900 truncate">Campus ISIPP</h2>
-      </div>
+        <h1 className="app-header-title">Campus ISIPP</h1>
+      </header>
 
-      {/* Sidebar Overlay - Mobile */}
+      {/* Sidebar Drawer Overlay - Mobile Only */}
       {sidebarOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-30"
-            onClick={closeSidebar}
+            className="app-sidebar-overlay"
+            onClick={() => setSidebarOpen(false)}
             aria-hidden="true"
           />
-          <div className="fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto flex flex-col" style={{ backgroundColor: 'var(--siu-sidebar-bg)', marginTop: '56px' }}>
+          <div className="app-sidebar-drawer">
             <Sidebar role={role} />
           </div>
         </>
       )}
 
-      {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto pb-20">
-        <div className="px-3 sm:px-4 py-4">
+      {/* Scrollable Content - Takes remaining space */}
+      <main className="app-main-mobile">
+        <div className="app-main-padding-mobile">
           <Outlet />
         </div>
-      </div>
+      </main>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation - Fixed */}
       <BottomNav role={role} />
     </div>
   )

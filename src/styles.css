@@ -1,4 +1,4 @@
-@import "tailwindcss" source("../");
+/* --- Botones --- *//* --- Barra lateral (menú tipo Guaraní) --- */@import "tailwindcss" source("../");
 
 /* --- Identidad ISIPP: blanco + bordó institucional (logo) --- */
 :root {
@@ -42,10 +42,203 @@ html, body {
   color: var(--siu-text);
   width: 100%;
   height: 100%;
+}
+
+/* ============================================================================
+   APP LAYOUT - DESKTOP & MOBILE RESPONSIVE STRUCTURE
+   ============================================================================ */
+
+/* DESKTOP LAYOUT (md+): Sidebar Left + Content Right */
+.app-layout-desktop {
+  @apply flex h-screen w-screen bg-gray-50;
   overflow: hidden;
 }
 
-/* --- Barra lateral (menú tipo Guaraní) --- */
+.app-sidebar-desktop {
+  @apply w-64 flex-shrink-0 border-r overflow-y-auto bg-white;
+  border-color: var(--siu-border);
+  min-width: 256px;
+  max-width: 256px;
+}
+
+.app-content-desktop {
+  @apply flex-1 flex flex-col overflow-hidden;
+  min-width: 0; /* Important: allows flex child to shrink below content size */
+}
+
+.app-main-scrollable {
+  @apply flex-1 overflow-y-auto overflow-x-hidden bg-gray-50;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+.app-main-padding {
+  @apply p-6;
+}
+
+/* MOBILE LAYOUT (sm-): Vertical Stack Header + Content + BottomNav */
+.app-layout-mobile {
+  @apply flex flex-col w-screen bg-gray-50;
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  overflow: hidden;
+}
+
+.app-header-mobile {
+  @apply flex-shrink-0 bg-white border-b px-4 py-3 flex items-center gap-3 z-40;
+  border-color: var(--siu-border);
+  min-height: 56px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.app-menu-button {
+  @apply p-2 rounded-lg text-gray-700 transition-colors flex-shrink-0;
+  background: rgba(88, 44, 49, 0.06);
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.app-menu-button:active {
+  @apply bg-gray-200;
+}
+
+.app-header-title {
+  @apply text-sm font-semibold text-gray-900 flex-1 truncate;
+}
+
+/* Sidebar Overlay (Mobile) */
+.app-sidebar-overlay {
+  @apply fixed inset-0 bg-black/50 z-30;
+  animation: fadeIn 150ms ease-out;
+}
+
+.app-sidebar-drawer {
+  @apply fixed top-0 left-0 z-40 w-64 h-full bg-white overflow-y-auto border-r;
+  border-color: var(--siu-border);
+  animation: slideInLeft 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Main Content Area (Mobile) */
+.app-main-mobile {
+  @apply flex-1 overflow-y-auto overflow-x-hidden bg-gray-50;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  /* Prevent content from being hidden behind BottomNav */
+  padding-bottom: 0;
+}
+
+.app-main-padding-mobile {
+  @apply p-4 pb-20; /* Extra padding to account for fixed BottomNav (56px + 8px) */
+}
+
+/* ============================================================================
+   BOTTOM NAVIGATION - FIXED MOBILE NAV
+   ============================================================================ */
+
+.bottom-nav-mobile {
+  @apply fixed bottom-0 left-0 right-0 z-40 border-t;
+  background: var(--siu-panel);
+  border-color: var(--siu-border);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.08);
+  min-height: 56px;
+}
+
+/* ============================================================================
+   BREAKPOINTS & RESPONSIVE BEHAVIOR
+   ============================================================================ */
+
+/* Extra Small Devices (320px - 479px) */
+@media (max-width: 479px) {
+  .app-main-padding-mobile {
+    @apply p-3 pb-20;
+  }
+
+  .app-header-mobile {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+}
+
+/* Small Devices (480px - 767px) */
+@media (min-width: 480px) and (max-width: 767px) {
+  .app-main-padding-mobile {
+    @apply p-4 pb-20;
+  }
+}
+
+/* Tablets & Small Laptops (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-sidebar-desktop {
+    width: 256px;
+  }
+
+  .app-main-padding {
+    @apply p-5;
+  }
+}
+
+/* Large Laptops (1024px - 1279px) */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .app-main-padding {
+    @apply p-6;
+  }
+}
+
+/* Extra Large Screens (1280px+) */
+@media (min-width: 1280px) {
+  .app-main-scrollable {
+    background: var(--siu-page-bg);
+  }
+
+  .app-main-padding {
+    @apply p-6;
+  }
+}
+
+/* Landscape Mobile Optimization */
+@media (max-height: 600px) and (orientation: landscape) {
+  .app-header-mobile {
+    min-height: 48px;
+    padding: 8px 12px;
+  }
+
+  .app-main-padding-mobile {
+    @apply pb-16; /* Adjust for smaller viewport */
+  }
+}
+
+/* Notched Devices (iPhone X+) */
+@supports (padding: max(0px)) {
+  .app-header-mobile {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .app-sidebar-drawer {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
 .sidebar {
   @apply h-full flex flex-col overflow-y-auto;
   background: var(--siu-sidebar-bg);
@@ -96,7 +289,39 @@ html, body {
   opacity: 0.9;
 }
 
-/* --- Botones --- */
+/* ============================================================================
+   SCROLL BEHAVIOR & OVERFLOW FIX
+   ============================================================================ */
+
+body {
+  overflow: hidden; /* Prevent double scrollbars */
+}
+
+/* Ensure smooth scrolling in scrollable containers */
+.app-main-scrollable,
+.app-main-mobile,
+.app-sidebar-desktop,
+.app-sidebar-drawer {
+  -webkit-overflow-scrolling: touch; /* Smooth momentum scrolling on iOS */
+}
+
+/* iOS fix: prevent zoom on input focus */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Fix 100vh issues on mobile with dynamic viewport */
+@media (max-width: 767px) {
+  .app-layout-mobile {
+    height: 100vh;
+    height: 100dvh; /* Fallback for older browsers */
+  }
+}
+
 .btn-primary {
   @apply inline-flex items-center justify-center px-4 py-2.5 md:py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   background: var(--siu-blue);
@@ -416,6 +641,34 @@ html, body {
   }
 }
 
+/* Bottom Nav Item Styling */
+.bottom-nav-item {
+  @apply flex flex-col items-center justify-center py-2.5 px-2 relative transition-colors flex-shrink-0;
+  min-height: 56px;
+  min-width: 56px;
+}
+
+.bottom-nav-item:active {
+  background: rgba(88, 44, 49, 0.06);
+}
+
+/* Scrollbar Hide Utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide bottom nav on desktop */
+@media (min-width: 768px) {
+  .bottom-nav-mobile {
+    display: none;
+  }
+}
+
 /* High DPI screens */
 @media (min-width: 1920px) {
   body {
@@ -434,7 +687,36 @@ html, body {
   }
 }
 
-/* Ensure proper scrolling on mobile */
+/* ============================================================================
+   ANIMATIONS & TRANSITIONS
+   ============================================================================ */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Reduce animations on slow devices */
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar-overlay,
+  .app-sidebar-drawer {
+    animation: none !important;
+  }
+}
+
 @media (max-width: 768px) {
   html {
     scroll-behavior: smooth;
