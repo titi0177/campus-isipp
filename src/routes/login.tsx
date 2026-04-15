@@ -636,6 +636,7 @@ function LoginPage() {
 
             <p className="mt-6 text-center text-xs text-slate-400">
               © {new Date().getFullYear()} Instituto Superior de Informática Puerto Piray
+              deloper=Cristian L. Medina
             </p>
           </div>
         </div>
