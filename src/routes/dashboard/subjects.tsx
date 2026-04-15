@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { StatusBadge } from '@/components/StatusBadge'
-import { ChevronDown, ChevronUp, Book, User, BarChart3, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, Book, User, BarChart3, CheckCircle2, AlertCircle, Zap, Award } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard/subjects')({
   component: SubjectsPage,
@@ -105,14 +105,11 @@ function SubjectsPage() {
         }
       }
 
-      // Filtrar enrollments para solo mostrar materias de la división elegida
       const filteredEnrollments = enrollmentsWithProfs.filter(enr => {
         const subject = enr.subject
         
-        // Si es materia de primer año CON división
         if (subject?.year === 1 && subject?.division) {
-          // Solo mostrar si el estudiante está inscripto en esa división
-          return enr.division === enr.division // La inscripción tiene división grabada
+          return enr.division === enr.division
         }
         
         return true
@@ -131,34 +128,35 @@ function SubjectsPage() {
     setExpandedId(expandedId === id ? null : id)
   }
 
-  function getGradeColor(grade: number | null | undefined) {
-    if (grade === null || grade === undefined) return 'from-gray-400 to-gray-500'
-    if (grade >= 7) return 'from-emerald-400 to-emerald-600'
-    if (grade >= 4) return 'from-amber-400 to-amber-600'
-    return 'from-red-400 to-red-600'
-  }
-
-  function getAttendanceColor(percentage: number | null | undefined) {
-    if (percentage === null || percentage === undefined) return 'from-gray-100 to-gray-200'
-    if (percentage >= 60) return 'from-emerald-100 to-emerald-200'
-    return 'from-red-100 to-red-200'
+  const stats = {
+    approved: enrollments.filter(e => {
+      const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
+      return grade && grade.status === 'passed'
+    }).length,
+    promoted: enrollments.filter(e => {
+      const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
+      return grade && grade.status === 'promoted'
+    }).length,
+    current: enrollments.filter(e => {
+      const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
+      return !grade || grade.status === 'in_progress'
+    }).length,
   }
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Mis Materias
-          </h1>
-          <p className="text-gray-500 mt-2">Cargando tu información académica...</p>
+      <div className="space-y-8">
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl animate-pulse">
+          <h1 className="text-4xl font-black mb-2 h-12 bg-white/20 rounded w-1/2"></h1>
+          <p className="text-indigo-100 h-6 bg-white/10 rounded w-2/3"></p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[1, 2, 3].map(i => (
             <div key={i} className="card p-6 animate-pulse">
               <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
               <div className="h-4 bg-gray-200 rounded w-1/2 mb-6"></div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="h-20 bg-gray-200 rounded"></div>
                 <div className="h-20 bg-gray-200 rounded"></div>
                 <div className="h-20 bg-gray-200 rounded"></div>
               </div>
@@ -171,40 +169,53 @@ function SubjectsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3">
-          Mis Materias
-        </h1>
-        <p className="text-gray-600 text-lg">Seguimiento de tu progreso académico</p>
-        <div className="mt-4 flex gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-            <span className="text-sm text-gray-600">Aprobado</span>
+      {/* Header Hero */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-indigo-100 text-sm font-semibold mb-2">Mi Desempeño</p>
+            <h1 className="text-5xl font-black mb-3">Mis Cursadas</h1>
+            <p className="text-indigo-100 text-lg max-w-2xl">Seguimiento detallado de tu progreso académico en todas las materias</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-            <span className="text-sm text-gray-600">En progreso</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span className="text-sm text-gray-600">Desaprobado</span>
-          </div>
+          <Book size={80} className="opacity-20" />
         </div>
       </div>
 
+      {/* Stats Cards */}
+      {enrollments.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="card p-6 border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-teal-50">
+            <p className="text-xs text-emerald-600 font-bold mb-3 uppercase tracking-wide">APROBADAS</p>
+            <p className="text-4xl font-black text-emerald-700">{stats.approved}</p>
+            <p className="text-sm text-emerald-600 mt-2">Materias completadas</p>
+          </div>
+
+          <div className="card p-6 border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 to-pink-50">
+            <p className="text-xs text-purple-600 font-bold mb-3 uppercase tracking-wide">PROMOCIONADAS</p>
+            <p className="text-4xl font-black text-purple-700">{stats.promoted}</p>
+            <p className="text-sm text-purple-600 mt-2">Con nota ≥8</p>
+          </div>
+
+          <div className="card p-6 border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-cyan-50">
+            <p className="text-xs text-blue-600 font-bold mb-3 uppercase tracking-wide">EN CURSO</p>
+            <p className="text-4xl font-black text-blue-700">{stats.current}</p>
+            <p className="text-sm text-blue-600 mt-2">En progreso</p>
+          </div>
+        </div>
+      )}
+
       {error && (
-        <div className="card p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3">
+        <div className="card p-4 bg-red-50 border-2 border-red-200 rounded-lg flex items-center gap-3">
           <AlertCircle className="text-red-600" size={20} />
           <p className="text-red-700 text-sm">{error}</p>
         </div>
       )}
 
       {enrollments.length === 0 ? (
-        <div className="card p-12 text-center rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100">
-          <Book size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600 text-lg">No tienes materias inscriptas aún.</p>
-          <p className="text-gray-500 text-sm mt-2">Dirígete a inscripciones para agregar tus materias.</p>
+        <div className="card p-16 text-center rounded-3xl bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200">
+          <Book size={64} className="mx-auto text-gray-400 mb-6" />
+          <p className="text-gray-600 text-xl font-semibold">No tienes materias inscriptas</p>
+          <p className="text-gray-500 mt-2">Dirígete a inscripciones para agregar tus materias</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -232,30 +243,47 @@ function SubjectsPage() {
             const finalGrade = grade?.final_grade_exam
             const attendance = att?.percentage
 
+            // Determine card color scheme based on status
+            const getCardStyle = () => {
+              if (finalGrade && finalGrade >= 8 && subject?.allows_promotion) {
+                return 'border-purple-600 bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50'
+              }
+              if (finalGrade && finalGrade >= 6) {
+                return 'border-emerald-600 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-50'
+              }
+              if (finalGrade && finalGrade < 6) {
+                return 'border-red-600 bg-gradient-to-br from-red-50 via-rose-50 to-red-50'
+              }
+              return 'border-indigo-600 bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-50'
+            }
+
             return (
               <div
                 key={enr.id}
-                className={`card overflow-hidden rounded-2xl transition-all duration-300 transform hover:shadow-xl ${
-                  isExpanded ? 'ring-2 ring-blue-400' : ''
+                className={`card overflow-hidden rounded-3xl border-2 transition-all duration-300 hover:shadow-2xl hover:scale-105 ${getCardStyle()} ${
+                  isExpanded ? 'ring-2 ring-indigo-400' : ''
                 }`}
               >
-                {/* Header - Click para expandir */}
+                {/* Header */}
                 <button
                   onClick={() => toggleExpanded(enr.id)}
-                  className="w-full p-6 text-left hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-colors"
+                  className="w-full p-6 text-left hover:bg-black/5 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start justify-between gap-4 mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100">
-                          <Book size={20} className="text-indigo-600" />
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100">
+                          <Book size={24} className="text-indigo-600" />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900">{subject?.name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <p className="text-sm text-gray-500">{subject?.code} • {professor?.name}</p>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-black text-gray-900">{subject?.name}</h3>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <p className="text-sm font-bold text-indigo-600 font-mono">{subject?.code}</p>
+                            <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                              {enr.academic_year}° año
+                            </span>
                             {subject?.division && (
-                              <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded">
+                              <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">
                                 Div. {subject.division}
                               </span>
                             )}
@@ -265,95 +293,100 @@ function SubjectsPage() {
                     </div>
 
                     {isExpanded ? (
-                      <ChevronUp className="text-blue-600" size={24} />
+                      <ChevronUp className="text-indigo-600" size={28} />
                     ) : (
-                      <ChevronDown className="text-gray-400" size={24} />
+                      <ChevronDown className="text-gray-400" size={28} />
                     )}
                   </div>
 
-                  {/* Quick Stats - Visible siempre */}
-                  <div className="grid grid-cols-3 gap-3 mt-4">
+                  {/* Quick Stats */}
+                  <div className="grid grid-cols-3 gap-3">
                     {/* Parcial */}
-                    <div className="p-3 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200">
-                      <p className="text-xs text-blue-600 font-semibold mb-1">PARCIAL</p>
+                    <div className="p-4 rounded-2xl bg-white/60 border-2 border-blue-200 hover:border-blue-400 transition-colors">
+                      <p className="text-xs text-blue-600 font-black mb-2 uppercase tracking-wide">PARCIAL</p>
                       <div className="flex items-center justify-between">
-                        <p className="text-2xl font-bold text-blue-900">{partialToShow ?? '—'}</p>
+                        <p className="text-3xl font-black text-blue-900">{partialToShow ?? '—'}</p>
                         {partialToShow && parseFloat(partialToShow as string) >= 6 && (
-                          <CheckCircle2 size={20} className="text-emerald-600" />
+                          <CheckCircle2 size={24} className="text-emerald-600" />
                         )}
                       </div>
                     </div>
 
                     {/* Final */}
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${
-                      finalGrade && finalGrade >= 7
-                        ? 'from-emerald-50 to-emerald-100 border border-emerald-200'
-                        : finalGrade && finalGrade >= 4
-                          ? 'from-amber-50 to-amber-100 border border-amber-200'
-                          : 'from-gray-50 to-gray-100 border border-gray-200'
+                    <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
+                      finalGrade && finalGrade >= 8 ? 'border-purple-400 hover:border-purple-600' :
+                      finalGrade && finalGrade >= 6 ? 'border-emerald-400 hover:border-emerald-600' :
+                      finalGrade ? 'border-red-400 hover:border-red-600' :
+                      'border-gray-300 hover:border-gray-500'
                     }`}>
-                      <p className={`text-xs font-semibold mb-1 ${
-                        finalGrade && finalGrade >= 7
-                          ? 'text-emerald-600'
-                          : finalGrade && finalGrade >= 4
-                            ? 'text-amber-600'
-                            : 'text-gray-600'
+                      <p className={`text-xs font-black mb-2 uppercase tracking-wide ${
+                        finalGrade && finalGrade >= 8 ? 'text-purple-600' :
+                        finalGrade && finalGrade >= 6 ? 'text-emerald-600' :
+                        finalGrade ? 'text-red-600' :
+                        'text-gray-600'
                       }`}>FINAL</p>
-                      <p className={`text-2xl font-bold ${
-                        finalGrade && finalGrade >= 7
-                          ? 'text-emerald-900'
-                          : finalGrade && finalGrade >= 4
-                            ? 'text-amber-900'
-                            : 'text-gray-600'
+                      <p className={`text-3xl font-black ${
+                        finalGrade && finalGrade >= 8 ? 'text-purple-900' :
+                        finalGrade && finalGrade >= 6 ? 'text-emerald-900' :
+                        finalGrade ? 'text-red-900' :
+                        'text-gray-600'
                       }`}>{finalGrade ?? '—'}</p>
                     </div>
 
                     {/* Asistencia */}
-                    <div className={`p-3 rounded-xl bg-gradient-to-br ${
-                      attendance && attendance >= 60
-                        ? 'from-emerald-50 to-emerald-100 border border-emerald-200'
-                        : 'from-red-50 to-red-100 border border-red-200'
+                    <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
+                      attendance && attendance >= 60 ? 'border-green-400 hover:border-green-600' :
+                      'border-orange-400 hover:border-orange-600'
                     }`}>
-                      <p className={`text-xs font-semibold mb-1 ${
-                        attendance && attendance >= 60
-                          ? 'text-emerald-600'
-                          : 'text-red-600'
-                      }`}>ASISTENCIA</p>
-                      <p className={`text-2xl font-bold ${
-                        attendance && attendance >= 60
-                          ? 'text-emerald-900'
-                          : 'text-red-900'
+                      <p className={`text-xs font-black mb-2 uppercase tracking-wide ${
+                        attendance && attendance >= 60 ? 'text-green-600' :
+                        'text-orange-600'
+                      }`}>ASIST.</p>
+                      <p className={`text-3xl font-black ${
+                        attendance && attendance >= 60 ? 'text-green-900' :
+                        'text-orange-900'
                       }`}>{attendance ?? '—'}%</p>
                     </div>
                   </div>
                 </button>
 
-                {/* Detalles expandido */}
+                {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200 p-6 space-y-6 bg-gradient-to-b from-gray-50 to-white">
-                    {/* Parciales y Trabajos Prácticos */}
+                  <div className="border-t-2 border-gray-200 p-6 space-y-6 bg-white/50 backdrop-blur-sm">
+                    {/* Profesor */}
+                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/60 border-2 border-gray-100">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-orange-100 to-yellow-100">
+                        <User size={20} className="text-orange-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-600 font-bold uppercase">Profesor</p>
+                        <p className="text-lg font-bold text-gray-900">{professor?.name || '—'}</p>
+                      </div>
+                    </div>
+
+                    {/* Parciales y TPs */}
                     {(partials.length > 0 || practicals.length > 0) && (
                       <div>
-                        <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <h4 className="text-sm font-black text-gray-900 mb-3 flex items-center gap-2">
                           <BarChart3 size={18} className="text-indigo-600" />
-                          Desglose de Calificaciones
+                          DESGLOSE DE CALIFICACIONES
                         </h4>
                         <div className="grid grid-cols-3 gap-2">
                           {[1, 2, 3].map(i => {
                             const pValue = grade?.[`partial_${i}`]
                             return (
-                              <div key={`p${i}`} className="bg-white rounded-lg p-3 border border-gray-200 text-center hover:border-indigo-300 transition-colors">
-                                <p className="text-xs text-gray-500 font-semibold mb-1">P{i}</p>
-                                <p className="text-xl font-bold text-gray-900">{pValue ?? '—'}</p>
+                              <div key={`p${i}`} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center hover:border-blue-400 transition-colors">
+                                <p className="text-xs text-blue-600 font-black mb-1 uppercase">P{i}</p>
+                                <p className="text-2xl font-black text-blue-900">{pValue ?? '—'}</p>
                               </div>
                             )
                           })}
                           {[1, 2, 3].map(i => {
                             const tpValue = grade?.[`practical_${i}`]
                             return (
-                              <div key={`tp${i}`} className="bg-white rounded-lg p-3 border border-gray-200 text-center hover:border-indigo-300 transition-colors">
-                                <p className="text-xs text-gray-500 font-semibold mb-1">TP{i}</p>
-                                <p className="text-xl font-bold text-gray-900">{tpValue ?? '—'}</p>
+                              <div key={`tp${i}`} className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 border-2 border-purple-200 text-center hover:border-purple-400 transition-colors">
+                                <p className="text-xs text-purple-600 font-black mb-1 uppercase">TP{i}</p>
+                                <p className="text-2xl font-black text-purple-900">{tpValue ?? '—'}</p>
                               </div>
                             )
                           })}
@@ -361,59 +394,61 @@ function SubjectsPage() {
                       </div>
                     )}
 
-                    {/* Información General */}
-                    <div className="border-t border-gray-200 pt-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="flex items-center gap-3">
-                          <User size={16} className="text-gray-400" />
-                          <div>
-                            <p className="text-gray-500 text-xs">Profesor</p>
-                            <p className="text-gray-900 font-semibold">{professor?.name || '—'}</p>
-                          </div>
+                    {/* Info General */}
+                    <div className="border-t-2 border-gray-200 pt-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
+                          <p className="text-xs text-gray-600 font-bold uppercase">Créditos</p>
+                          <p className="text-2xl font-black text-gray-900">{subject?.credits || '—'}</p>
                         </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Año Académico</p>
-                          <p className="text-gray-900 font-semibold">{enr.academic_year}°</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Créditos</p>
-                          <p className="text-gray-900 font-semibold">{subject?.credits || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-500 text-xs">Intento</p>
-                          <p className="text-gray-900 font-semibold">{enr.attempt || 1}</p>
+                        <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
+                          <p className="text-xs text-gray-600 font-bold uppercase">Intento</p>
+                          <p className="text-2xl font-black text-gray-900">{enr.attempt || 1}</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Estado Final */}
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-                      <p className="text-xs text-blue-600 font-bold mb-2">ESTADO FINAL</p>
+                    <div className={`rounded-2xl p-6 border-2 ${
+                      finalGrade && finalGrade >= 8 && subject?.allows_promotion 
+                        ? 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-400' :
+                      finalGrade && finalGrade >= 6
+                        ? 'bg-gradient-to-r from-emerald-100 to-teal-100 border-emerald-400' :
+                      finalGrade
+                        ? 'bg-gradient-to-r from-red-100 to-rose-100 border-red-400' :
+                        'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-400'
+                    }`}>
+                      <p className={`text-xs font-black mb-3 uppercase tracking-wide ${
+                        finalGrade && finalGrade >= 8 && subject?.allows_promotion 
+                          ? 'text-purple-700' :
+                        finalGrade && finalGrade >= 6
+                          ? 'text-emerald-700' :
+                        finalGrade
+                          ? 'text-red-700' :
+                          'text-blue-700'
+                      }`}>ESTADO FINAL</p>
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-600">Condición académica</p>
-                          <StatusBadge status={displayStatus} />
-                        </div>
+                        <StatusBadge status={displayStatus} />
                         <div className="text-right">
-                          {finalGrade && finalGrade >= 7 ? (
-                            <div className="text-emerald-600">
-                              <CheckCircle2 size={32} />
-                              <p className="text-xs font-semibold mt-1">PROMOCIONADO</p>
+                          {finalGrade && finalGrade >= 8 && subject?.allows_promotion ? (
+                            <div className="flex items-center gap-1 text-purple-700">
+                              <Award size={28} />
+                              <span className="text-xs font-black">PROMOCIONADO</span>
                             </div>
-                          ) : finalGrade && finalGrade >= 4 ? (
-                            <div className="text-amber-600">
-                              <CheckCircle2 size={32} />
-                              <p className="text-xs font-semibold mt-1">APROBADO</p>
+                          ) : finalGrade && finalGrade >= 6 ? (
+                            <div className="flex items-center gap-1 text-emerald-700">
+                              <CheckCircle2 size={28} />
+                              <span className="text-xs font-black">APROBADO</span>
                             </div>
                           ) : finalGrade ? (
-                            <div className="text-red-600">
-                              <AlertCircle size={32} />
-                              <p className="text-xs font-semibold mt-1">DESAPROBADO</p>
+                            <div className="flex items-center gap-1 text-red-700">
+                              <AlertCircle size={28} />
+                              <span className="text-xs font-black">DESAPROBADO</span>
                             </div>
                           ) : (
-                            <div className="text-gray-600">
-                              <div className="h-8 w-8 rounded-full border-2 border-gray-400 flex items-center justify-center text-xs font-bold">?</div>
-                              <p className="text-xs font-semibold mt-1">PENDIENTE</p>
+                            <div className="flex items-center gap-1 text-blue-700">
+                              <Zap size={28} />
+                              <span className="text-xs font-black">PENDIENTE</span>
                             </div>
                           )}
                         </div>
@@ -429,23 +464,23 @@ function SubjectsPage() {
 
       {/* Footer Info */}
       {enrollments.length > 0 && (
-        <div className="bg-gradient-to-r from-indigo-50 via-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-200">
-          <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <BarChart3 size={20} className="text-indigo-600" />
+        <div className="bg-gradient-to-r from-indigo-100 via-purple-100 to-pink-100 rounded-3xl p-8 border-2 border-indigo-300">
+          <h3 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
+            <BarChart3 size={24} className="text-indigo-600" />
             Cómo interpretar tus calificaciones
-          </h4>
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <p className="font-semibold text-blue-900 mb-2">📚 Nota Parcial</p>
-              <p className="text-sm text-gray-700">Promedio de tus parciales y trabajos prácticos. Necesitas mínimo <strong>6 puntos</strong> para habilitar el examen final.</p>
+            <div className="bg-white/70 rounded-xl p-4">
+              <p className="font-black text-blue-900 mb-2">📚 Nota Parcial</p>
+              <p className="text-sm text-gray-700">Promedio de parciales y trabajos prácticos. Mínimo <strong>6 puntos</strong> para examen final.</p>
             </div>
-            <div>
-              <p className="font-semibold text-indigo-900 mb-2">📊 Nota Final</p>
-              <p className="text-sm text-gray-700"><strong>≥7</strong> Promocionado • <strong>4-6</strong> Aprobado • <strong>&lt;4</strong> Desaprobado</p>
+            <div className="bg-white/70 rounded-xl p-4">
+              <p className="font-black text-indigo-900 mb-2">📊 Nota Final</p>
+              <p className="text-sm text-gray-700"><strong>≥8</strong> Promocionado • <strong>6-7</strong> Aprobado • <strong>&lt;6</strong> Desaprobado</p>
             </div>
-            <div>
-              <p className="font-semibold text-cyan-900 mb-2">✓ Asistencia</p>
-              <p className="text-sm text-gray-700">Porcentaje acumulado de Abril a Diciembre. Necesitas mínimo <strong>60%</strong> para poder rendir examen.</p>
+            <div className="bg-white/70 rounded-xl p-4">
+              <p className="font-black text-cyan-900 mb-2">✓ Asistencia</p>
+              <p className="text-sm text-gray-700">Mínimo <strong>60%</strong> para poder rendir examen final.</p>
             </div>
           </div>
         </div>

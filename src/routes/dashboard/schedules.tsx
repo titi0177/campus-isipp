@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Calendar } from 'lucide-react'
+import { Calendar, Clock, MapPin, User, Grid3x3, List } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard/schedules')({
   component: StudentSchedulesPage,
@@ -23,6 +23,7 @@ type Schedule = {
 function StudentSchedulesPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const { showToast } = useToast()
 
   const days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
@@ -33,6 +34,15 @@ function StudentSchedulesPage() {
     Jueves: 3,
     Viernes: 4,
     Sábado: 5,
+  }
+
+  const dayColors: Record<string, string> = {
+    Lunes: 'from-blue-600 to-blue-700',
+    Martes: 'from-purple-600 to-purple-700',
+    Miércoles: 'from-pink-600 to-pink-700',
+    Jueves: 'from-orange-600 to-orange-700',
+    Viernes: 'from-green-600 to-green-700',
+    Sábado: 'from-indigo-600 to-indigo-700',
   }
 
   useEffect(() => {
@@ -56,7 +66,6 @@ function StudentSchedulesPage() {
         return
       }
 
-      // Obtener materias inscritas por el estudiante
       const { data: enrollments } = await supabase
         .from('enrollments')
         .select('subject_id')
@@ -70,7 +79,6 @@ function StudentSchedulesPage() {
 
       const subjectIds = enrollments.map(e => e.subject_id)
 
-      // Obtener horarios de esas materias
       const { data } = await supabase
         .from('schedules')
         .select(`
@@ -109,116 +117,250 @@ function StudentSchedulesPage() {
     }
   }
 
-  // Agrupar por día
   const byDay: Record<string, Schedule[]> = {}
   days.forEach(day => {
     byDay[day] = schedules.filter(s => s.day === day)
   })
 
   if (loading) {
-    return <p className="text-slate-600">Cargando horarios...</p>
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-8 text-white shadow-2xl">
+          <h1 className="text-4xl font-black mb-2">Mi Horario</h1>
+          <p className="text-blue-100">Cargando tu horario de clases...</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="card p-6 animate-pulse">
+              <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-6"></div>
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-200 rounded"></div>
+                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Calendar size={28} />
-          Mi Horario
-        </h1>
-        <p className="text-slate-600 text-sm mt-1">Horarios de las materias en las que estoy inscripto</p>
+    <div className="space-y-8">
+      {/* Header Hero */}
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-8 text-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-blue-100 text-sm font-semibold mb-2">Calendario Académico</p>
+            <h1 className="text-5xl font-black mb-2">Mi Horario</h1>
+            <p className="text-blue-100 text-lg">Horarios de todas tus clases del semestre</p>
+          </div>
+          <Calendar size={80} className="opacity-20" />
+        </div>
       </div>
 
       {schedules.length === 0 ? (
-        <div className="card p-6 text-center">
-          <p className="text-slate-500">Aún no tienes materias con horarios asignados.</p>
-          <p className="text-slate-400 text-sm mt-1">Inscríbete en materias para ver los horarios de clases.</p>
+        <div className="card p-16 text-center rounded-3xl bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200">
+          <Calendar size={64} className="mx-auto text-gray-400 mb-6" />
+          <p className="text-gray-600 text-xl font-semibold">No tienes horarios asignados</p>
+          <p className="text-gray-500 mt-2">Inscríbete en materias para ver sus horarios de clase</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {days.map(day => {
-            const daySchedules = byDay[day] || []
-            if (daySchedules.length === 0) return null
+        <>
+          {/* View Toggle */}
+          <div className="flex gap-2 bg-gray-100 p-1 rounded-full w-fit">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`px-4 py-2 rounded-full font-semibold flex items-center gap-2 transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-white text-indigo-600 shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Grid3x3 size={18} />
+              Vista Grid
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-4 py-2 rounded-full font-semibold flex items-center gap-2 transition-all ${
+                viewMode === 'table'
+                  ? 'bg-white text-indigo-600 shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <List size={18} />
+              Vista Tabla
+            </button>
+          </div>
 
-            return (
-              <div key={day} className="card p-0 overflow-hidden">
-                <div className="siu-band-header">
-                  <h3 className="text-sm font-bold tracking-wide text-white">{day}</h3>
-                </div>
-                <div className="space-y-3 p-4">
-                  {daySchedules.map(s => (
-                    <div
-                      key={s.id}
-                      className="border border-slate-200 rounded p-3 hover:bg-slate-50 transition"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900">{s.subject_name}</p>
-                          <p className="text-xs text-slate-500 mt-1">{s.subject_code}</p>
-                          {s.professor_name && (
-                            <p className="text-sm text-slate-600 mt-2">
-                              Prof: <span className="font-medium">{s.professor_name}</span>
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right ml-2">
-                          <p className="font-bold text-lg text-[var(--siu-blue)]">
-                            {s.start_time}
-                          </p>
-                          <p className="text-xs text-slate-500">a {s.end_time}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="text-sm text-slate-700">
-                          <span className="font-medium">Aula:</span> {s.classroom}
-                        </p>
-                      </div>
+          {/* Grid View */}
+          {viewMode === 'grid' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {days.map(day => {
+                const daySchedules = byDay[day] || []
+                if (daySchedules.length === 0) return null
+
+                return (
+                  <div key={day} className="card p-0 overflow-hidden shadow-lg hover:shadow-2xl transition-shadow">
+                    {/* Day Header */}
+                    <div className={`bg-gradient-to-r ${dayColors[day]} p-6 text-white`}>
+                      <h3 className="text-2xl font-black">{day}</h3>
+                      <p className="text-blue-100 text-sm mt-1">{daySchedules.length} clase{daySchedules.length !== 1 ? 's' : ''}</p>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Schedule Items */}
+                    <div className="space-y-3 p-4">
+                      {daySchedules.map((s, idx) => (
+                        <div
+                          key={s.id}
+                          className="border-l-4 border-l-indigo-600 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-4 hover:shadow-md transition-all hover:scale-105"
+                        >
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex-1">
+                              <h4 className="font-bold text-gray-900 text-sm">{s.subject_name}</h4>
+                              <p className="text-xs font-mono font-semibold text-indigo-600 mt-1">{s.subject_code}</p>
+                            </div>
+                            <div className="bg-indigo-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                              {idx + 1}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 text-sm">
+                            <div className="flex items-center gap-2 text-gray-700">
+                              <Clock size={16} className="text-indigo-600" />
+                              <span className="font-semibold">{s.start_time}</span>
+                              <span className="text-gray-500">-</span>
+                              <span className="font-semibold">{s.end_time}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-gray-700">
+                              <MapPin size={16} className="text-indigo-600" />
+                              <span className="font-semibold">Aula {s.classroom}</span>
+                            </div>
+                            {s.professor_name && (
+                              <div className="flex items-center gap-2 text-gray-700">
+                                <User size={16} className="text-indigo-600" />
+                                <span className="font-semibold">{s.professor_name}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Table View */}
+          {viewMode === 'table' && (
+            <div className="card p-0 overflow-hidden shadow-lg">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                      <th className="px-6 py-4 text-left text-sm font-bold">Materia</th>
+                      <th className="px-6 py-4 text-left text-sm font-bold">Profesor</th>
+                      <th className="px-6 py-4 text-left text-sm font-bold">Día</th>
+                      <th className="px-6 py-4 text-center text-sm font-bold">Horario</th>
+                      <th className="px-6 py-4 text-center text-sm font-bold">Aula</th>
+                      <th className="px-6 py-4 text-center text-sm font-bold">Año</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {schedules
+                      .sort((a, b) => {
+                        const dayDiff = (daysOrder[a.day] || 0) - (daysOrder[b.day] || 0)
+                        if (dayDiff !== 0) return dayDiff
+                        return a.start_time.localeCompare(b.start_time)
+                      })
+                      .map((s, idx) => (
+                        <tr
+                          key={s.id}
+                          className={`hover:bg-indigo-50 transition-colors ${
+                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                          }`}
+                        >
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="font-bold text-gray-900">{s.subject_name}</p>
+                              <p className="text-xs font-mono text-indigo-600 mt-1">{s.subject_code}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-700 font-medium">{s.professor_name || '-'}</td>
+                          <td className="px-6 py-4">
+                            <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold">
+                              {s.day}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center font-bold text-gray-900">
+                            {s.start_time} - {s.end_time}
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 font-semibold text-sm">
+                              {s.classroom}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center font-bold text-gray-900">{s.year}°</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
-            )
-          })}
-        </div>
+            </div>
+          )}
+
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="card p-4 border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 to-blue-50">
+              <p className="text-xs text-indigo-600 font-bold mb-2">TOTAL DE CLASES</p>
+              <p className="text-3xl font-black text-indigo-700">{schedules.length}</p>
+            </div>
+            <div className="card p-4 border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 to-pink-50">
+              <p className="text-xs text-purple-600 font-bold mb-2">DÍAS CON CLASE</p>
+              <p className="text-3xl font-black text-purple-700">{Object.values(byDay).filter(d => d.length > 0).length}</p>
+            </div>
+            <div className="card p-4 border-l-4 border-l-green-600 bg-gradient-to-br from-green-50 to-emerald-50">
+              <p className="text-xs text-green-600 font-bold mb-2">PRIMERO MATERIA</p>
+              <p className="text-sm font-bold text-green-700">
+                {schedules.length > 0 
+                  ? `${schedules.reduce((min, s) => {
+                      const timeA = parseInt(s.start_time.replace(':', ''))
+                      const timeB = parseInt(min.start_time.replace(':', ''))
+                      return timeA < timeB ? s : min
+                    }).start_time} hs`
+                  : 'N/A'}
+              </p>
+            </div>
+            <div className="card p-4 border-l-4 border-l-orange-600 bg-gradient-to-br from-orange-50 to-yellow-50">
+              <p className="text-xs text-orange-600 font-bold mb-2">ÚLTIMA MATERIA</p>
+              <p className="text-sm font-bold text-orange-700">
+                {schedules.length > 0
+                  ? `${schedules.reduce((max, s) => {
+                      const timeA = parseInt(s.end_time.replace(':', ''))
+                      const timeB = parseInt(max.end_time.replace(':', ''))
+                      return timeA > timeB ? s : max
+                    }).end_time} hs`
+                  : 'N/A'}
+              </p>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Vista de tabla alternativa */}
+      {/* Info Box */}
       {schedules.length > 0 && (
-        <div className="card p-0 overflow-hidden mt-6">
-          <div className="siu-band-header">
-            <h3 className="text-sm font-bold tracking-wide text-white">Vista de Tabla</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-600 border-b">
-                  <th className="px-4 py-2 text-left font-medium">Materia</th>
-                  <th className="px-4 py-2 text-left font-medium">Profesor</th>
-                  <th className="px-4 py-2 text-left font-medium">Día</th>
-                  <th className="px-4 py-2 text-center font-medium">Hora</th>
-                  <th className="px-4 py-2 text-left font-medium">Aula</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedules
-                  .sort((a, b) => {
-                    const dayDiff = (daysOrder[a.day] || 0) - (daysOrder[b.day] || 0)
-                    if (dayDiff !== 0) return dayDiff
-                    return a.start_time.localeCompare(b.start_time)
-                  })
-                  .map(s => (
-                    <tr key={s.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium">{s.subject_name}</td>
-                      <td className="px-4 py-3 text-slate-600">{s.professor_name || '-'}</td>
-                      <td className="px-4 py-3">{s.day}</td>
-                      <td className="px-4 py-3 text-center font-medium">
-                        {s.start_time} - {s.end_time}
-                      </td>
-                      <td className="px-4 py-3">{s.classroom}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+        <div className="bg-gradient-to-r from-cyan-50 via-blue-50 to-indigo-50 rounded-3xl p-6 border-2 border-blue-200">
+          <div className="flex gap-4">
+            <Calendar size={24} className="text-blue-600 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="font-bold text-gray-900 mb-2">Consejos para no faltar</h3>
+              <ul className="space-y-1 text-sm text-gray-700">
+                <li>✓ La <strong>asistencia mínima del 60%</strong> es obligatoria para poder rendir examen</li>
+                <li>✓ Planifica tus actividades considerando tus horarios de clase</li>
+                <li>✓ Si necesitas faltar, avísale al profesor con anticipación</li>
+              </ul>
+            </div>
           </div>
         </div>
       )}
