@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/:path((?!_next/static|_next/image|favicon.ico).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
