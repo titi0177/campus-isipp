@@ -78,7 +78,7 @@ export function Sidebar({ role }: SidebarProps) {
   const router = useRouterState()
   const currentPath = router.location.pathname
   const unreadMessages = useUnreadMessages()
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768)
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -126,7 +126,7 @@ export function Sidebar({ role }: SidebarProps) {
   }, [currentPath])
 
   return (
-    <aside className="sidebar h-full flex flex-col overflow-y-auto" style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
+    <aside className="sidebar h-screen flex flex-col" style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
       {/* Logo Section - Responsive */}
       <div className="siu-sidebar-brand flex-shrink-0">
         <div className="siu-sidebar-logo-box">
@@ -150,7 +150,7 @@ export function Sidebar({ role }: SidebarProps) {
       </div>
 
       {/* Navigation - Scrollable */}
-      <nav className="flex-1 space-y-0.5 py-2 md:py-3 overflow-y-auto px-2 min-h-0">
+      <nav className="flex-1 space-y-0.5 py-2 md:py-3 overflow-y-auto px-2">
         {navItems.map((item) => {
           const active = isActive(item.href)
           return (
@@ -183,7 +183,7 @@ export function Sidebar({ role }: SidebarProps) {
       </nav>
 
       {/* Logout Button - Always visible at bottom, not affected by scroll */}
-      <div className="flex-shrink-0 border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3 m-2 rounded-sm">
+      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3 m-2 rounded-sm">
         <button
           type="button"
           onClick={handleLogout}
