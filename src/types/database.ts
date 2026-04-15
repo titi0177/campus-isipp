@@ -134,6 +134,7 @@ export interface Database {
           code: string
           year: number
           credits: number
+          division?: 'A' | 'B' | null
           created_at: string
           updated_at: string
         }
@@ -146,6 +147,7 @@ export interface Database {
           code: string
           year?: number
           credits?: number
+          division?: 'A' | 'B' | null
         }
         Update: {
           institution_id?: string | null
@@ -155,6 +157,7 @@ export interface Database {
           code?: string
           year?: number
           credits?: number
+          division?: 'A' | 'B' | null
         }
       }
       enrollments: {
@@ -165,6 +168,7 @@ export interface Database {
           academic_period_id?: string | null
           year: number
           semester: number
+          division?: 'A' | 'B' | null
           status: string
           created_at: string
           updated_at: string
@@ -176,12 +180,14 @@ export interface Database {
           academic_period_id?: string | null
           year: number
           semester: number
+          division?: 'A' | 'B' | null
           status?: string
         }
         Update: {
           academic_period_id?: string | null
           year?: number
           semester?: number
+          division?: 'A' | 'B' | null
           status?: string
         }
       }

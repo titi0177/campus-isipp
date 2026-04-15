@@ -172,6 +172,7 @@ function SubjectsPage() {
           { key: 'professor', label: 'Profesor', render: (r: any) => r.professor?.name || '-' },
           { key: 'credits', label: 'Créditos' },
           { key: 'allows_promotion', label: 'Promocional', render: (r: any) => r.allows_promotion ? '✓' : '-' },
+          { key: 'division', label: 'División', render: (r: any) => r.division ? `Div. ${r.division}` : '-' },
         ]}
         data={filteredSubjects as any}
         actions={(row: any) => (
@@ -247,6 +248,14 @@ function SubjectsPage() {
             <div>
               <label className="form-label">Créditos</label>
               <input type="number" min={1} className="form-input" value={editing.credits || 4} onChange={e => setEditing(p => ({ ...p, credits: +e.target.value }))} />
+            </div>
+            <div>
+              <label className="form-label">División (Año 1)</label>
+              <select className="form-input" value={editing.division || ''} onChange={e => setEditing(p => ({ ...p, division: e.target.value || null }))} disabled={(editing as any).year !== 1}>
+                <option value="">Sin división</option>
+                <option value="A">División A</option>
+                <option value="B">División B</option>
+              </select>
             </div>
           </div>
 

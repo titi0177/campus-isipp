@@ -10,18 +10,15 @@ export const Route = createFileRoute('/professor/grades')({
 
 type StudentGrade = {
   enrollmentId: string
+  division?: string | null
   studentName: string
-  // Parciales
   partial1?: number
   partial2?: number
   partial3?: number
-  // Trabajos prácticos
   practical1?: number
   practical2?: number
   practical3?: number
-  // Nota final del examen
   finalGradeExam?: number
-  // Datos calculados
   avgPartials?: number
   avgPracticals?: number
   partialGrade?: number
@@ -31,6 +28,7 @@ type StudentGrade = {
 function ProfessorGradesPage() {
   const [subjects, setSubjects] = useState<any[]>([])
   const [selectedSubject, setSelectedSubject] = useState('')
+  const [selectedDivision, setSelectedDivision] = useState<string | null>(null)
   const [students, setStudents] = useState<StudentGrade[]>([])
   const [loading, setLoading] = useState(false)
   const [schemaReady, setSchemaReady] = useState(false)
@@ -58,9 +56,10 @@ function ProfessorGradesPage() {
 
       const { data } = await supabase
         .from('subjects')
-        .select('id, name, code')
+        .select('id, name, code, year, division')
         .eq('professor_id', prof.id)
-        .order('name')
+        .order('year')
+        .order('code')
 
       setSubjects(data ?? [])
     } catch (err) {
@@ -69,15 +68,19 @@ function ProfessorGradesPage() {
     }
   }
 
-  async function loadStudents(subjectId: string) {
+  function getDivisionLabel(subject: any) {
+    return subject.division ? ` - Div. ${subject.division}` : ''
+  }
+
+  async function loadStudents(subjectId: string, division: string | null) {
     try {
       setLoading(true)
 
-      // Intentar cargar con schema nuevo (después de migración)
-      const { data: enrollmentsData, error } = await supabase
+      const baseQuery = supabase
         .from('enrollments')
         .select(`
           id,
+          division,
           student:students(first_name, last_name),
           grades(
             id,
@@ -92,6 +95,12 @@ function ProfessorGradesPage() {
         .eq('subject_id', subjectId)
         .order('student(last_name)')
 
+      const query = division 
+        ? baseQuery.eq('division', division)
+        : baseQuery
+
+      const { data: enrollmentsData, error } = await query
+
       if (error) {
         console.error('Error loading students:', error)
         showToast('Error al cargar alumnos', 'error')
@@ -99,7 +108,6 @@ function ProfessorGradesPage() {
         return
       }
 
-      // Detectar si schema tiene columnas nuevas
       const hasNewSchema = enrollmentsData && enrollmentsData.length > 0 && 
         enrollmentsData[0].grades && 
         'partial_1' in (Array.isArray(enrollmentsData[0].grades) ? enrollmentsData[0].grades[0] : enrollmentsData[0].grades)
@@ -111,7 +119,6 @@ function ProfessorGradesPage() {
           const grade = Array.isArray(enrollment.grades) ? enrollment.grades[0] : enrollment.grades
 
           if (hasNewSchema && grade) {
-            // Nueva estructura con parciales y trabajos
             const partials = [grade?.partial_1, grade?.partial_2, grade?.partial_3].filter(p => p != null)
             const practicals = [grade?.practical_1, grade?.practical_2, grade?.practical_3].filter(p => p != null)
 
@@ -130,6 +137,7 @@ function ProfessorGradesPage() {
 
             return {
               enrollmentId: enrollment.id,
+              division: enrollment.division,
               studentName: `${enrollment.student?.last_name || 'Sin'}, ${enrollment.student?.first_name || 'Nombre'}`,
               partial1: grade?.partial_1,
               partial2: grade?.partial_2,
@@ -144,7 +152,6 @@ function ProfessorGradesPage() {
               status,
             }
           } else {
-            // Schema antiguo (solo parcial_grade y final_exam_grade)
             const partialGrade = grade?.partial_grade
             const finalGrade = grade?.final_grade_exam || grade?.final_grade
 
@@ -152,6 +159,7 @@ function ProfessorGradesPage() {
 
             return {
               enrollmentId: enrollment.id,
+              division: enrollment.division,
               studentName: `${enrollment.student?.last_name || 'Sin'}, ${enrollment.student?.first_name || 'Nombre'}`,
               partialGrade,
               finalGradeExam: finalGrade,
@@ -175,7 +183,6 @@ function ProfessorGradesPage() {
       if (s.enrollmentId === enrollmentId) {
         const updated = { ...s, [field]: value === '' ? undefined : value }
 
-        // Recalcular promedios solo si usamos schema nuevo
         if (schemaReady && ['partial1', 'partial2', 'partial3', 'practical1', 'practical2', 'practical3'].includes(field)) {
           const partials = [updated.partial1, updated.partial2, updated.partial3].filter(p => p != null)
           const practicals = [updated.practical1, updated.practical2, updated.practical3].filter(p => p != null)
@@ -187,7 +194,6 @@ function ProfessorGradesPage() {
           updated.partialGrade = allGrades.length > 0 ? Math.round((allGrades.reduce((a, b) => a + b, 0) / allGrades.length) * 100) / 100 : undefined
         }
 
-        // Recalcular status si se modifica nota final
         if (field === 'finalGradeExam') {
           if (updated.finalGradeExam == null) {
             updated.status = 'in_progress'
@@ -218,7 +224,6 @@ function ProfessorGradesPage() {
         let gradeData: any = {}
 
         if (schemaReady) {
-          // Guardar en schema nuevo
           const partials = [student.partial1, student.partial2, student.partial3].filter(p => p != null)
           const practicals = [student.practical1, student.practical2, student.practical3].filter(p => p != null)
           const allGrades = [...partials, ...practicals]
@@ -244,7 +249,6 @@ function ProfessorGradesPage() {
             status,
           }
         } else {
-          // Guardar en schema antiguo
           gradeData = {
             partial_grade: student.partialGrade || null,
             final_grade_exam: student.finalGradeExam || null,
@@ -286,36 +290,50 @@ function ProfessorGradesPage() {
         </p>
       </div>
 
-      {!schemaReady && (
-        <div className="card p-4 bg-blue-50 border border-blue-200">
-          <p className="text-sm text-blue-900">
-            <strong>Próximamente:</strong> Se habilitarán campos para cargar 3 parciales y 3 trabajos prácticos.
-            Por ahora puedes cargar nota parcial y final.
-          </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+        <div>
+          <label htmlFor="subject-select" className="form-label">Seleccionar materia</label>
+          <select
+            id="subject-select"
+            name="subject"
+            className="form-input"
+            value={selectedSubject}
+            onChange={(e) => {
+              const v = e.target.value
+              setSelectedSubject(v)
+              setSelectedDivision(null)
+              if (v) void loadStudents(v, null)
+              else setStudents([])
+            }}
+          >
+            <option value="">-- Selecciona materia --</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.code} - {s.name}{getDivisionLabel(s)}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
 
-      <div>
-        <label htmlFor="subject-select" className="form-label">Seleccionar materia</label>
-        <select
-          id="subject-select"
-          name="subject"
-          className="form-input max-w-md"
-          value={selectedSubject}
-          onChange={(e) => {
-            const v = e.target.value
-            setSelectedSubject(v)
-            if (v) void loadStudents(v)
-            else setStudents([])
-          }}
-        >
-          <option value="">-- Selecciona materia --</option>
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.code} - {s.name}
-            </option>
-          ))}
-        </select>
+        {selectedSubject && subjects.find(s => s.id === selectedSubject)?.year === 1 && (
+          <div>
+            <label htmlFor="division-select" className="form-label">División (Año 1)</label>
+            <select
+              id="division-select"
+              className="form-input"
+              value={selectedDivision || ''}
+              onChange={(e) => {
+                const div = e.target.value || null
+                setSelectedDivision(div)
+                void loadStudents(selectedSubject, div)
+              }}
+            >
+              <option value="">Ver ambas divisiones</option>
+              <option value="A">División A</option>
+              <option value="B">División B</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {students.length > 0 && (
@@ -332,6 +350,7 @@ function ProfessorGradesPage() {
               <thead>
                 <tr className="bg-slate-700 text-white border-b">
                   <th className="px-3 py-2 text-left min-w-32">Alumno</th>
+                  {selectedDivision && <th className="px-3 py-2 text-center bg-slate-800 min-w-12">Div.</th>}
                   {schemaReady && (
                     <>
                       <th colSpan={3} className="px-3 py-2 text-center bg-blue-700">Parciales</th>
@@ -348,6 +367,7 @@ function ProfessorGradesPage() {
                 {schemaReady && (
                   <tr className="bg-slate-600 text-white text-xs">
                     <th className="px-3 py-1"></th>
+                    {selectedDivision && <th className="px-3 py-1"></th>}
                     <th className="px-2 py-1 text-center">P1</th>
                     <th className="px-2 py-1 text-center">P2</th>
                     <th className="px-2 py-1 text-center">P3</th>
@@ -364,6 +384,7 @@ function ProfessorGradesPage() {
                 {students.map((student) => (
                   <tr key={student.enrollmentId} className="border-b hover:bg-slate-50">
                     <td className="px-3 py-2 font-medium">{student.studentName}</td>
+                    {selectedDivision && <td className="px-3 py-2 text-center font-bold text-blue-600">{student.division}</td>}
                     {schemaReady && (
                       <>
                         <td className="px-2 py-2">

@@ -21,6 +21,7 @@ function EnrollmentsPage() {
   const [form, setForm] = useState({
     student_id: '',
     subject_id: '',
+    division: '',
     year: new Date().getFullYear(),
     attempt: 1,
     status: 'active'
@@ -39,7 +40,7 @@ function EnrollmentsPage() {
         .select(`
           *,
           student:students(id, first_name, last_name, legajo),
-          subject:subjects(id, name, code)
+          subject:subjects(id, name, code, year, division)
         `)
         .order('created_at', { ascending: false }),
 
@@ -50,7 +51,7 @@ function EnrollmentsPage() {
 
       supabase
         .from('subjects')
-        .select('id, name, code, year')
+        .select('id, name, code, year, division')
         .order('name'),
     ])
 
@@ -68,19 +69,21 @@ function EnrollmentsPage() {
       .select('id')
       .eq('student_id', form.student_id)
       .eq('subject_id', form.subject_id)
-      .eq('academic_year', form.year)
+      .eq('year', form.year)
+      .eq('division', form.division || null)
       .single()
 
     if (existing) {
-      showToast('Este alumno ya está inscripto en esta materia en este año.', 'error')
+      showToast('Este alumno ya está inscripto en esta materia/división en este año.', 'error')
       return
     }
 
     const { error } = await supabase.from('enrollments').insert({
       student_id: form.student_id,
       subject_id: form.subject_id,
-      academic_year: form.year,
-      attempt: form.attempt,
+      year: form.year,
+      semester: 1,
+      division: form.division || null,
       status: form.status
     })
 
@@ -90,11 +93,12 @@ function EnrollmentsPage() {
       return
     }
 
-    showToast('Inscripción creada exitosamente (sin restricciones).', 'info')
+    showToast('Inscripción creada exitosamente.', 'info')
 
     setForm({
       student_id: '',
       subject_id: '',
+      division: '',
       year: new Date().getFullYear(),
       attempt: 1,
       status: 'active'
@@ -135,7 +139,7 @@ function EnrollmentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Inscripciones</h1>
-          <p className="text-sm text-slate-600 mt-1">Gestiona inscripciones sin restricciones académicas</p>
+          <p className="text-sm text-slate-600 mt-1">Gestiona inscripciones con soporte para divisiones A y B en 1er año</p>
         </div>
 
         <button
@@ -151,16 +155,11 @@ function EnrollmentsPage() {
         <div className="flex items-start gap-3">
           <Shield size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-blue-900">Permisos de Administrador</h3>
+            <h3 className="font-semibold text-blue-900">Divisiones en Primer Año</h3>
             <p className="text-sm text-blue-800 mt-1">
-              Como administrador, puedes inscribir a alumnos en cualquier materia <strong>sin validar restricciones</strong> de:
+              Para materias de 1er año puedes asignar <strong>División A o División B</strong>. 
+              Los profesores verán separadas las notas y asistencias por división.
             </p>
-            <ul className="text-sm text-blue-800 mt-2 space-y-1 ml-4">
-              <li>✓ Correlativas (materias requisito)</li>
-              <li>✓ Año/nivel del alumno</li>
-              <li>✓ Períodos cuatrimestrales</li>
-              <li>✓ Inscripciones duplicadas</li>
-            </ul>
           </div>
         </div>
       </div>
@@ -214,19 +213,19 @@ function EnrollmentsPage() {
               render: (r: any) => (
                 <div>
                   <div className="font-medium">{r.subject?.name}</div>
-                  <div className="text-xs text-slate-500">{r.subject?.code}</div>
+                  <div className="text-xs text-slate-500">{r.subject?.code} {r.subject?.division ? `- Div. ${r.subject.division}` : ''}</div>
                 </div>
               )
             },
             {
-              key: 'academic_year',
+              key: 'year',
               label: 'Año',
-              render: (r: any) => r.academic_year
+              render: (r: any) => r.year
             },
             {
-              key: 'attempt',
-              label: 'Intento',
-              render: (r: any) => `${r.attempt}°`
+              key: 'division',
+              label: 'División',
+              render: (r: any) => r.division || '-'
             },
             {
               key: 'status',
@@ -261,53 +260,74 @@ function EnrollmentsPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title="Nueva Inscripción (Sin Restricciones)"
+        title="Nueva Inscripción"
       >
         <form onSubmit={handleSave} className="space-y-4">
-          {/* Estudiante */}
-          <div>
-            <label className="form-label">Estudiante *</label>
-            <select
-              className="form-input"
-              required
-              value={form.student_id}
-              onChange={e => setForm(p => ({ ...p, student_id: e.target.value }))}
-            >
-              <option value="">Seleccionar estudiante...</option>
-              {students.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.last_name}, {s.first_name} ({s.legajo}) - Año {s.year}
-                </option>
-              ))}
-            </select>
-            {selectedStudent && (
-              <p className="text-xs text-slate-500 mt-1">
-                Año actual del estudiante: {selectedStudent.year}
-              </p>
-            )}
-          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Estudiante *</label>
+              <select
+                className="form-input"
+                required
+                value={form.student_id}
+                onChange={e => setForm(p => ({ ...p, student_id: e.target.value }))}
+              >
+                <option value="">Seleccionar estudiante...</option>
+                {students.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.last_name}, {s.first_name} ({s.legajo}) - Año {s.year}
+                  </option>
+                ))}
+              </select>
+              {selectedStudent && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Año actual: {selectedStudent.year}
+                </p>
+              )}
+            </div>
 
-          {/* Materia */}
-          <div>
-            <label className="form-label">Materia *</label>
-            <select
-              className="form-input"
-              required
-              value={form.subject_id}
-              onChange={e => setForm(p => ({ ...p, subject_id: e.target.value }))}
-            >
-              <option value="">Seleccionar materia...</option>
-              {subjects.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.code}) - Año {s.year}
-                </option>
-              ))}
-            </select>
-            {selectedSubject && (
-              <p className="text-xs text-slate-500 mt-1">
-                Materia del año {selectedSubject.year}
-              </p>
-            )}
+            <div>
+              <label className="form-label">Materia *</label>
+              <select
+                className="form-input"
+                required
+                value={form.subject_id}
+                onChange={e => setForm(p => ({ ...p, subject_id: e.target.value, division: '' }))}
+              >
+                <option value="">Seleccionar materia...</option>
+                {subjects.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.code}) - Año {s.year} {s.division ? `Div. ${s.division}` : ''}
+                  </option>
+                ))}
+              </select>
+              {selectedSubject && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Materia del año {selectedSubject.year}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="form-label">División (Año 1)</label>
+              <select
+                className="form-input"
+                value={form.division}
+                onChange={e => setForm(p => ({ ...p, division: e.target.value }))}
+                disabled={!selectedSubject || selectedSubject.year !== 1}
+              >
+                <option value="">Sin división</option>
+                {selectedSubject?.year === 1 && (
+                  <>
+                    <option value="A">División A</option>
+                    <option value="B">División B</option>
+                  </>
+                )}
+              </select>
+              {selectedSubject?.year !== 1 && (
+                <p className="text-xs text-slate-500 mt-1">Solo se aplica a 1er año</p>
+              )}
+            </div>
           </div>
 
           {/* Año lectivo */}
@@ -318,18 +338,6 @@ function EnrollmentsPage() {
               className="form-input"
               value={form.year}
               onChange={e => setForm(p => ({ ...p, year: +e.target.value }))}
-            />
-          </div>
-
-          {/* Intento */}
-          <div>
-            <label className="form-label">Intento</label>
-            <input
-              type="number"
-              min="1"
-              className="form-input"
-              value={form.attempt}
-              onChange={e => setForm(p => ({ ...p, attempt: +e.target.value }))}
             />
           </div>
 
@@ -345,13 +353,6 @@ function EnrollmentsPage() {
               <option value="completed">Completada</option>
               <option value="dropped">Abandonada</option>
             </select>
-          </div>
-
-          {/* Advertencia */}
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              <strong>⚠️ Nota:</strong> Esta inscripción se realiza sin validar restricciones académicas. Asegúrate de que sea apropiada.
-            </p>
           </div>
 
           {/* Botones */}

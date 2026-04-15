@@ -13,6 +13,7 @@ type AttendanceDay = 'present' | 'absent' | null
 
 type StudentAttendance = {
   enrollmentId: string
+  division?: string | null
   legajo: string
   name: string
   dni: string
@@ -20,13 +21,13 @@ type StudentAttendance = {
   totalPresent: number
   totalDays: number
   accumulativePercentage: number
-  // Track cambios
   isDirty?: boolean
 }
 
 function ProfessorAttendancePage() {
   const [subjects, setSubjects] = useState<any[]>([])
   const [selectedSubject, setSelectedSubject] = useState('')
+  const [selectedDivision, setSelectedDivision] = useState<string | null>(null)
   const [subjectName, setSubjectName] = useState('')
   const [students, setStudents] = useState<StudentAttendance[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,7 +66,7 @@ function ProfessorAttendancePage() {
 
       const { data } = await supabase
         .from('subjects')
-        .select('id, name, code, year')
+        .select('id, name, code, year, division')
         .eq('professor_id', professor.id)
         .order('year')
         .order('code')
@@ -78,20 +79,27 @@ function ProfessorAttendancePage() {
     }
   }
 
-  async function loadEnrollments(subjectId: string) {
+  async function loadEnrollments(subjectId: string, division: string | null) {
     try {
       const subject = subjects.find(s => s.id === subjectId)
       setSubjectName(subject?.name ?? '')
 
-      const { data: enrollmentsData, error: enrollError } = await supabase
+      const baseQuery = supabase
         .from('enrollments')
         .select(`
           id,
+          division,
           student_id,
           student:students(id, first_name, last_name, legajo, dni)
         `)
         .eq('subject_id', subjectId)
         .order('student(last_name)', { ascending: true })
+
+      const query = division
+        ? baseQuery.eq('division', division)
+        : baseQuery
+
+      const { data: enrollmentsData, error: enrollError } = await query
 
       if (enrollError) {
         console.error('Error loading enrollments:', enrollError)
@@ -99,7 +107,6 @@ function ProfessorAttendancePage() {
       }
 
       if (enrollmentsData && enrollmentsData.length > 0) {
-        // Cargar TODA la asistencia de una sola vez (no por alumno)
         const enrollmentIds = enrollmentsData.map(e => e.id)
         const { data: allAttendanceData } = await supabase
           .from('class_attendance')
@@ -109,7 +116,6 @@ function ProfessorAttendancePage() {
           .lt('date', `${currentYear}-12-31`)
 
         const studentList: StudentAttendance[] = enrollmentsData.map((enr: any) => {
-          // Filtrar asistencias de este alumno
           const studentAttendance = (allAttendanceData || []).filter(
             (a: any) => a.enrollment_id === enr.id
           )
@@ -142,6 +148,7 @@ function ProfessorAttendancePage() {
 
           return {
             enrollmentId: enr.id,
+            division: enr.division,
             legajo: enr.student?.legajo ?? 'S/N',
             name: `${enr.student?.last_name || 'Sin'} ${enr.student?.first_name || 'Nombre'}`,
             dni: enr.student?.dni ?? 'S/N',
@@ -216,11 +223,9 @@ function ProfessorAttendancePage() {
     try {
       const startTime = performance.now()
 
-      // Preparar todas las operaciones en paralelo
       const allOperations: Promise<any>[] = []
 
       for (const student of students) {
-        // Actualizar attendance (porcentaje total)
         allOperations.push(
           supabase
             .from('attendance')
@@ -233,7 +238,6 @@ function ProfessorAttendancePage() {
             )
         )
 
-        // Preparar todos los registros de asistencia para este alumno
         const attendanceRecords: any[] = []
         const recordsToDelete: string[] = []
 
@@ -255,7 +259,6 @@ function ProfessorAttendancePage() {
           }
         }
 
-        // Insertar/actualizar todos los registros en batch
         if (attendanceRecords.length > 0) {
           allOperations.push(
             supabase
@@ -264,7 +267,6 @@ function ProfessorAttendancePage() {
           )
         }
 
-        // Eliminar registros de "sin clase" en batch
         if (recordsToDelete.length > 0) {
           allOperations.push(
             supabase
@@ -276,7 +278,6 @@ function ProfessorAttendancePage() {
         }
       }
 
-      // Ejecutar todas las operaciones en paralelo
       await Promise.all(allOperations)
 
       const endTime = performance.now()
@@ -284,8 +285,7 @@ function ProfessorAttendancePage() {
 
       alert(`Asistencia guardada correctamente (${students.length} estudiantes) en ${timeSeconds}s`)
       
-      // Recargar para ver cambios
-      if (selectedSubject) loadEnrollments(selectedSubject)
+      if (selectedSubject) loadEnrollments(selectedSubject, selectedDivision)
     } catch (err) {
       console.error('Error saving:', err)
       alert('Error guardando asistencia: ' + String(err))
@@ -308,30 +308,39 @@ function ProfessorAttendancePage() {
     
     doc.setFontSize(11)
     doc.text(`Materia: ${subjectName}`, 14, 25)
-    doc.text(`Período: Abril - Diciembre ${currentYear}`, 14, 31)
-    doc.text(`Generado: ${currentDate}`, 14, 37)
+    if (selectedDivision) {
+      doc.text(`División: ${selectedDivision}`, 14, 31)
+      doc.text(`Período: Abril - Diciembre ${currentYear}`, 14, 37)
+      doc.text(`Generado: ${currentDate}`, 14, 43)
+    } else {
+      doc.text(`Período: Abril - Diciembre ${currentYear}`, 14, 31)
+      doc.text(`Generado: ${currentDate}`, 14, 37)
+    }
 
     const tableData = students.map(s => [
       s.legajo,
       s.name,
+      s.division || '-',
       s.totalPresent,
       s.totalDays,
       `${s.accumulativePercentage}%`,
     ])
 
-    const headers = ['Legajo', 'Alumno', 'Presentes', 'Total Días', '% Acumulado']
+    const headers = selectedDivision 
+      ? ['Legajo', 'Alumno', 'Presentes', 'Total Días', '% Acumulado']
+      : ['Legajo', 'Alumno', 'Div.', 'Presentes', 'Total Días', '% Acumulado']
 
     doc.autoTable({
       head: [headers],
       body: tableData,
-      startY: 45,
+      startY: selectedDivision ? 45 : 50,
       margin: 10,
       headStyles: { fillColor: [88, 44, 49], fontSize: 10 },
       bodyStyles: { fontSize: 9 },
       alternateRowStyles: { fillColor: [240, 240, 240] },
     })
 
-    doc.save(`planilla_asistencia_${subjectName}_acumulada.pdf`)
+    doc.save(`planilla_asistencia_${subjectName}${selectedDivision ? `_div${selectedDivision}` : ''}_acumulada.pdf`)
   }
 
   function getCheckboxStyle(status: AttendanceDay) {
@@ -357,7 +366,7 @@ function ProfessorAttendancePage() {
         <p className="siu-page-subtitle mt-1">Asistencia acumulativa de Abril a Diciembre (20 días por mes) - 3 estados: Presente, Ausente, Sin clase</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl">
         <div>
           <label htmlFor="subject-select" className="form-label">Materia</label>
           <select
@@ -367,15 +376,16 @@ function ProfessorAttendancePage() {
             value={selectedSubject}
             onChange={(e) => {
               setSelectedSubject(e.target.value)
+              setSelectedDivision(null)
               if (e.target.value) {
-                loadEnrollments(e.target.value)
+                loadEnrollments(e.target.value, null)
               }
             }}
           >
             <option value="">Seleccionar...</option>
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.code} - {s.name}
+                {s.code} - {s.name} {s.division ? `Div. ${s.division}` : ''}
               </option>
             ))}
           </select>
@@ -397,6 +407,26 @@ function ProfessorAttendancePage() {
             ))}
           </select>
         </div>
+
+        {selectedSubject && subjects.find(s => s.id === selectedSubject)?.year === 1 && (
+          <div>
+            <label htmlFor="division-select" className="form-label">División (Año 1)</label>
+            <select
+              id="division-select"
+              className="form-input"
+              value={selectedDivision || ''}
+              onChange={(e) => {
+                const div = e.target.value || null
+                setSelectedDivision(div)
+                loadEnrollments(selectedSubject, div)
+              }}
+            >
+              <option value="">Ver ambas divisiones</option>
+              <option value="A">División A</option>
+              <option value="B">División B</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {selectedSubject && students.length > 0 && (
@@ -410,6 +440,7 @@ function ProfessorAttendancePage() {
                 <tr className="bg-slate-600 border-b sticky top-0 text-white">
                   <th className="px-3 py-2 text-left min-w-20">Legajo</th>
                   <th className="px-3 py-2 text-left min-w-48">Alumno</th>
+                  {!selectedDivision && <th className="px-3 py-2 text-center bg-slate-700 w-12">Div.</th>}
                   <th className="px-3 py-2 text-left min-w-16">DNI</th>
                   {days.map(day => (
                     <th key={day} className="px-1 py-2 text-center w-8 font-bold text-xs">
@@ -433,6 +464,7 @@ function ProfessorAttendancePage() {
                     <tr key={student.enrollmentId} className="border-b hover:bg-blue-50 transition-colors">
                       <td className="px-3 py-2 font-medium text-slate-900">{student.legajo}</td>
                       <td className="px-3 py-2 text-slate-900 font-medium">{student.name}</td>
+                      {!selectedDivision && <td className="px-3 py-2 text-center font-bold text-blue-600">{student.division}</td>}
                       <td className="px-3 py-2 text-slate-600 text-sm">{student.dni}</td>
                       {days.map(day => {
                         const status = student.monthlyAttendance[currentMonth]?.[day]
@@ -472,6 +504,7 @@ function ProfessorAttendancePage() {
                 <thead>
                   <tr className="bg-green-200">
                     <th className="px-3 py-2 text-left">Alumno</th>
+                    {!selectedDivision && <th className="px-3 py-2 text-center">Div.</th>}
                     <th className="px-3 py-2 text-center">Presentes</th>
                     <th className="px-3 py-2 text-center">Total Días</th>
                     <th className="px-3 py-2 text-center font-bold">% Acumulado</th>
@@ -482,6 +515,7 @@ function ProfessorAttendancePage() {
                   {students.map((student) => (
                     <tr key={student.enrollmentId} className="border-b">
                       <td className="px-3 py-2 font-medium">{student.name}</td>
+                      {!selectedDivision && <td className="px-3 py-2 text-center font-bold text-blue-600">{student.division}</td>}
                       <td className="px-3 py-2 text-center">{student.totalPresent}</td>
                       <td className="px-3 py-2 text-center">{student.totalDays}</td>
                       <td className="px-3 py-2 text-center font-bold">
