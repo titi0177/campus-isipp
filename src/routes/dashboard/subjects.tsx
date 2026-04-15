@@ -45,6 +45,7 @@ function SubjectsPage() {
           id,
           student_id,
           subject_id,
+          division,
           academic_year,
           attempt,
           status,
@@ -52,6 +53,8 @@ function SubjectsPage() {
             id,
             name,
             code,
+            year,
+            division,
             credits,
             allows_promotion,
             professor_id
@@ -102,7 +105,30 @@ function SubjectsPage() {
         }
       }
 
-      setEnrollments(enrollmentsWithProfs)
+      // Filtrar enrollments para ocultar otras divisiones de primer año
+      const filteredEnrollments = enrollmentsWithProfs.filter(enr => {
+        const subject = enr.subject
+        const division = enr.division
+        
+        // Si es materia de primer año, verificar divisiones
+        if (subject?.year === 1 && subject?.division) {
+          // Buscar si hay alguna inscripción en primer año de otra división
+          const firstYearWithDivision = enrollmentsWithProfs.find(e => 
+            e.subject?.year === 1 && 
+            e.subject?.division && 
+            e.division
+          )
+          
+          // Si hay inscripción en otra división, ocultar este
+          if (firstYearWithDivision && firstYearWithDivision.division !== division) {
+            return false
+          }
+        }
+        
+        return true
+      })
+      
+      setEnrollments(filteredEnrollments)
     } catch (err) {
       console.error('Error loading subjects:', err)
       setError('Error al cargar materias')
@@ -236,7 +262,14 @@ function SubjectsPage() {
                         </div>
                         <div>
                           <h3 className="text-lg font-bold text-gray-900">{subject?.name}</h3>
-                          <p className="text-sm text-gray-500">{subject?.code} • {professor?.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-sm text-gray-500">{subject?.code} • {professor?.name}</p>
+                            {subject?.division && (
+                              <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded">
+                                Div. {subject.division}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

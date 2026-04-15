@@ -8,6 +8,7 @@ type SubjectRow = {
   name: string
   code: string
   year: number
+  division?: string | null
   dictation_type: string
   semester: number
   correlatives_ok: boolean
@@ -65,7 +66,7 @@ function RoadmapPage() {
     if (programId) {
       const { data: subs } = await supabase
         .from('subjects')
-        .select('id, name, code, year, dictation_type, semester, allows_promotion')
+        .select('id, name, code, year, division, dictation_type, semester, allows_promotion')
         .eq('program_id', programId)
         .order('year')
         .order('code')
@@ -80,13 +81,14 @@ function RoadmapPage() {
 
     const { data: enrollments } = await supabase
       .from('enrollments')
-      .select('id, subject_id, academic_year, status')
+      .select('id, subject_id, division, academic_year, status')
       .eq('student_id', (student as any).id)
 
     const enrolledIds = new Set<string>()
     const passedIds = new Set<string>()
     const recursantIds = new Set<string>()
     const gradesMap = new Map<string, any>()
+    let enrolledDivision: string | null = null
 
     if (enrollments && enrollments.length > 0) {
       for (const enr of enrollments) {
@@ -106,6 +108,12 @@ function RoadmapPage() {
           recursantIds.add(enr.subject_id)
           enrolledIds.add(enr.subject_id)
         }
+        
+        // Detectar si está inscripto en una división de primer año
+        const subj = sMap.get(enr.subject_id)
+        if (subj?.year === 1 && (enr as any).division) {
+          enrolledDivision = (enr as any).division
+        }
       }
     }
 
@@ -120,7 +128,16 @@ function RoadmapPage() {
       requiresMap.set(c.subject_id, arr)
     }
 
-    const computed: SubjectRow[] = (catalog as any[]).map((s) => {
+    const computed: SubjectRow[] = (catalog as any[])
+      .filter(s => {
+        // Filtrar divisiones: si está inscripto en una división de primer año,
+        // ocultar materias de primer año de la otra división
+        if (s.year === 1 && s.division && enrolledDivision && enrolledDivision !== s.division) {
+          return false
+        }
+        return true
+      })
+      .map((s) => {
       const reqs = requiresMap.get(s.id) ?? []
       const correlatives_ok =
         reqs.length === 0 || reqs.every((rid) => passedIds.has(rid))
@@ -152,6 +169,7 @@ function RoadmapPage() {
         name: s.name,
         code: s.code,
         year: s.year,
+        division: s.division,
         dictation_type: s.dictation_type || 'anual',
         semester: s.semester || 1,
         correlatives_ok,
@@ -322,7 +340,14 @@ function RoadmapPage() {
                         {getDictationLabel(s)}
                       </span>
                     </div>
-                    <h3 className="font-bold text-gray-900 text-sm leading-tight">{s.name}</h3>
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-gray-900 text-sm leading-tight">{s.name}</h3>
+                      {s.division && (
+                        <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded inline-block">
+                          Div. {s.division}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Estado */}
