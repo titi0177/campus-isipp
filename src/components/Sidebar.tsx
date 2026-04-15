@@ -126,7 +126,7 @@ export function Sidebar({ role }: SidebarProps) {
   }, [currentPath])
 
   return (
-    <aside className="sidebar h-screen flex flex-col pb-20 md:pb-0"> style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
+    <aside className="sidebar h-screen flex flex-col pb-20 md:pb-0" style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
       {/* Logo Section - Responsive */}
       <div className="siu-sidebar-brand flex-shrink-0">
         <div className="siu-sidebar-logo-box">
