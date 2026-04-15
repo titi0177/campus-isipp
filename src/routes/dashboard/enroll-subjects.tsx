@@ -290,7 +290,6 @@ function EnrollSubjectsPage() {
         student_id: student.id,
         subject_id: subjectId,
         year: currentYear,
-        semester: 1,
         division: division,
         status: 'active',
       })
