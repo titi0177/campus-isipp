@@ -93,7 +93,14 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
 
       <div className="flex items-center gap-1.5 sm:gap-2">
         <NotificationBell />
-        
+        {/* Logout button for mobile */}
+<button
+  onClick={handleLogout}
+  className="md:hidden flex items-center justify-center rounded-sm p-2 text-white/90 hover:bg-white/10 active:bg-white/20"
+  title="Cerrar sesión"
+>
+  <LogOut size={20} />
+</button>
         <Link
           to={announcementsPath}
           className="rounded-sm p-2 text-white/90 transition-colors hover:bg-white/10 active:bg-white/20"
