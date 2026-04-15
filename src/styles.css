@@ -336,38 +336,9 @@ body {
 
 /* --- OPTIMIZACIONES MOBILE --- */
 
-/* Responsive helpers */
-@media (max-width: 767px) {
-  html {
-    font-size: 15px;
-  }
-
-  .sidebar {
-    @apply w-64;
-  }
-
-  .form-input,
-  select,
-  textarea {
-    @apply text-base; /* Evita zoom automático */
-  }
-
-  .card {
-    @apply rounded-lg;
-  }
-
-  .overflow-x-auto {
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-/* Tablet y arriba */
+/* Full width content layout */
 @media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
-
-  .sidebar {
-    @apply sticky;
+  .flex-1 {
+    width: 100%;
   }
 }

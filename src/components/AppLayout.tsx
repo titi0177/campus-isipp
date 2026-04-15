@@ -27,56 +27,41 @@ export function AppLayout({ role = 'student' }: AppLayoutProps) {
   }, [])
 
   useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false)
-    }
-  }, [router.location.pathname, isMobile])
+    setSidebarOpen(false)
+  }, [router.location.pathname])
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden flex-col md:flex-row">
-      {/* Mobile Menu Button */}
-      {isMobile && (
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md md:hidden hover:bg-gray-100 transition-colors"
-          aria-label="Toggle menu"
-        >
-          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      )}
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Menu Button - Both mobile and desktop */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md hover:bg-gray-100 transition-colors"
+        aria-label="Toggle menu"
+      >
+        {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
 
-      {/* Overlay for mobile */}
-      {isMobile && sidebarOpen && (
+      {/* Overlay for sidebar */}
+      {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar - Hidden on mobile, visible on desktop */}
-      <div
-        className={`
-          ${isMobile ? 'hidden' : 'block'}
-          md:block md:relative md:h-screen md:w-64 md:flex-shrink-0
-        `}
-      >
-        <Sidebar role={role} />
-      </div>
-
-      {/* Mobile Sidebar Overlay */}
-      {isMobile && sidebarOpen && (
-        <div className="fixed inset-0 z-40 overflow-hidden">
-          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setSidebarOpen(false)} />
-          <div className="absolute left-0 top-0 h-screen w-64 bg-white shadow-lg overflow-y-auto">
+      {/* Sidebar - Modal/Overlay style */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 overflow-hidden pointer-events-none">
+          <div className="absolute inset-y-0 left-0 w-64 bg-white shadow-lg overflow-y-auto pointer-events-auto">
             <Sidebar role={role} />
           </div>
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Main Content - Full width */}
       <div className="flex-1 overflow-auto flex flex-col w-full">
         {/* Add padding on mobile to account for hamburger menu and bottom nav */}
-        <div className={`flex-1 overflow-auto ${isMobile ? 'pt-16 pb-20' : ''}`}>
+        <div className={`flex-1 overflow-auto ${isMobile ? 'pt-16 pb-20' : 'pt-16'}`}>
           <Outlet />
         </div>
       </div>
