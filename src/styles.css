@@ -68,8 +68,10 @@ body {
 }
 
 .sidebar-link {
-  @apply mx-2 flex items-center gap-3 rounded-sm px-2 md:px-3 py-2.5 md:py-3 text-sm font-medium transition-colors min-h-[44px];
+  @apply mx-2 flex items-center gap-3 rounded-sm px-2 md:px-3 py-2.5 md:py-3 text-sm font-medium transition-colors;
   color: var(--siu-blue);
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .sidebar-link:hover {
@@ -92,12 +94,13 @@ body {
 
 /* --- Botones --- */
 .btn-primary {
-  @apply inline-flex items-center justify-center px-4 py-2.5 md:py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] md:min-h-auto;
+  @apply inline-flex items-center justify-center px-4 py-2.5 md:py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   background: var(--siu-blue);
   color: white;
   border-radius: 2px;
   border: 1px solid var(--isipp-bordo-deep);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
+  min-height: 44px;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -105,11 +108,12 @@ body {
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center px-4 py-2.5 md:py-2 text-sm font-semibold transition-colors min-h-[44px] md:min-h-auto;
+  @apply inline-flex items-center justify-center px-4 py-2.5 md:py-2 text-sm font-semibold transition-colors;
   background: var(--siu-panel);
   color: var(--siu-navy);
   border-radius: 2px;
   border: 1px solid var(--siu-border);
+  min-height: 44px;
 }
 
 .btn-secondary:hover {
@@ -163,11 +167,12 @@ body {
 
 /* --- Formularios --- */
 .form-input {
-  @apply w-full px-3 py-2 md:py-2.5 text-base md:text-sm transition-shadow min-h-[44px] md:min-h-auto;
+  @apply w-full px-3 py-2 md:py-2.5 text-base md:text-sm transition-shadow;
   border: 1px solid var(--siu-border);
   border-radius: 2px;
   background: #fafbfc;
   color: var(--siu-text);
+  min-height: 44px;
 }
 
 .form-input:focus {
@@ -309,7 +314,9 @@ body {
 
 /* Botón ícono en grillas (editar / eliminar) */
 .siu-table-action {
-  @apply rounded-sm p-1.5 text-slate-500 transition-colors hover:bg-[var(--isipp-bordo-soft)] hover:text-[var(--isipp-bordo-dark)] touch-target;
+  @apply rounded-sm p-1.5 text-slate-500 transition-colors hover:bg-[var(--isipp-bordo-soft)] hover:text-[var(--isipp-bordo-dark)];
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .siu-band-header {
@@ -328,11 +335,6 @@ body {
 }
 
 /* --- OPTIMIZACIONES MOBILE --- */
-
-/* Touch targets: 44x44px mínimo */
-.touch-target {
-  @apply min-h-[44px] min-w-[44px];
-}
 
 /* Responsive helpers */
 @media (max-width: 767px) {
