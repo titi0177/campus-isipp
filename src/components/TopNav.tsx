@@ -1,5 +1,5 @@
-import { Bell, User, ChevronDown } from 'lucide-react'
-import { useState } from 'react'
+import { Bell, User, ChevronDown, LogOut } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { NotificationBell } from '@/components/NotificationCenter'
@@ -13,11 +13,26 @@ interface TopNavProps {
 
 export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
   const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = '/'
   }
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false)
+      }
+    }
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
 
   const moduleLine =
     role === 'admin'
@@ -65,9 +80,9 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
           : 'Alumno'
 
   return (
-    <header className="siu-topnav">
+    <header className="siu-topnav hidden md:flex">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <img src={LOGO_SRC} alt="" className="siu-topnav-logo" width={140} height={48} />
+        <img src={LOGO_SRC} alt="" className="siu-topnav-logo" width={140} height={48} loading="lazy" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <h1 className="siu-topnav-title truncate text-sm leading-tight sm:text-base">
             Instituto Superior de Informática Puerto Piray
@@ -76,21 +91,24 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <NotificationBell />
+        
         <Link
           to={announcementsPath}
-          className="relative rounded-sm p-2 text-white/90 transition-colors hover:bg-white/10"
+          className="rounded-sm p-2 text-white/90 transition-colors hover:bg-white/10 active:bg-white/20"
           title="Novedades"
         >
           <Bell size={20} />
         </Link>
 
-        <div className="relative">
+        <div className="relative" ref={menuRef}>
           <button
             type="button"
             onClick={() => setShowMenu(!showMenu)}
-            className="flex items-center gap-2 rounded-sm py-1.5 pl-1 pr-2 text-white transition-colors hover:bg-white/10"
+            className="flex items-center gap-2 rounded-sm py-1.5 pl-1.5 pr-2 text-white transition-colors hover:bg-white/10 active:bg-white/20"
+            aria-haspopup="menu"
+            aria-expanded={showMenu}
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-sm border border-white/25 bg-white/15">
               <User size={17} className="text-white" />
@@ -103,14 +121,22 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
                 {roleLabel}
               </div>
             </div>
-            <ChevronDown size={14} className="text-white/60" />
+            <ChevronDown size={14} className={`text-white/60 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
           </button>
 
           {showMenu && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-52 border border-[var(--siu-border)] bg-white py-1 shadow-lg">
+            <div
+              className="absolute right-0 top-full z-50 mt-1 w-52 border shadow-lg overflow-hidden rounded-sm"
+              style={{
+                backgroundColor: 'var(--siu-panel)',
+                borderColor: 'var(--siu-border)',
+              }}
+              role="menu"
+            >
               <Link
                 to={settingsPath}
-                className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-[var(--siu-blue-soft)]"
+                className="block px-4 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--siu-blue-soft)]"
+                style={{ color: 'var(--siu-text)' }}
                 onClick={() => setShowMenu(false)}
               >
                 {settingsLabel}
@@ -119,8 +145,10 @@ export function TopNav({ userName = 'Usuario', role }: TopNavProps) {
               <button
                 type="button"
                 onClick={handleLogout}
-                className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-red-700 hover:bg-red-50"
+                className="block w-full px-4 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-red-50 flex items-center gap-2"
+                style={{ color: '#7f1d1d' }}
               >
+                <LogOut size={16} />
                 Cerrar sesión
               </button>
             </div>

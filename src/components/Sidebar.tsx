@@ -1,5 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   LayoutDashboard, Users, BookOpen, GraduationCap, UserCheck,
   ClipboardList, Star, Calendar, FileText, Bell, Settings,
@@ -111,13 +111,22 @@ export function Sidebar({ role }: SidebarProps) {
     }
   }
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await supabase.auth.signOut()
     window.location.href = '/'
-  }
+  }, [])
+
+  const isActive = useCallback((href: string) => {
+    return currentPath === href ||
+      (href !== '/admin' &&
+        href !== '/dashboard' &&
+        href !== '/professor' &&
+        href !== '/treasurer' &&
+        currentPath.startsWith(href))
+  }, [currentPath])
 
   return (
-    <aside className="sidebar h-full flex flex-col overflow-y-auto">
+    <aside className="sidebar h-full flex flex-col overflow-y-auto" style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
       {/* Logo Section - Responsive */}
       <div className="siu-sidebar-brand">
         <div className="siu-sidebar-logo-box">
@@ -141,18 +150,22 @@ export function Sidebar({ role }: SidebarProps) {
       </div>
 
       {/* Navigation - Scrollable */}
-      <nav className="flex-1 space-y-0.5 py-2 md:py-3 overflow-y-auto">
+      <nav className="flex-1 space-y-0.5 py-2 md:py-3 overflow-y-auto px-2">
         {navItems.map((item) => {
-          const isActive = currentPath === item.href ||
-            (item.href !== '/admin' &&
-              item.href !== '/dashboard' &&
-              item.href !== '/professor' &&
-              currentPath.startsWith(item.href))
+          const active = isActive(item.href)
           return (
             <Link
               key={item.href}
               to={item.href}
-              className={`sidebar-link group touch-target ${isActive ? 'active' : ''}`}
+              className={`sidebar-link group touch-target ${active ? 'active' : ''}`}
+              style={active ? {
+                backgroundColor: 'var(--siu-panel)',
+                color: 'var(--isipp-bordo-dark)',
+                boxShadow: 'inset 4px 0 0 var(--isipp-bordo), 0 1px 2px rgba(44, 21, 24, 0.06)',
+                border: '1px solid var(--siu-border-light)',
+              } : {
+                color: 'var(--siu-blue)',
+              }}
             >
               <span className="relative flex-shrink-0">
                 {item.icon}
@@ -163,18 +176,18 @@ export function Sidebar({ role }: SidebarProps) {
                 )}
               </span>
               <span className="flex-1 leading-snug text-sm md:text-base truncate">{item.label}</span>
-              {isActive && <ChevronRight size={14} className="opacity-70 flex-shrink-0" />}
+              {active && <ChevronRight size={14} className="opacity-70 flex-shrink-0" />}
             </Link>
           )
         })}
       </nav>
 
       {/* Logout Button - Fixed at bottom */}
-      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3">
+      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3 m-2 rounded-sm">
         <button
           type="button"
           onClick={handleLogout}
-          className="sidebar-link w-full text-left text-slate-600 hover:text-red-800 touch-target"
+          className="sidebar-link w-full text-left text-slate-600 hover:text-red-800 touch-target transition-colors"
         >
           <LogOut size={18} />
           <span className="font-semibold text-sm md:text-base">Cerrar sesión</span>

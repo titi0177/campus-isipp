@@ -37,13 +37,13 @@ const StatCardMemo = memo(function StatCardComp({
   text: string
 }) {
   return (
-    <div className={`card p-6 ${bg} shadow-sm hover:shadow-md transition-shadow`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className={`text-xs font-semibold ${text} uppercase tracking-wide`}>{label}</p>
-          <p className={`text-3xl font-bold mt-1`}>{value}</p>
+    <div className={`card p-4 sm:p-6 ${bg} shadow-sm hover:shadow-md transition-shadow`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs sm:text-sm font-semibold ${text} uppercase tracking-wide`}>{label}</p>
+          <p className={`text-2xl sm:text-3xl font-bold mt-2`}>{value}</p>
         </div>
-        <Icon className="w-8 h-8 opacity-80" />
+        <Icon className="w-6 h-6 sm:w-8 sm:h-8 opacity-80 flex-shrink-0" />
       </div>
     </div>
   )
@@ -58,18 +58,18 @@ const ExamCard = memo(function ExamCardComp({
   idx: number
 }) {
   return (
-    <div className="flex gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
-      <div className="flex flex-col items-center justify-start min-w-fit">
-        <div className="w-10 h-10 rounded-full bg-[var(--siu-blue)] text-white flex items-center justify-center font-bold text-sm">
+    <div className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
+      <div className="flex flex-col items-center justify-start flex-shrink-0">
+        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[var(--siu-blue)] text-white flex items-center justify-center font-bold text-xs sm:text-sm">
           {idx + 1}
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-slate-900">{exam.subject?.name ?? 'Materia'}</p>
-        <p className="text-sm text-slate-600 mt-1 flex gap-2 flex-wrap">
+        <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">{exam.subject?.name ?? 'Materia'}</p>
+        <p className="text-xs sm:text-sm text-slate-600 mt-1 flex gap-2 flex-wrap">
           <span>📅 {new Date(exam.exam_date).toLocaleDateString('es-AR')}</span>
           <span>🕐 {new Date(exam.exam_date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
-          {exam.location && <span>📍 {exam.location}</span>}
+          {exam.location && <span className="hidden sm:inline">📍 {exam.location}</span>}
         </p>
       </div>
     </div>
@@ -99,12 +99,12 @@ const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: numbe
   
   return (
     <tr key={index} className="hover:bg-slate-50 transition-colors">
-      <td className="px-4 py-3 font-medium text-slate-900">{s.subject?.name}</td>
-      <td className="px-4 py-3 text-center text-slate-600">{s.partial_grade ?? '—'}</td>
-      <td className="px-4 py-3 text-center text-slate-600">{s.final_exam_grade ?? '—'}</td>
-      <td className={`px-4 py-3 text-center font-bold ${noteColor}`}>{fg ?? '—'}</td>
-      <td className="px-4 py-3 text-center">
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBg}`}>{status}</span>
+      <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-slate-900 text-xs sm:text-sm truncate">{s.subject?.name}</td>
+      <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-slate-600 text-xs sm:text-sm">{s.partial_grade ?? '—'}</td>
+      <td className="hidden sm:table-cell px-4 py-3 text-center text-slate-600">{s.final_exam_grade ?? '—'}</td>
+      <td className={`px-2 sm:px-4 py-2 sm:py-3 text-center font-bold text-xs sm:text-sm ${noteColor}`}>{fg ?? '—'}</td>
+      <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
+        <span className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold whitespace-nowrap ${statusBg}`}>{status}</span>
       </td>
     </tr>
   )
@@ -245,27 +245,27 @@ function DashboardPage() {
   ).length
 
   return (
-    <div className="space-y-8">
-      {/* Hero Header */}
-      <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] rounded-xl p-8 text-white shadow-lg">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="space-y-6 sm:space-y-8">
+      {/* Hero Header - Responsive */}
+      <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8 text-white shadow-lg">
+        <div className="flex flex-col justify-between gap-3 sm:gap-4">
           <div>
-            <p className="text-sm font-medium opacity-90 mb-2">Bienvenido de nuevo</p>
-            <h1 className="text-4xl font-bold sm:text-5xl">{student.first_name}</h1>
-            <p className="text-sm opacity-80 mt-2">
+            <p className="text-xs sm:text-sm font-medium opacity-90 mb-1 sm:mb-2">Bienvenido de nuevo</p>
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold truncate">{student.first_name}</h1>
+            <p className="text-xs sm:text-sm opacity-80 mt-2 truncate">
               {student.program?.name ?? 'Carrera'} • Legajo: {student.legajo}
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Link
               to="/dashboard/enroll-subjects"
-              className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all"
+              className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all active:scale-95"
             >
               + Inscribirse
             </Link>
             <Link
               to="/dashboard/roadmap"
-              className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all"
+              className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all active:scale-95"
             >
               Plan de estudios
             </Link>
@@ -285,8 +285,8 @@ function DashboardPage() {
         />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats Grid - Responsive columns */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
         <StatCardMemo
           label="Promedio"
           value={gpa != null ? gpa.toFixed(2) : '—'}
@@ -319,25 +319,25 @@ function DashboardPage() {
 
       {/* Upcoming Exams */}
       <div className="card overflow-hidden shadow-md">
-        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 flex items-center gap-3">
-          <Calendar className="w-5 h-5 text-white" />
-          <h2 className="text-lg font-bold text-white">Próximas mesas de examen</h2>
+        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-2 sm:gap-3">
+          <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white flex-shrink-0" />
+          <h2 className="text-base sm:text-lg font-bold text-white truncate">Próximas mesas de examen</h2>
         </div>
-        <div className="p-6">
+        <div className="p-3 sm:p-6">
           {upcomingExams.length === 0 ? (
-            <div className="text-center py-8">
-              <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-600 font-medium">No hay mesas programadas</p>
-              <p className="text-sm text-slate-500 mt-1">Las mesas se mostrarán aquí cuando se publiquen</p>
+            <div className="text-center py-6 sm:py-8">
+              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-slate-300 mx-auto mb-2 sm:mb-3" />
+              <p className="text-slate-600 font-medium text-sm sm:text-base">No hay mesas programadas</p>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">Las mesas se mostrarán aquí cuando se publiquen</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {upcomingExams.map((exam, idx) => (
                 <ExamCard key={exam.id} exam={exam} idx={idx} />
               ))}
             </div>
           )}
-          <Link to="/dashboard/exams" className="mt-4 inline-flex items-center gap-2 text-[var(--siu-blue)] hover:text-[var(--siu-navy)] font-semibold text-sm">
+          <Link to="/dashboard/exams" className="mt-3 sm:mt-4 inline-flex items-center gap-2 text-[var(--siu-blue)] hover:text-[var(--siu-navy)] font-semibold text-xs sm:text-sm transition-colors">
             Ver todas las mesas →
           </Link>
         </div>
@@ -345,41 +345,41 @@ function DashboardPage() {
 
       {/* Recent Grades */}
       <div className="card overflow-hidden shadow-md">
-        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-white" />
-            <h2 className="text-lg font-bold text-white">Calificaciones recientes</h2>
+        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-white flex-shrink-0" />
+            <h2 className="text-base sm:text-lg font-bold text-white truncate">Calificaciones recientes</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => generateRegularCertificate(student, student.program)}
-              className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded text-xs font-semibold transition-colors"
+              className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-semibold transition-colors flex-shrink-0"
             >
               Certificado
             </button>
-            <Link to="/dashboard/certificates" className="text-xs font-semibold text-white/80 hover:text-white transition-colors">
+            <Link to="/dashboard/certificates" className="text-[10px] sm:text-xs font-semibold text-white/80 hover:text-white transition-colors flex-shrink-0">
               Más →
             </Link>
           </div>
         </div>
-        <div className="p-6">
+        <div className="p-3 sm:p-6 overflow-x-auto">
           {rows.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-600 font-medium">No hay calificaciones registradas</p>
-              <p className="text-sm text-slate-500 mt-1">Tus notas aparecerán aquí cuando los docentes las carguen</p>
+            <div className="text-center py-8 sm:py-12">
+              <FileText className="w-10 h-10 sm:w-12 sm:h-12 text-slate-300 mx-auto mb-2 sm:mb-3" />
+              <p className="text-slate-600 font-medium text-sm sm:text-base">No hay calificaciones registradas</p>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">Tus notas aparecerán aquí cuando los docentes las carguen</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-3 sm:-mx-6">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    <th className="px-4 py-3">Materia</th>
-                    <th className="px-4 py-3 text-center">Parcial</th>
-                    <th className="px-4 py-3 text-center">Final</th>
-                    <th className="px-4 py-3 text-center">Nota</th>
-                    <th className="px-4 py-3 text-center">Estado</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3">Materia</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Parcial</th>
+                    <th className="hidden sm:table-cell px-4 py-3 text-center">Final</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Nota</th>
+                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Estado</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
