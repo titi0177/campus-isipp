@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Lock, CheckCircle2, BookOpen, AlertCircle, RefreshCw, Zap, Award } from 'lucide-react'
+import { Lock, CheckCircle2, BookOpen, AlertCircle, RefreshCw, Zap, Award, TrendingUp } from 'lucide-react'
 
 type SubjectRow = {
   id: string
@@ -15,7 +15,6 @@ type SubjectRow = {
   state: 'done' | 'current' | 'locked' | 'available' | 'recursant'
   isRecursant: boolean
   blockedByCorrelatives: Array<{ id: string; name: string; code: string }>
-  // Nuevos campos para notas
   finalGrade?: number
   partialGrade?: number
   gradeStatus?: string
@@ -94,7 +93,7 @@ function RoadmapPage() {
       for (const enr of enrollments) {
         const { data: grades } = await supabase
           .from('grades')
-          .select('status, final_grade, partial_grade')
+          .select('status, final_grade_exam, partial_grade')
           .eq('enrollment_id', enr.id)
           .single()
 
@@ -109,7 +108,6 @@ function RoadmapPage() {
           enrolledIds.add(enr.subject_id)
         }
         
-        // Detectar si está inscripto en una división de primer año
         const subj = sMap.get(enr.subject_id)
         if (subj?.year === 1 && (enr as any).division) {
           enrolledDivision = (enr as any).division
@@ -130,8 +128,6 @@ function RoadmapPage() {
 
     const computed: SubjectRow[] = (catalog as any[])
       .filter(s => {
-        // Filtrar divisiones: si está inscripto en una división de primer año,
-        // ocultar materias de primer año de la otra división
         if (s.year === 1 && s.division && enrolledDivision && enrolledDivision !== s.division) {
           return false
         }
@@ -176,7 +172,7 @@ function RoadmapPage() {
         state,
         isRecursant,
         blockedByCorrelatives,
-        finalGrade: grades?.final_grade,
+        finalGrade: grades?.final_grade_exam,
         partialGrade: grades?.partial_grade,
         gradeStatus: grades?.status,
         allowsPromotion: s.allows_promotion,
@@ -196,21 +192,14 @@ function RoadmapPage() {
 
   function getGradeColor(finalGrade?: number, allowsPromotion?: boolean) {
     if (!finalGrade) return 'from-gray-100 to-gray-200'
-    
-    // Si permite promoción y nota >= 7, mostrar como promocionado
-    if (allowsPromotion && finalGrade >= 7) return 'from-purple-100 to-purple-200'
-    // Si nota >= 7 pero no permite promoción, mostrar como aprobado
-    if (finalGrade >= 7) return 'from-emerald-100 to-emerald-200'
-    // Si nota entre 4-6, mostrar como aprobado
-    if (finalGrade >= 4) return 'from-emerald-100 to-emerald-200'
-    // Si nota < 4, desaprobado
-    return 'from-red-100 to-red-200'
+    if (allowsPromotion && finalGrade >= 8) return 'from-purple-100 to-pink-100'
+    if (finalGrade >= 7) return 'from-emerald-100 to-teal-100'
+    if (finalGrade >= 4) return 'from-emerald-100 to-teal-100'
+    return 'from-red-100 to-rose-100'
   }
 
-  function getStatusLabel(finalGrade?: number, allowsPromotion?: boolean, gradeStatus?: string) {
+  function getStatusLabel(finalGrade?: number, allowsPromotion?: boolean) {
     if (!finalGrade) return null
-    
-    // Lógica: promocionado solo si allows_promotion = true Y nota >= 8
     if (allowsPromotion && finalGrade >= 8) return 'Promocionado'
     if (finalGrade >= 6) return 'Aprobado'
     return 'Desaprobado'
@@ -218,7 +207,6 @@ function RoadmapPage() {
 
   function getStatusColor(finalGrade?: number, allowsPromotion?: boolean) {
     if (!finalGrade) return 'text-gray-600'
-    
     if (allowsPromotion && finalGrade >= 8) return 'text-purple-700'
     if (finalGrade >= 8) return 'text-emerald-700'
     if (finalGrade >= 6) return 'text-emerald-700'
@@ -235,21 +223,26 @@ function RoadmapPage() {
     return [...m.entries()].sort((a, b) => a[0] - b[0])
   }, [subjects])
 
+  const stats = useMemo(() => {
+    const approved = subjects.filter(s => s.state === 'done').length
+    const promoted = subjects.filter(s => s.state === 'done' && s.finalGrade && s.finalGrade >= 8 && s.allowsPromotion).length
+    const current = subjects.filter(s => s.state === 'current').length
+    const available = subjects.filter(s => s.state === 'available').length
+    return { approved, promoted, current, available, total: subjects.length }
+  }, [subjects])
+
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            Plan de Estudios
-          </h1>
-          <p className="text-gray-500 mt-2">Cargando tu plan académico...</p>
+      <div className="space-y-8">
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-8 text-white shadow-2xl animate-pulse">
+          <div className="h-12 bg-white/20 rounded w-1/2 mb-4"></div>
+          <div className="h-6 bg-white/10 rounded w-1/3"></div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => (
             <div key={i} className="card p-4 animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-3/4 mb-3"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
-              <div className="h-12 bg-gray-200 rounded"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-3"></div>
+              <div className="h-8 bg-gray-200 rounded"></div>
             </div>
           ))}
         </div>
@@ -259,219 +252,332 @@ function RoadmapPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3">
-          Plan de Estudios
-        </h1>
-        {programName && (
-          <p className="text-gray-600 text-lg">
-            Carrera: <span className="font-bold text-gray-900">{programName}</span>
-          </p>
-        )}
-        <div className="mt-4 flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={18} className="text-emerald-600" />
-            <span className="text-gray-700">Aprobado</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Award size={18} className="text-purple-600" />
-            <span className="text-gray-700">Promocionado</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <BookOpen size={18} className="text-blue-600" />
-            <span className="text-gray-700">En curso</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Zap size={18} className="text-amber-600" />
-            <span className="text-gray-700">Disponible</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Lock size={18} className="text-gray-400" />
-            <span className="text-gray-700">Bloqueado</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <RefreshCw size={18} className="text-orange-600" />
-            <span className="text-gray-700">Recursante</span>
-          </div>
+      {/* Header Hero */}
+      <div className="relative bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-8 text-white shadow-2xl overflow-hidden">
+        <div className="absolute top-0 right-0 opacity-20">
+          <TrendingUp size={120} />
+        </div>
+        <div className="relative z-10">
+          <p className="text-blue-100 text-sm font-semibold mb-2">Bienvenido</p>
+          <h1 className="text-5xl md:text-6xl font-black mb-2">Plan de Estudios</h1>
+          {programName && (
+            <p className="text-xl text-blue-100 font-medium">{programName}</p>
+          )}
+          <p className="text-blue-100 mt-4 max-w-2xl">Seguimiento completo de tu progreso académico. Visualiza tus materias, calificaciones y estado de cada asignatura.</p>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="card p-4 border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-teal-50 hover:shadow-lg transition-all cursor-pointer">
+          <p className="text-xs text-emerald-600 font-bold mb-2">APROBADAS</p>
+          <p className="text-3xl font-black text-emerald-700">{stats.approved}</p>
+          <p className="text-xs text-emerald-600 mt-1">{stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}%</p>
+        </div>
+        
+        <div className="card p-4 border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-lg transition-all cursor-pointer">
+          <p className="text-xs text-purple-600 font-bold mb-2">PROMOCIONADAS</p>
+          <p className="text-3xl font-black text-purple-700">{stats.promoted}</p>
+          <p className="text-xs text-purple-600 mt-1">Nota ≥8</p>
+        </div>
+        
+        <div className="card p-4 border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-cyan-50 hover:shadow-lg transition-all cursor-pointer">
+          <p className="text-xs text-blue-600 font-bold mb-2">EN CURSO</p>
+          <p className="text-3xl font-black text-blue-700">{stats.current}</p>
+          <p className="text-xs text-blue-600 mt-1">Inscripto</p>
+        </div>
+        
+        <div className="card p-4 border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 hover:shadow-lg transition-all cursor-pointer">
+          <p className="text-xs text-amber-600 font-bold mb-2">DISPONIBLES</p>
+          <p className="text-3xl font-black text-amber-700">{stats.available}</p>
+          <p className="text-xs text-amber-600 mt-1">Podés inscribir</p>
+        </div>
+
+        <div className="card p-4 border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 to-indigo-100 hover:shadow-lg transition-all cursor-pointer">
+          <p className="text-xs text-indigo-600 font-bold mb-2">TOTAL</p>
+          <p className="text-3xl font-black text-indigo-700">{stats.total}</p>
+          <p className="text-xs text-indigo-600 mt-1">Materias</p>
+        </div>
+      </div>
+
+      {/* Legend Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="card p-3 border-t-4 border-t-emerald-600 hover:shadow-md transition-all text-center">
+          <CheckCircle2 size={24} className="text-emerald-600 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-900">APROBADO</p>
+          <p className="text-xs text-gray-600 mt-1">Completado</p>
+        </div>
+        
+        <div className="card p-3 border-t-4 border-t-purple-600 hover:shadow-md transition-all text-center">
+          <Award size={24} className="text-purple-600 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-900">PROMOCIÓN</p>
+          <p className="text-xs text-gray-600 mt-1">Nota ≥8</p>
+        </div>
+        
+        <div className="card p-3 border-t-4 border-t-blue-600 hover:shadow-md transition-all text-center">
+          <BookOpen size={24} className="text-blue-600 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-900">EN CURSO</p>
+          <p className="text-xs text-gray-600 mt-1">Inscripto</p>
+        </div>
+        
+        <div className="card p-3 border-t-4 border-t-amber-500 hover:shadow-md transition-all text-center">
+          <Zap size={24} className="text-amber-600 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-900">DISPONIBLE</p>
+          <p className="text-xs text-gray-600 mt-1">Podés inscribir</p>
+        </div>
+        
+        <div className="card p-3 border-t-4 border-t-orange-600 hover:shadow-md transition-all text-center">
+          <RefreshCw size={24} className="text-orange-600 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-900">RECURSANTE</p>
+          <p className="text-xs text-gray-600 mt-1">Reintentando</p>
+        </div>
+        
+        <div className="card p-3 border-t-4 border-t-gray-400 hover:shadow-md transition-all text-center">
+          <Lock size={24} className="text-gray-500 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-900">BLOQUEADO</p>
+          <p className="text-xs text-gray-600 mt-1">Sin requisitos</p>
         </div>
       </div>
 
       {/* Materias por año */}
-      {byYear.map(([year, list]) => (
-        <section key={year} className="space-y-4">
-          <h2 className="text-2xl font-bold text-gray-900 border-b-4 border-indigo-600 pb-2 inline-block">
-            Año {year}
-          </h2>
-          
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {list.map((s) => {
-              const statusLabel = getStatusLabel(s.finalGrade, s.allowsPromotion, s.gradeStatus)
-              const statusColor = getStatusColor(s.finalGrade, s.allowsPromotion)
-              
-              return (
-                <div
-                  key={s.id}
-                  className={`card rounded-xl overflow-hidden border-l-4 transition-all hover:shadow-lg ${
-                    s.state === 'done'
-                      ? 'border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-teal-50'
-                      : s.state === 'recursant'
-                        ? 'border-l-orange-600 bg-gradient-to-br from-orange-50 to-amber-50'
-                        : s.state === 'current'
-                          ? 'border-l-blue-600 bg-gradient-to-br from-blue-50 to-cyan-50'
-                          : s.state === 'available'
-                            ? 'border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50'
-                            : 'border-l-gray-300 bg-gradient-to-br from-gray-50 to-slate-50'
-                  }`}
-                >
-                  {/* Header con código y tipo */}
-                  <div className="p-4 border-b border-gray-200">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        {s.state === 'done' && <CheckCircle2 className="h-5 w-5 text-emerald-700" />}
-                        {s.state === 'recursant' && <RefreshCw className="h-5 w-5 text-orange-700" />}
-                        {s.state === 'current' && <BookOpen className="h-5 w-5 text-blue-700" />}
-                        {s.state === 'available' && <Zap className="h-5 w-5 text-amber-700" />}
-                        {s.state === 'locked' && <Lock className="h-5 w-5 text-gray-400" />}
-                        
-                        <span className="font-mono text-sm font-bold text-gray-600">{s.code}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-200 text-gray-700">
-                          {getDictationLabel(s)}
-                        </span>
-                        {s.allowsPromotion && (
-                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-purple-200 text-purple-700" title="Permite promoción con nota ≥8">
-                            🎓 Promocional
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="font-bold text-gray-900 text-sm leading-tight">{s.name}</h3>
-                      {s.division && (
-                        <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded inline-block">
-                          Div. {s.division}
-                        </span>
-                      )}
+      {byYear.length > 0 && (
+        <div className="space-y-12">
+          {byYear.map(([year, list]) => {
+            const yearStats = {
+              done: list.filter(s => s.state === 'done').length,
+              current: list.filter(s => s.state === 'current').length,
+              available: list.filter(s => s.state === 'available').length,
+              total: list.length
+            }
+            
+            return (
+              <section key={year} className="space-y-6">
+                {/* Year Header */}
+                <div className="flex items-end gap-4 pb-4 border-b-4 border-gradient-to-r from-indigo-600 to-purple-600">
+                  <div>
+                    <h2 className="text-4xl font-black text-gray-900">Año {year}</h2>
+                    <div className="flex gap-4 mt-2 text-sm">
+                      <span className="text-emerald-600 font-semibold">{yearStats.done}/{yearStats.total} Aprobadas</span>
+                      <span className="text-blue-600 font-semibold">{yearStats.current} En curso</span>
+                      <span className="text-amber-600 font-semibold">{yearStats.available} Disponibles</span>
                     </div>
                   </div>
-
-                  {/* Estado */}
-                  <div className="px-4 py-3 bg-white/50">
-                    <p className="text-xs text-gray-600 font-semibold mb-1">ESTADO</p>
-                    <p className="text-sm font-bold text-gray-900">
-                      {s.state === 'done' && '✓ Aprobada'}
-                      {s.state === 'recursant' && '↻ Recursante'}
-                      {s.state === 'current' && '● En curso'}
-                      {s.state === 'available' && '⚡ Disponible'}
-                      {s.state === 'locked' && '🔒 Bloqueada'}
-                    </p>
+                  <div className="ml-auto">
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600 font-semibold">Progreso</p>
+                      <div className="mt-1 w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all"
+                          style={{width: `${yearStats.total > 0 ? (yearStats.done / yearStats.total) * 100 : 0}%`}}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">{yearStats.total > 0 ? Math.round((yearStats.done / yearStats.total) * 100) : 0}%</p>
+                    </div>
                   </div>
-
-                  {/* Notas si tiene */}
-                  {(s.finalGrade !== undefined || s.partialGrade !== undefined) && (
-                    <div className="px-4 py-3 border-t border-gray-200 space-y-2">
-                      <p className="text-xs text-gray-600 font-semibold">CALIFICACIÓN</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {s.partialGrade !== undefined && (
-                          <div className="bg-white rounded p-2 text-center border border-blue-200">
-                            <p className="text-xs text-blue-600 font-semibold">Parcial</p>
-                            <p className="text-lg font-bold text-blue-900">{s.partialGrade}</p>
-                          </div>
-                        )}
-                        {s.finalGrade !== undefined && (
-                          <div className={`bg-gradient-to-br ${getGradeColor(s.finalGrade, s.allowsPromotion)} rounded p-2 text-center border`}>
-                            <p className="text-xs font-semibold" style={{color: s.finalGrade >= 7 ? '#047857' : s.finalGrade >= 4 ? '#047857' : '#dc2626'}}>
-                              Final
-                            </p>
-                            <p className="text-lg font-bold" style={{color: s.finalGrade >= 7 ? '#065f46' : s.finalGrade >= 4 ? '#065f46' : '#7f1d1d'}}>
-                              {s.finalGrade}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Status según condición */}
-                      {statusLabel && (
-                        <div className={`mt-2 p-2 rounded text-center text-xs font-bold ${statusColor}`}>
-                          {s.allowsPromotion && s.finalGrade >= 8 && (
-                            <div className="flex items-center justify-center gap-1">
-                              <Award size={14} />
-                              Promocionado
-                            </div>
-                          )}
-                          {((!s.allowsPromotion && s.finalGrade >= 8) || (s.finalGrade >= 6 && s.finalGrade < 8)) && (
-                            <div>Aprobado</div>
-                          )}
-                          {s.finalGrade < 6 && (
-                            <div>Desaprobado</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Correlativas bloqueando */}
-                  {s.blockedByCorrelatives.length > 0 && (
-                    <div className="px-4 py-3 border-t border-gray-200 bg-yellow-50">
-                      <div className="flex items-center gap-1 text-xs font-bold text-amber-700 mb-2">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        Requiere:
-                      </div>
-                      <div className="space-y-1">
-                        {s.blockedByCorrelatives.map((corr) => (
-                          <div key={corr.id} className="text-xs text-amber-900">
-                            <span className="font-mono font-bold">{corr.code}</span> {corr.name}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              )
-            })}
-          </div>
-        </section>
-      ))}
+                
+                {/* Subject Cards Grid */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {list.map((s) => {
+                    const statusLabel = getStatusLabel(s.finalGrade, s.allowsPromotion)
+                    const statusColor = getStatusColor(s.finalGrade, s.allowsPromotion)
+                    
+                    return (
+                      <div
+                        key={s.id}
+                        className={`card rounded-2xl overflow-hidden border-2 transition-all hover:shadow-2xl hover:scale-105 ${
+                          s.state === 'done'
+                            ? 'border-emerald-600 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50'
+                            : s.state === 'recursant'
+                              ? 'border-orange-600 bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50'
+                              : s.state === 'current'
+                                ? 'border-blue-600 bg-gradient-to-br from-blue-50 via-cyan-50 to-sky-50'
+                                : s.state === 'available'
+                                  ? 'border-amber-500 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50'
+                                  : 'border-gray-300 bg-gradient-to-br from-gray-50 via-slate-50 to-zinc-50'
+                        }`}
+                      >
+                        {/* Header Section */}
+                        <div className={`p-4 border-b-2 ${
+                          s.state === 'done' ? 'border-emerald-200 bg-emerald-100/30' :
+                          s.state === 'recursant' ? 'border-orange-200 bg-orange-100/30' :
+                          s.state === 'current' ? 'border-blue-200 bg-blue-100/30' :
+                          s.state === 'available' ? 'border-amber-200 bg-amber-100/30' :
+                          'border-gray-200 bg-gray-100/30'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex items-center gap-2">
+                              {s.state === 'done' && <CheckCircle2 className="h-6 w-6 text-emerald-700" />}
+                              {s.state === 'recursant' && <RefreshCw className="h-6 w-6 text-orange-700" />}
+                              {s.state === 'current' && <BookOpen className="h-6 w-6 text-blue-700" />}
+                              {s.state === 'available' && <Zap className="h-6 w-6 text-amber-700" />}
+                              {s.state === 'locked' && <Lock className="h-6 w-6 text-gray-500" />}
+                              <span className="font-mono text-lg font-black text-gray-900">{s.code}</span>
+                            </div>
+                          </div>
+                          
+                          <h3 className="font-bold text-gray-900 text-sm leading-snug mb-2">{s.name}</h3>
+                          
+                          <div className="flex gap-2 flex-wrap">
+                            {s.division && (
+                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-blue-200 text-blue-700">
+                                Div. {s.division}
+                              </span>
+                            )}
+                            <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-200 text-gray-700">
+                              {getDictationLabel(s)}
+                            </span>
+                            {s.allowsPromotion && (
+                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-purple-200 text-purple-700">
+                                🎓 Promocional
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-      {subjects.length === 0 && (
-        <div className="card p-12 text-center rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100">
-          <BookOpen size={48} className="mx-auto text-gray-400 mb-4" />
-          <p className="text-gray-600 text-lg">No hay materias catalogadas para tu programa.</p>
+                        {/* Status Badge */}
+                        <div className="px-4 py-3 bg-white/60 backdrop-blur-sm">
+                          <p className="text-xs text-gray-600 font-bold tracking-wide mb-2">ESTADO</p>
+                          <div className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
+                            s.state === 'done' ? 'bg-emerald-200 text-emerald-900' :
+                            s.state === 'recursant' ? 'bg-orange-200 text-orange-900' :
+                            s.state === 'current' ? 'bg-blue-200 text-blue-900' :
+                            s.state === 'available' ? 'bg-amber-200 text-amber-900' :
+                            'bg-gray-200 text-gray-700'
+                          }`}>
+                            {s.state === 'done' && '✓ Aprobada'}
+                            {s.state === 'recursant' && '↻ Recursante'}
+                            {s.state === 'current' && '● En Curso'}
+                            {s.state === 'available' && '⚡ Disponible'}
+                            {s.state === 'locked' && '🔒 Bloqueada'}
+                          </div>
+                        </div>
+
+                        {/* Grades Section */}
+                        {(s.finalGrade !== undefined || s.partialGrade !== undefined) && (
+                          <div className="px-4 py-3 border-t-2 border-gray-200 space-y-3 bg-white/40">
+                            <p className="text-xs text-gray-600 font-bold tracking-wide">CALIFICACIÓN</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {s.partialGrade !== undefined && (
+                                <div className="bg-white rounded-xl p-3 text-center border-2 border-blue-200 shadow-sm">
+                                  <p className="text-xs text-blue-600 font-bold mb-1">Parcial</p>
+                                  <p className="text-2xl font-black text-blue-900">{s.partialGrade}</p>
+                                </div>
+                              )}
+                              {s.finalGrade !== undefined && (
+                                <div className={`bg-gradient-to-br ${getGradeColor(s.finalGrade, s.allowsPromotion)} rounded-xl p-3 text-center border-2 shadow-sm ${
+                                  s.finalGrade >= 8 ? 'border-purple-400' :
+                                  s.finalGrade >= 6 ? 'border-emerald-400' :
+                                  'border-red-400'
+                                }`}>
+                                  <p className={`text-xs font-bold mb-1 ${
+                                    s.finalGrade >= 8 ? 'text-purple-700' :
+                                    s.finalGrade >= 6 ? 'text-emerald-700' :
+                                    'text-red-700'
+                                  }`}>
+                                    Final
+                                  </p>
+                                  <p className={`text-2xl font-black ${
+                                    s.finalGrade >= 8 ? 'text-purple-900' :
+                                    s.finalGrade >= 6 ? 'text-emerald-900' :
+                                    'text-red-900'
+                                  }`}>
+                                    {s.finalGrade}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {statusLabel && (
+                              <div className={`mt-2 p-3 rounded-xl text-center text-sm font-bold ${statusColor} bg-white/60 border-2 ${
+                                s.allowsPromotion && s.finalGrade >= 8 ? 'border-purple-400' :
+                                s.finalGrade >= 6 ? 'border-emerald-400' :
+                                'border-red-400'
+                              }`}>
+                                {s.allowsPromotion && s.finalGrade >= 8 && (
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Award size={16} />
+                                    Promocionado
+                                  </div>
+                                )}
+                                {((!s.allowsPromotion && s.finalGrade >= 8) || (s.finalGrade >= 6 && s.finalGrade < 8)) && (
+                                  <div>Aprobado</div>
+                                )}
+                                {s.finalGrade < 6 && (
+                                  <div>Desaprobado</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Correlatives Section */}
+                        {s.blockedByCorrelatives.length > 0 && (
+                          <div className="px-4 py-3 border-t-2 border-yellow-200 bg-yellow-50/80">
+                            <div className="flex items-center gap-1 text-xs font-bold text-amber-700 mb-2">
+                              <AlertCircle className="h-4 w-4" />
+                              Requiere aprobar:
+                            </div>
+                            <div className="space-y-1">
+                              {s.blockedByCorrelatives.map((corr) => (
+                                <div key={corr.id} className="text-xs text-amber-900 bg-white/50 px-2 py-1 rounded">
+                                  <span className="font-mono font-bold">{corr.code}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })}
         </div>
       )}
 
-      {/* Leyenda final */}
-      <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-6 border border-blue-200">
-        <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <AlertCircle size={20} className="text-blue-600" />
-          Cómo interpretar tu plan de estudios
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-          <div>
-            <p className="font-semibold text-blue-900 mb-2">📌 Estados</p>
-            <ul className="space-y-1 text-gray-700">
-              <li><strong>Aprobada:</strong> Ya cursaste y aprobaste</li>
-              <li><strong>Promocionado:</strong> Nota ≥8 en materia que permite promoción</li>
-              <li><strong>En curso:</strong> Actualmente inscripto</li>
-              <li><strong>Disponible:</strong> Podés inscribirte</li>
-              <li><strong>Bloqueada:</strong> Falta correlativa o no es tu año</li>
-              <li><strong>Recursante:</strong> Cursaste pero no aprobaste</li>
-            </ul>
-          </div>
-          <div>
-            <p className="font-semibold text-indigo-900 mb-2">📊 Calificaciones</p>
-            <ul className="space-y-1 text-gray-700">
-              <li><strong>Parcial:</strong> Promedio de trabajos y parciales</li>
-              <li><strong>Final:</strong> Nota del examen final</li>
-              <li><strong>Promocionado:</strong> Solo si ≥8 Y materia lo permite (badge 🎓)</li>
-              <li><strong>Aprobado:</strong> Nota entre 6-7 ó ≥8 sin promoción</li>
-              <li><strong>Desaprobado:</strong> Nota menor a 6</li>
-            </ul>
+      {subjects.length === 0 && (
+        <div className="card p-16 text-center rounded-3xl bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200">
+          <BookOpen size={64} className="mx-auto text-gray-400 mb-6" />
+          <p className="text-gray-600 text-xl font-semibold">No hay materias catalogadas</p>
+          <p className="text-gray-500 mt-2">Para tu programa aún no se han registrado asignaturas</p>
+        </div>
+      )}
+
+      {/* Info Box */}
+      {subjects.length > 0 && (
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <h3 className="text-2xl font-black mb-4 flex items-center gap-2">
+                <span className="text-3xl">📌</span>
+                Estados
+              </h3>
+              <ul className="space-y-2 text-indigo-50">
+                <li><strong>✓ Aprobada:</strong> Ya cursaste y aprobaste</li>
+                <li><strong>● En curso:</strong> Actualmente inscripto</li>
+                <li><strong>⚡ Disponible:</strong> Podés inscribirte ahora</li>
+                <li><strong>↻ Recursante:</strong> Cursaste pero no aprobaste</li>
+                <li><strong>🔒 Bloqueada:</strong> Falta correlativa o no es tu año</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-2xl font-black mb-4 flex items-center gap-2">
+                <span className="text-3xl">📊</span>
+                Calificaciones
+              </h3>
+              <ul className="space-y-2 text-indigo-50">
+                <li><strong>Parcial:</strong> Promedio de trabajos y parciales</li>
+                <li><strong>Final:</strong> Nota del examen final</li>
+                <li><strong>🎓 Promocionado:</strong> ≥8 en materia que lo permite</li>
+                <li><strong>Aprobado:</strong> Entre 6-7 ó ≥8 sin promoción</li>
+                <li><strong>Desaprobado:</strong> Menor a 6</li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
