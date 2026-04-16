@@ -3,52 +3,64 @@ import { saveAs } from "file-saver"
 
 export const generateExamRecordExcel = async (data: any) => {
 
-  try {
+console.log("DATA ACTA:", data)
 
-    const response = await fetch("/Acta de Examenes ISIPP 2026 MATEMATICA.xlsx")
-    const buffer = await response.arrayBuffer()
+try {
 
-    const workbook = new ExcelJS.Workbook()
+```
+const response = await fetch("/Acta de Examenes ISIPP 2026 MATEMATICA.xlsx")
+const buffer = await response.arrayBuffer()
 
-    await workbook.xlsx.load(buffer)
+const workbook = new ExcelJS.Workbook()
 
-    const sheet = workbook.worksheets[0]
+await workbook.xlsx.load(buffer)
 
-    // ===== DATOS PRINCIPALES =====
+const sheet = workbook.worksheets[0]
 
-    sheet.getCell("D7").value = data.subject
-    sheet.getCell("J7").value = data.year
-    sheet.getCell("D49").value = data.examDate
+// ===== DATOS PRINCIPALES =====
 
-    // ===== PROFESORES =====
+sheet.getCell("D7").value = data?.subject ?? ""
+sheet.getCell("J7").value = data?.year ?? ""
+sheet.getCell("D49").value = data?.examDate ?? ""
 
-    sheet.getCell("B42").value = data.president
-    sheet.getCell("F42").value = data.firstVocal
-    sheet.getCell("I42").value = data.secondVocal
+// ===== PROFESORES =====
 
-    // ===== ALUMNOS =====
+sheet.getCell("B42").value = data?.president ?? ""
+sheet.getCell("F42").value = data?.firstVocal ?? ""
+sheet.getCell("I42").value = data?.secondVocal ?? ""
 
-    data.students.forEach((student: any, i: number) => {
+// ===== ALUMNOS =====
 
-      const row = 11 + i
+const students = data?.students || []
 
-      sheet.getCell(`D${row}`).value = student.dni
-      sheet.getCell(`E${row}`).value = student.name
+students.forEach((student: any, i: number) => {
 
-    })
+  const row = 11 + i
 
-    const fileBuffer = await workbook.xlsx.writeBuffer()
+  sheet.getCell(`D${row}`).value = student?.dni ?? ""
+  sheet.getCell(`E${row}`).value =
+    student?.name ??
+    student?.full_name ??
+    student?.student_name ??
+    ""
 
-    const blob = new Blob([fileBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    })
+})
 
-    saveAs(blob, "Acta_Examen.xlsx")
+const fileBuffer = await workbook.xlsx.writeBuffer()
 
-  } catch (err) {
+const blob = new Blob([fileBuffer], {
+  type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+})
 
-    console.error("Error generating Excel:", err)
+saveAs(blob, "Acta_Examen.xlsx")
+```
 
-  }
+} catch (err) {
+
+```
+console.error("Error generating Excel:", err)
+```
+
+}
 
 }
