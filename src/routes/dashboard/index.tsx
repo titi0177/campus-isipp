@@ -2,7 +2,18 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState, memo, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { generateRegularCertificate } from '@/utils/generateRegularCertificate'
-import { FileText, GraduationCap, CalendarCheck, BookOpen, TrendingUp, Calendar } from 'lucide-react'
+import { 
+  FileText, 
+  GraduationCap, 
+  CalendarCheck, 
+  BookOpen, 
+  TrendingUp, 
+  Calendar,
+  Award,
+  Clock,
+  ChevronRight,
+  Sparkles
+} from 'lucide-react'
 import StatCard from '@/components/StatCard'
 import { CareerProgressBar } from '@/features/student/components/CareerProgressBar'
 import { useRealtimeGrades } from '@/hooks/useRealtimeGrades'
@@ -22,34 +33,39 @@ type Row = {
   allows_promotion?: boolean
 }
 
-// Memoized stat card component
+// Memoized stat card component - IMPROVED
 const StatCardMemo = memo(function StatCardComp({ 
   label, 
   value, 
   icon: Icon, 
   bg, 
-  text 
+  text,
+  subtext
 }: {
   label: string
   value: string | number
   icon: any
   bg: string
   text: string
+  subtext?: string
 }) {
   return (
-    <div className={`card p-4 sm:p-6 ${bg} shadow-sm hover:shadow-md transition-shadow`}>
+    <div className={`card p-5 sm:p-6 ${bg} shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className={`text-xs sm:text-sm font-semibold ${text} uppercase tracking-wide`}>{label}</p>
-          <p className={`text-2xl sm:text-3xl font-bold mt-2`}>{value}</p>
+          <p className={`text-xs sm:text-sm font-semibold ${text} uppercase tracking-widest`}>{label}</p>
+          <p className={`text-3xl sm:text-4xl font-black mt-2 ${text}`}>{value}</p>
+          {subtext && <p className="text-xs mt-1 opacity-70">{subtext}</p>}
         </div>
-        <Icon className="w-6 h-6 sm:w-8 sm:h-8 opacity-80 flex-shrink-0" />
+        <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+          <Icon className="w-6 h-6 sm:w-7 sm:h-7 opacity-60" />
+        </div>
       </div>
     </div>
   )
 })
 
-// Memoized exam card component
+// Memoized exam card component - IMPROVED
 const ExamCard = memo(function ExamCardComp({ 
   exam, 
   idx 
@@ -58,53 +74,66 @@ const ExamCard = memo(function ExamCardComp({
   idx: number
 }) {
   return (
-    <div className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors">
+    <div className="flex gap-4 p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-300 group">
       <div className="flex flex-col items-center justify-start flex-shrink-0">
-        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-[var(--siu-blue)] text-white flex items-center justify-center font-bold text-xs sm:text-sm">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--siu-blue)] to-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-md group-hover:shadow-lg transition-shadow">
           {idx + 1}
         </div>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">{exam.subject?.name ?? 'Materia'}</p>
-        <p className="text-xs sm:text-sm text-slate-600 mt-1 flex gap-2 flex-wrap">
-          <span>📅 {new Date(exam.exam_date).toLocaleDateString('es-AR')}</span>
-          <span>🕐 {new Date(exam.exam_date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
-          {exam.location && <span className="hidden sm:inline">📍 {exam.location}</span>}
-        </p>
+        <p className="font-semibold text-slate-900 text-sm sm:text-base">{exam.subject?.name ?? 'Materia'}</p>
+        <div className="flex gap-3 mt-2 flex-wrap text-xs sm:text-sm text-slate-600">
+          <span className="flex items-center gap-1">
+            <Calendar className="w-4 h-4" />
+            {new Date(exam.exam_date).toLocaleDateString('es-AR')}
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock className="w-4 h-4" />
+            {new Date(exam.exam_date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          {exam.location && <span className="hidden sm:flex items-center gap-1">📍 {exam.location}</span>}
+        </div>
       </div>
+      <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-400 transition-colors flex-shrink-0" />
     </div>
   )
 })
 
-// Memoized grades table row
+// Memoized grades table row - IMPROVED
 const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: number }) {
   const fg = s.final_grade
   let status = 'En curso'
   let statusBg = 'bg-slate-100 text-slate-700'
+  let statusIcon = '⏳'
   let noteColor = 'text-slate-600'
   
   if (fg != null && fg >= 8 && s.allows_promotion) {
     status = 'Promocionado'
-    statusBg = 'bg-green-100 text-green-700 font-semibold'
-    noteColor = 'text-green-700 font-bold'
+    statusBg = 'bg-emerald-100 text-emerald-700 font-semibold'
+    statusIcon = '⭐'
+    noteColor = 'text-emerald-700 font-bold'
   } else if (fg != null && fg >= 6) {
     status = 'Aprobado'
     statusBg = 'bg-blue-100 text-blue-700 font-semibold'
+    statusIcon = '✓'
     noteColor = 'text-blue-700 font-bold'
   } else if (fg != null && fg < 6) {
     status = 'Desaprobado'
     statusBg = 'bg-red-100 text-red-700 font-semibold'
+    statusIcon = '✗'
     noteColor = 'text-red-700 font-bold'
   }
   
   return (
-    <tr key={index} className="hover:bg-slate-50 transition-colors">
-      <td className="px-2 sm:px-4 py-2 sm:py-3 font-medium text-slate-900 text-xs sm:text-sm truncate">{s.subject?.name}</td>
-      <td className="px-2 sm:px-4 py-2 sm:py-3 text-center text-slate-600 text-xs sm:text-sm">{s.partial_grade ?? '—'}</td>
-      <td className="hidden sm:table-cell px-4 py-3 text-center text-slate-600">{s.final_exam_grade ?? '—'}</td>
-      <td className={`px-2 sm:px-4 py-2 sm:py-3 text-center font-bold text-xs sm:text-sm ${noteColor}`}>{fg ?? '—'}</td>
-      <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-        <span className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-semibold whitespace-nowrap ${statusBg}`}>{status}</span>
+    <tr key={index} className="hover:bg-blue-50 transition-colors duration-200 border-b border-slate-100 last:border-b-0">
+      <td className="px-3 sm:px-4 py-3 font-medium text-slate-900 text-sm">{s.subject?.name}</td>
+      <td className="px-3 sm:px-4 py-3 text-center text-slate-600 text-sm font-medium">{s.partial_grade ?? '—'}</td>
+      <td className="hidden sm:table-cell px-4 py-3 text-center text-slate-600 text-sm font-medium">{s.final_exam_grade ?? '—'}</td>
+      <td className={`px-3 sm:px-4 py-3 text-center font-black text-lg ${noteColor}`}>{fg ?? '—'}</td>
+      <td className="px-3 sm:px-4 py-3 text-center">
+        <span className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${statusBg} inline-flex items-center gap-1`}>
+          {statusIcon} {status}
+        </span>
       </td>
     </tr>
   )
@@ -245,30 +274,38 @@ function DashboardPage() {
   ).length
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      {/* Hero Header - Responsive */}
-      <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] rounded-lg sm:rounded-xl p-4 sm:p-6 md:p-8 text-white shadow-lg">
-        <div className="flex flex-col justify-between gap-3 sm:gap-4">
-          <div>
-            <p className="text-xs sm:text-sm font-medium opacity-90 mb-1 sm:mb-2">Bienvenido de nuevo</p>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold truncate">{student.first_name}</h1>
-            <p className="text-xs sm:text-sm opacity-80 mt-2 truncate">
-              {student.program?.name ?? 'Carrera'} • Legajo: {student.legajo}
-            </p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Link
-              to="/dashboard/enroll-subjects"
-              className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all active:scale-95"
-            >
-              + Inscribirse
-            </Link>
-            <Link
-              to="/dashboard/roadmap"
-              className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-all active:scale-95"
-            >
-              Plan de estudios
-            </Link>
+    <div className="space-y-8">
+      {/* Hero Header - REDESIGNED */}
+      <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--isipp-bordo)] via-red-600 to-[var(--siu-blue)] opacity-90"></div>
+        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_50%)]"></div>
+        
+        <div className="relative p-6 sm:p-8 md:p-10 text-white">
+          <div className="flex flex-col justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-5 h-5 text-yellow-300" />
+                <p className="text-sm font-semibold uppercase tracking-widest text-yellow-300">Campus ISIPP</p>
+              </div>
+              <h1 className="text-3xl sm:text-5xl md:text-6xl font-black mb-2">{student.first_name}</h1>
+              <p className="text-sm sm:text-base opacity-90 font-medium">
+                {student.program?.name ?? 'Carrera'} • Legajo <span className="font-bold">{student.legajo}</span>
+              </p>
+            </div>
+            <div className="flex gap-3 flex-wrap pt-4 border-t border-white/20">
+              <Link
+                to="/dashboard/enroll-subjects"
+                className="bg-white text-[var(--siu-blue)] hover:bg-slate-100 px-5 sm:px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-95"
+              >
+                + Inscribirse
+              </Link>
+              <Link
+                to="/dashboard/roadmap"
+                className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-5 sm:px-6 py-2.5 rounded-lg font-semibold text-sm transition-all active:scale-95"
+              >
+                Plan de estudios
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -285,104 +322,117 @@ function DashboardPage() {
         />
       </div>
 
-      {/* Stats Grid - Responsive columns */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stats Grid - REDESIGNED */}
+      <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
         <StatCardMemo
           label="Promedio"
           value={gpa != null ? gpa.toFixed(2) : '—'}
+          subtext="GPA"
           icon={TrendingUp}
-          bg="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200/50"
+          bg="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200"
           text="text-amber-700"
         />
         <StatCardMemo
           label="Aprobadas"
           value={approved}
-          icon={GraduationCap}
-          bg="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200/50"
+          subtext={`de ${progress.total_materias}`}
+          icon={Award}
+          bg="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200"
           text="text-emerald-700"
         />
         <StatCardMemo
           label="Asistencia"
           value={`${attendancePercent}%`}
+          subtext="Promedio"
           icon={CalendarCheck}
-          bg="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200/50"
+          bg="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200"
           text="text-blue-700"
         />
         <StatCardMemo
-          label="En curso"
-          value={rows.length}
+          label="En Curso"
+          value={progress.en_curso}
+          subtext={`de ${rows.length}`}
           icon={BookOpen}
-          bg="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200/50"
+          bg="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200"
           text="text-purple-700"
         />
       </div>
 
-      {/* Upcoming Exams */}
-      <div className="card overflow-hidden shadow-md">
-        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-2 sm:gap-3">
-          <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white flex-shrink-0" />
-          <h2 className="text-base sm:text-lg font-bold text-white truncate">Próximas mesas de examen</h2>
+      {/* Upcoming Exams - REDESIGNED */}
+      <div className="card overflow-hidden shadow-xl border-0">
+        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-5 flex items-center gap-3">
+          <Calendar className="w-6 h-6 text-white flex-shrink-0" />
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-white">Próximas mesas de examen</h2>
+            <p className="text-sm text-indigo-100">{upcomingExams.length} mesa{upcomingExams.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
-        <div className="p-3 sm:p-6">
+        <div className="p-6">
           {upcomingExams.length === 0 ? (
-            <div className="text-center py-6 sm:py-8">
-              <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-slate-300 mx-auto mb-2 sm:mb-3" />
-              <p className="text-slate-600 font-medium text-sm sm:text-base">No hay mesas programadas</p>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">Las mesas se mostrarán aquí cuando se publiquen</p>
+            <div className="text-center py-12">
+              <Calendar className="w-16 h-16 text-slate-200 mx-auto mb-3" />
+              <p className="text-slate-600 font-semibold text-base">No hay mesas programadas</p>
+              <p className="text-sm text-slate-500 mt-2">Las mesas se mostrarán aquí cuando se publiquen</p>
             </div>
           ) : (
-            <div className="space-y-2 sm:space-y-3">
+            <div className="space-y-3">
               {upcomingExams.map((exam, idx) => (
                 <ExamCard key={exam.id} exam={exam} idx={idx} />
               ))}
             </div>
           )}
-          <Link to="/dashboard/exams" className="mt-3 sm:mt-4 inline-flex items-center gap-2 text-[var(--siu-blue)] hover:text-[var(--siu-navy)] font-semibold text-xs sm:text-sm transition-colors">
-            Ver todas las mesas →
+          <Link 
+            to="/dashboard/exams" 
+            className="mt-6 inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-sm transition-colors hover:gap-3"
+          >
+            Ver todas las mesas <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
       </div>
 
-      {/* Recent Grades */}
-      <div className="card overflow-hidden shadow-md">
-        <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-white flex-shrink-0" />
-            <h2 className="text-base sm:text-lg font-bold text-white truncate">Calificaciones recientes</h2>
+      {/* Recent Grades - REDESIGNED */}
+      <div className="card overflow-hidden shadow-xl border-0">
+        <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 px-6 py-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <FileText className="w-6 h-6 text-white flex-shrink-0" />
+            <div>
+              <h2 className="text-lg font-bold text-white">Calificaciones recientes</h2>
+              <p className="text-sm text-slate-300">{rows.length} materia{rows.length !== 1 ? 's' : ''}</p>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-3 flex-wrap">
             <button
               type="button"
               onClick={() => generateRegularCertificate(student, student.program)}
-              className="bg-white/20 hover:bg-white/30 text-white px-2 sm:px-3 py-1 sm:py-1.5 rounded text-[10px] sm:text-xs font-semibold transition-colors flex-shrink-0"
+              className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-md hover:shadow-lg active:scale-95"
             >
               Certificado
             </button>
-            <Link to="/dashboard/certificates" className="text-[10px] sm:text-xs font-semibold text-white/80 hover:text-white transition-colors flex-shrink-0">
+            <Link to="/dashboard/certificates" className="text-xs font-bold text-white/80 hover:text-white transition-colors px-2 py-2">
               Más →
             </Link>
           </div>
         </div>
-        <div className="p-3 sm:p-6 overflow-x-auto">
+        <div className="p-6 overflow-x-auto">
           {rows.length === 0 ? (
-            <div className="text-center py-8 sm:py-12">
-              <FileText className="w-10 h-10 sm:w-12 sm:h-12 text-slate-300 mx-auto mb-2 sm:mb-3" />
-              <p className="text-slate-600 font-medium text-sm sm:text-base">No hay calificaciones registradas</p>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">Tus notas aparecerán aquí cuando los docentes las carguen</p>
+            <div className="text-center py-12">
+              <FileText className="w-16 h-16 text-slate-200 mx-auto mb-3" />
+              <p className="text-slate-600 font-semibold text-base">No hay calificaciones registradas</p>
+              <p className="text-sm text-slate-500 mt-2">Tus notas aparecerán aquí cuando los docentes las carguen</p>
             </div>
           ) : (
-            <div className="overflow-x-auto -mx-3 sm:-mx-6">
+            <div className="overflow-x-auto -mx-6">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b-2 border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                    <th className="px-2 sm:px-4 py-2 sm:py-3">Materia</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Parcial</th>
-                    <th className="hidden sm:table-cell px-4 py-3 text-center">Final</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Nota</th>
-                    <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Estado</th>
+                  <tr className="border-b-2 border-slate-300 bg-slate-50">
+                    <th className="px-6 py-3 text-left font-bold text-slate-700 uppercase tracking-wider text-xs">Materia</th>
+                    <th className="px-6 py-3 text-center font-bold text-slate-700 uppercase tracking-wider text-xs">Parcial</th>
+                    <th className="hidden sm:table-cell px-6 py-3 text-center font-bold text-slate-700 uppercase tracking-wider text-xs">Final</th>
+                    <th className="px-6 py-3 text-center font-bold text-slate-700 uppercase tracking-wider text-xs">Nota</th>
+                    <th className="px-6 py-3 text-center font-bold text-slate-700 uppercase tracking-wider text-xs">Estado</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody>
                   {rows.map((s, i) => (
                     <GradeRow key={i} s={s} index={i} />
                   ))}
