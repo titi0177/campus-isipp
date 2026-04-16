@@ -1,43 +1,61 @@
 import JSZip from "jszip"
 
 export const generateExamRecordExcel = async (data: any) => {
+
   try {
 
-    // cargar plantilla excel
     const response = await fetch("/Acta de Examenes ISIPP 2026 MATEMATICA.xlsx")
     const buffer = await response.arrayBuffer()
 
     const zip = await JSZip.loadAsync(buffer)
 
     const sheetPath = "xl/worksheets/sheet1.xml"
+    const sharedStringsPath = "xl/sharedStrings.xml"
 
     const sheetXml = await zip.file(sheetPath)?.async("string")
+    const sharedXml = await zip.file(sharedStringsPath)?.async("string")
 
-    if (!sheetXml) {
-      throw new Error("No se pudo encontrar la hoja Excel")
+    if (!sheetXml || !sharedXml) {
+      throw new Error("No se pudo leer la plantilla Excel")
     }
 
     const parser = new DOMParser()
-    const xmlDoc = parser.parseFromString(sheetXml, "application/xml")
 
-    // buscar celda
-    const findCell = (cellRef: string) => {
-      return xmlDoc.querySelector(`c[r="${cellRef}"]`)
+    const sheetDoc = parser.parseFromString(sheetXml, "application/xml")
+    const sharedDoc = parser.parseFromString(sharedXml, "application/xml")
+
+    const sharedRoot = sharedDoc.querySelector("sst")
+
+    const addSharedString = (text: string) => {
+
+      const si = sharedDoc.createElement("si")
+      const t = sharedDoc.createElement("t")
+
+      t.textContent = text
+
+      si.appendChild(t)
+      sharedRoot?.appendChild(si)
+
+      return sharedRoot?.children.length! - 1
+
     }
 
-    // establecer valor en celda
-    const setCellValue = (cellRef: string, value: string | number) => {
+    const findCell = (ref: string) => {
+      return sheetDoc.querySelector(`c[r="${ref}"]`)
+    }
 
-      let cell = findCell(cellRef)
+    const setCell = (ref: string, value: string) => {
 
-      const rowNumber = cellRef.match(/\d+/)?.[0]
-      const row = xmlDoc.querySelector(`row[r="${rowNumber}"]`)
+      let cell = findCell(ref)
+
+      const rowNumber = ref.match(/\d+/)?.[0]
+      const row = sheetDoc.querySelector(`row[r="${rowNumber}"]`)
 
       if (!row) return
 
       if (!cell) {
-        cell = xmlDoc.createElement("c")
-        cell.setAttribute("r", cellRef)
+        cell = sheetDoc.createElement("c")
+        cell.setAttribute("r", ref)
         row.appendChild(cell)
       }
 
@@ -45,59 +63,60 @@ export const generateExamRecordExcel = async (data: any) => {
         cell.removeChild(cell.firstChild)
       }
 
-      const v = xmlDoc.createElement("v")
-      v.textContent = String(value)
+      const index = addSharedString(value)
+
+      const v = sheetDoc.createElement("v")
+      v.textContent = String(index)
+
+      cell.setAttribute("t", "s")
 
       cell.appendChild(v)
+
     }
 
-    // ===== DATOS GENERALES =====
+    // ===== DATOS PRINCIPALES =====
 
-    setCellValue("D7", data.subject)
-    setCellValue("J7", data.year)
-    setCellValue("D49", data.examDate)
+    setCell("D7", data.subject)
+    setCell("J7", data.year)
+    setCell("D49", data.examDate)
 
-    // ===== AUTORIDADES =====
+    // ===== PROFESORES =====
 
-    setCellValue("B42", data.president)
-    setCellValue("F42", data.firstVocal)
-    setCellValue("I42", data.secondVocal)
+    setCell("B42", data.president)
+    setCell("F42", data.firstVocal)
+    setCell("I42", data.secondVocal)
 
     // ===== ALUMNOS =====
 
-    data.students.forEach((student: any, index: number) => {
+    data.students.forEach((student: any, i: number) => {
 
-      const fila = 11 + index
+      const row = 11 + i
 
-      setCellValue(`D${fila}`, student.dni)
-      setCellValue(`E${fila}`, student.name)
+      setCell(`D${row}`, student.dni)
+      setCell(`E${row}`, student.name)
 
     })
 
-    // serializar XML modificado
     const serializer = new XMLSerializer()
-    const newSheetXml = serializer.serializeToString(xmlDoc)
 
-    zip.file(sheetPath, newSheetXml)
+    zip.file(sheetPath, serializer.serializeToString(sheetDoc))
+    zip.file(sharedStringsPath, serializer.serializeToString(sharedDoc))
 
-    // generar nuevo excel
     const newFile = await zip.generateAsync({ type: "blob" })
 
-    const url = window.URL.createObjectURL(newFile)
+    const url = URL.createObjectURL(newFile)
 
     const a = document.createElement("a")
     a.href = url
     a.download = "Acta_Examen.xlsx"
-
-    document.body.appendChild(a)
     a.click()
-    a.remove()
 
-    window.URL.revokeObjectURL(url)
+    URL.revokeObjectURL(url)
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error("Error generating Excel:", error)
+    console.error("Error generating Excel:", err)
 
   }
+
 }
