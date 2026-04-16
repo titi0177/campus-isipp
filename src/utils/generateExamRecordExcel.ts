@@ -12,7 +12,7 @@ interface GenerateExamExcelParams {
 }
 
 /**
- * Genera acta de examen en Excel basada en plantilla
+ * Genera acta de examen en Excel basada en plantilla, preservando formato
  */
 export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
   try {
@@ -21,34 +21,50 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
     const response = await fetch(templatePath)
     const arrayBuffer = await response.arrayBuffer()
     
-    // Parsear workbook
-    const workbook = read(new Uint8Array(arrayBuffer), { type: 'array' })
+    // Parsear workbook preservando formato
+    const workbook = read(new Uint8Array(arrayBuffer), { 
+      type: 'array',
+      cellFormula: true,
+      cellStyles: true
+    })
     const worksheet = workbook.Sheets[workbook.SheetNames[0]]
 
-    // Completar celdas fijas
-    // D7: Materia
-    worksheet['D7'] = { t: 's', v: params.subjectName }
+    // Función auxiliar para preservar formato de celda
+    const setCellValue = (cellRef: string, value: string | number) => {
+      if (!worksheet[cellRef]) {
+        worksheet[cellRef] = {}
+      }
+      const cell = worksheet[cellRef]
+      
+      // Preservar estilos y formato existente
+      if (typeof value === 'number') {
+        cell.t = 'n'
+        cell.v = value
+      } else {
+        cell.t = 's'
+        cell.v = value
+      }
+    }
+
+    // Completar celdas específicas SIN cambiar formato
+    setCellValue('D7', params.subjectName)
+    setCellValue('J7', params.subjectYear)
+    setCellValue('D49', params.examDate)
     
-    // J7: Año
-    worksheet['J7'] = { t: 'n', v: params.subjectYear }
+    // Presidente (B42:D42 - celdas fusionadas)
+    setCellValue('B42', params.presidentName)
+    setCellValue('C42', '')
+    setCellValue('D42', '')
     
-    // D49: Fecha
-    worksheet['D49'] = { t: 's', v: params.examDate }
+    // Vocal 1 (F42:G42 - celdas fusionadas)
+    setCellValue('F42', params.vocal1Name)
+    setCellValue('G42', '')
     
-    // Presidente (celdas fusionadas B42:D42)
-    worksheet['B42'] = { t: 's', v: params.presidentName }
-    worksheet['C42'] = { t: 's', v: '' }
-    worksheet['D42'] = { t: 's', v: '' }
-    
-    // Vocal 1 (celdas fusionadas F42:G42)
-    worksheet['F42'] = { t: 's', v: params.vocal1Name }
-    worksheet['G42'] = { t: 's', v: '' }
-    
-    // Vocal 2 (celdas fusionadas I42:L42)
-    worksheet['I42'] = { t: 's', v: params.vocal2Name }
-    worksheet['J42'] = { t: 's', v: '' }
-    worksheet['K42'] = { t: 's', v: '' }
-    worksheet['L42'] = { t: 's', v: '' }
+    // Vocal 2 (I42:L42 - celdas fusionadas)
+    setCellValue('I42', params.vocal2Name)
+    setCellValue('J42', '')
+    setCellValue('K42', '')
+    setCellValue('L42', '')
     
     // Completar alumnos (D11-D37 DNI, E11-E37 Nombres)
     const maxRows = 27 // D11 a D37 son 27 filas
@@ -57,19 +73,22 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
       const student = params.students[i]
       
       if (student) {
-        // DNI en columna D
-        worksheet[`D${row}`] = { t: 's', v: student.dni || '' }
-        // Nombre en columna E
-        worksheet[`E${row}`] = { t: 's', v: student.nombre || '' }
+        setCellValue(`D${row}`, student.dni || '')
+        setCellValue(`E${row}`, student.nombre || '')
       } else {
-        // Limpiar filas vacías
-        worksheet[`D${row}`] = { t: 's', v: '' }
-        worksheet[`E${row}`] = { t: 's', v: '' }
+        // Limpiar filas vacías pero preservar formato
+        setCellValue(`D${row}`, '')
+        setCellValue(`E${row}`, '')
       }
     }
 
-    // Escribir workbook
-    const excelBuffer = write(workbook, { bookType: 'xls', type: 'array' })
+    // Escribir workbook preservando formato original
+    const excelBuffer = write(workbook, { 
+      bookType: 'xls', 
+      type: 'array',
+      cellFormula: true,
+      cellStyles: true
+    })
     
     // Descargar archivo
     const blob = new Blob([excelBuffer], { 
@@ -78,7 +97,7 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `Acta_Examen_${params.subjectName}_${new Date().toISOString().slice(0, 10)}.xls`
+    link.download = `Acta_Examen_${params.subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
