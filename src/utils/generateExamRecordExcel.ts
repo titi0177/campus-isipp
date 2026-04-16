@@ -37,33 +37,49 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
       throw new Error('No se pudo encontrar la hoja de trabajo')
     }
     
-    // Función para buscar y reemplazar celda en el XML como string
-    const updateCellInXml = (xml: string, cellRef: string, value: string): string => {
-      const stringValue = String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      
-      // Regex para encontrar celda existente
-      const cellRegex = new RegExp(`<c[^>]*r="${cellRef}"[^>]*>.*?</c>`, 's')
-      
-      if (cellRegex.test(xml)) {
-        // Reemplazar celda existente manteniendo atributos
-        const match = xml.match(new RegExp(`<c([^>]*)r="${cellRef}"([^>]*)>.*?</c>`, 's'))
-        if (match) {
-          const attrs = match[1] + 'r="' + cellRef + '"' + match[2]
-          const newCell = `<c${attrs} t="str"><v>${stringValue}</v></c>`
-          return xml.replace(cellRegex, newCell)
+    // Usar DOMParser para manipular XML de forma segura
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(sheetXml, 'text/xml')
+    
+    // Función para encontrar celda por referencia
+    const findCell = (cellRef: string) => {
+      // Buscar todos los elementos <c> y comprobar el atributo r
+      const cells = xmlDoc.querySelectorAll('c')
+      for (let cell of cells) {
+        if (cell.getAttribute('r') === cellRef) {
+          return cell
         }
       }
-      
-      return xml
+      return null
     }
     
-    // Aplicar todos los cambios
-    sheetXml = updateCellInXml(sheetXml, 'D7', params.subjectName)
-    sheetXml = updateCellInXml(sheetXml, 'J7', String(params.subjectYear))
-    sheetXml = updateCellInXml(sheetXml, 'D49', params.examDate)
-    sheetXml = updateCellInXml(sheetXml, 'B42', params.presidentName)
-    sheetXml = updateCellInXml(sheetXml, 'F42', params.vocal1Name)
-    sheetXml = updateCellInXml(sheetXml, 'I42', params.vocal2Name)
+    // Función para establecer valor de celda
+    const setCellValue = (cellRef: string, value: string | number) => {
+      const cell = findCell(cellRef)
+      
+      if (cell) {
+        // Limpiar contenido anterior
+        while (cell.firstChild) {
+          cell.removeChild(cell.firstChild)
+        }
+        
+        // Crear elemento v con el valor
+        const v = xmlDoc.createElement('v')
+        v.textContent = String(value)
+        cell.appendChild(v)
+        
+        // Asegurar tipo correcto
+        cell.setAttribute('t', 's')
+      }
+    }
+    
+    // Cargar datos
+    setCellValue('D7', params.subjectName)
+    setCellValue('J7', String(params.subjectYear))
+    setCellValue('D49', params.examDate)
+    setCellValue('B42', params.presidentName)
+    setCellValue('F42', params.vocal1Name)
+    setCellValue('I42', params.vocal2Name)
     
     // Alumnos
     const maxRows = 27
@@ -72,15 +88,19 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
       const student = params.students[i]
       
       if (student?.dni) {
-        sheetXml = updateCellInXml(sheetXml, `D${row}`, student.dni)
+        setCellValue(`D${row}`, student.dni)
       }
       if (student?.nombre) {
-        sheetXml = updateCellInXml(sheetXml, `E${row}`, student.nombre)
+        setCellValue(`E${row}`, student.nombre)
       }
     }
     
+    // Serializar XML de forma segura
+    const serializer = new XMLSerializer()
+    const modifiedXml = serializer.serializeToString(xmlDoc)
+    
     // Actualizar ZIP
-    xlsxZip.file('xl/worksheets/sheet1.xml', sheetXml)
+    xlsxZip.file('xl/worksheets/sheet1.xml', modifiedXml)
     
     // Generar archivo final
     const blob = await xlsxZip.generateAsync({ type: 'blob' })
