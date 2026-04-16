@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { generateAnalytico, generateConstancia, StudentData, GradeData, getCondicion } from '@/lib/certificatosUtil'
+import { generateAnalytico, generateConstancia, generateApprovedCertificate, StudentData, GradeData, getCondicion } from '@/lib/certificatosUtil'
 import { Award, FileText, Loader } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard/certificates')({
@@ -85,6 +85,90 @@ function CertificatesPage() {
       console.error('Error loading data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDownloadApprovedCertificate() {
+    if (!studentId || !student) {
+      alert('Error: No se encontró la información del estudiante')
+      return
+    }
+
+    try {
+      // Obtener calificaciones aprobadas (igual que historial)
+      const { data: gradesData, error: gradesError } = await supabase
+        .from('grades')
+        .select(`
+          id,
+          final_grade,
+          final_grade_exam,
+          created_at,
+          status,
+          enrollment_id,
+          enrollments!inner(
+            student_id,
+            subject_id,
+            subjects!inner(id, name, code, year, allows_promotion)
+          )
+        `)
+
+      if (gradesError) {
+        console.error('Error fetching grades:', gradesError)
+        alert('Error al descargar el certificado')
+        return
+      }
+
+      if (!gradesData || gradesData.length === 0) {
+        alert('No hay calificaciones registradas')
+        return
+      }
+
+      const approvedGrades: GradeData[] = []
+
+      for (const grade of gradesData) {
+        const enrollment = (grade as any).enrollments
+        
+        // Filtrar solo del estudiante actual
+        if (!enrollment || enrollment.student_id !== studentId) continue
+
+        const subject = enrollment.subjects
+        if (!subject) continue
+
+        // Validar nota final >= 6
+        const finalGrade = grade.final_grade ?? grade.final_grade_exam
+        
+        if (
+          finalGrade !== null && 
+          finalGrade !== undefined && 
+          finalGrade >= 6
+        ) {
+          const condicion = getCondicion(finalGrade, subject.allows_promotion)
+
+          approvedGrades.push({
+            id: grade.id,
+            codigo: subject.code,
+            materia: subject.name,
+            parcial: null,
+            final: finalGrade,
+            estado: grade.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
+            condicion,
+            año: subject.year,
+            created_at: grade.created_at,
+            allows_promotion: subject.allows_promotion,
+          })
+        }
+      }
+
+      // Ordenar por año, luego por fecha
+      approvedGrades.sort((a, b) => {
+        if (a.año !== b.año) return a.año - b.año
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      })
+
+      generateApprovedCertificate(student, approvedGrades)
+    } catch (err) {
+      console.error('Error downloading certificado:', err)
+      alert('Error al descargar el certificado')
     }
   }
 
@@ -282,13 +366,13 @@ function CertificatesPage() {
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h3 className="text-2xl font-black text-gray-900 mb-2">Certificado de Materias Aprobadas</h3>
-                <p className="text-sm text-gray-600">Listado completo de materias aprobadas con calificaciones</p>
+                <p className="text-sm text-gray-600">Listado completo de materias aprobadas con calificaciones y fechas</p>
               </div>
               <Award size={40} className="text-purple-600 opacity-30" />
             </div>
 
             <button
-              onClick={() => generateAnalytico(student, grades)}
+              onClick={handleDownloadApprovedCertificate}
               className="w-full btn-primary flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700"
             >
               <FileText size={18} />
@@ -306,7 +390,7 @@ function CertificatesPage() {
         <ul className="text-sm text-amber-900 space-y-2 list-disc list-inside">
           <li><strong>Constancia de Alumno Regular:</strong> Acredita tu condición de alumno activo en el instituto</li>
           <li><strong>Analítico de Calificaciones:</strong> Documento con todas tus notas parciales y finales</li>
-          <li><strong>Certificado de Materias Aprobadas:</strong> Solo aparece si tienes materias aprobadas</li>
+          <li><strong>Certificado de Materias Aprobadas:</strong> Listado de materias aprobadas con fecha de aprobación</li>
           <li>Los certificados son válidos para presentar ante autoridades que los requieran</li>
           <li>Se generan automáticamente con la fecha actual de emisión</li>
         </ul>

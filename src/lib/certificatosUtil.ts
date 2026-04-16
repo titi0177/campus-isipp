@@ -41,25 +41,23 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
   let yPos = 12
 
   // ============ LOGO ============
-try {
+  try {
+    const logoWidth = 35
+    const logoHeight = 35
+    const marginRight = 15
 
-  const logoWidth = 35
-  const logoHeight = 35
+    doc.addImage(
+      '/logo.png',
+      'PNG',
+      pageWidth - logoWidth - marginRight,
+      yPos - 10,
+      logoWidth,
+      logoHeight
+    )
+  } catch (err) {
+    console.error('Error adding logo:', err)
+  }
 
-  const marginRight = 15
-
-  doc.addImage(
-    '/logo.png',
-    'PNG',
-    pageWidth - logoWidth - marginRight,
-    yPos - 10,
-    logoWidth,
-    logoHeight
-  )
-
-} catch (err) {
-  console.error('Error adding logo:', err)
-}
   // ============ ENCABEZADO ============
   doc.setFontSize(10)
   doc.setFont(undefined, 'bold')
@@ -198,44 +196,185 @@ try {
     { maxWidth: pageWidth - 40 }
   )
 
-// ============ FIRMA ============
-// margen inferior de la firma
-const margenFirma = 60
+  // ============ FIRMA ============
+  const margenFirma = 60
+  const firmaY = pageHeight - margenFirma
 
-// posición vertical de la firma
-const firmaY = pageHeight - margenFirma
+  doc.setLineWidth(0.3)
+  doc.line(pageWidth / 2 - 35, firmaY, pageWidth / 2 + 35, firmaY)
 
-// línea de firma
-doc.setLineWidth(0.3)
+  doc.setFontSize(10)
+  doc.text('Secretario Académico', pageWidth / 2, firmaY + 6, { align: 'center' })
 
-doc.line(
-  pageWidth / 2 - 35,
-  firmaY,
-  pageWidth / 2 + 35,
-  firmaY
-)
-
-// texto firma
-doc.setFontSize(10)
-
-doc.text(
-  "Secretario Académico",
-  pageWidth / 2,
-  firmaY + 6,
-  { align: "center" }
-)
-
-doc.setFontSize(9)
-
-doc.text(
-  "Instituto Superior de Informática (1206)",
-  pageWidth / 2,
-  firmaY + 11,
-  { align: "center" }
-)
+  doc.setFontSize(9)
+  doc.text('Instituto Superior de Informática (1206)', pageWidth / 2, firmaY + 11, { align: 'center' })
 
   // Descargar
   doc.save(`Analítico_${student.apellido}_${student.nombre}.pdf`)
+}
+
+/**
+ * Genera un certificado de materias aprobadas (solo aprobadas) en PDF
+ */
+export function generateApprovedCertificate(student: StudentData, grades: GradeData[]) {
+  const doc = new jsPDF('p', 'mm', 'a4')
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  let yPos = 12
+
+  // ============ LOGO ============
+  try {
+    const logoWidth = 35
+    const logoHeight = 35
+    const marginRight = 15
+
+    doc.addImage(
+      '/logo.png',
+      'PNG',
+      pageWidth - logoWidth - marginRight,
+      yPos - 10,
+      logoWidth,
+      logoHeight
+    )
+  } catch (err) {
+    console.error('Error adding logo:', err)
+  }
+
+  // ============ ENCABEZADO ============
+  doc.setFontSize(10)
+  doc.setFont(undefined, 'bold')
+  doc.text('INSTITUTO SUPERIOR DE INFORMATICA (1206)', 20, yPos)
+
+  yPos += 5
+  doc.setFontSize(9)
+  doc.setFont(undefined, 'normal')
+  doc.text('FUNDACION NUESTRA SEÑORA DE LOS MILAGROS', 20, yPos)
+
+  yPos += 4
+  doc.text('(Personalía Jurídica A-4954)', 20, yPos)
+
+  yPos += 4
+  doc.text('CUIT: 30-71709246-1', 20, yPos)
+
+  yPos += 4
+  doc.text('Calle Juan Manuel de Rosas S/N – Puerto Piray, Misiones  C.P 3381', 20, yPos)
+
+  // Línea separadora
+  yPos += 6
+  doc.setLineWidth(0.5)
+  doc.line(20, yPos, pageWidth - 20, yPos)
+
+  yPos += 12
+
+  // ============ TÍTULO ============
+  doc.setFontSize(12)
+  doc.setFont(undefined, 'bold')
+  doc.text('CERTIFICADO DE MATERIAS APROBADAS', pageWidth / 2, yPos, { align: 'center' })
+
+  yPos += 10
+
+  // ============ DATOS DEL ALUMNO ============
+  doc.setFontSize(9)
+  doc.setFont(undefined, 'normal')
+
+  const fullName = `${student.apellido.toUpperCase()} ${student.nombre.toUpperCase()}`
+  doc.text(`Alumno: ${fullName}`, 20, yPos)
+  yPos += 4
+  doc.text(`DNI: ${student.dni}`, 20, yPos)
+  yPos += 4
+  doc.text(`Legajo: ${student.legajo}`, 20, yPos)
+  yPos += 4
+  doc.text(`Carrera: ${student.carrera}`, 20, yPos)
+
+  yPos += 10
+
+  // ============ TABLA DE CALIFICACIONES ============
+  // Agrupar por año
+  const gradesByYear = grades.reduce(
+    (acc, grade) => {
+      const key = grade.año
+      if (!acc[key]) acc[key] = []
+      acc[key].push(grade)
+      return acc
+    },
+    {} as Record<number, GradeData[]>
+  )
+
+  // Procesar cada año
+  Object.keys(gradesByYear)
+    .sort((a, b) => parseInt(a) - parseInt(b))
+    .forEach((year) => {
+      const yearGrades = gradesByYear[year]
+
+      const tableData = yearGrades.map((g) => [
+        g.codigo,
+        g.materia,
+        g.final !== null ? g.final.toString() : '—',
+        getCondicion(g.final, g.allows_promotion),
+        g.created_at ? formatDateForPdf(g.created_at) : '—',
+      ])
+
+      autoTable(doc, {
+        head: [['CÓDIGO', 'MATERIA', 'NOTA', 'RESULTADO', 'FECHA APROBACIÓN']],
+        body: tableData,
+        startY: yPos,
+        margin: { left: 20, right: 20 },
+        headStyles: {
+          fillColor: [88, 44, 49],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+          halign: 'center',
+        },
+        bodyStyles: {
+          fontSize: 8,
+          halign: 'left',
+        },
+        alternateRowStyles: {
+          fillColor: [240, 240, 240],
+        },
+        columnStyles: {
+          0: { halign: 'center' },
+          2: { halign: 'center' },
+          3: { halign: 'center' },
+          4: { halign: 'center' },
+        },
+      })
+
+      yPos = (doc as any).lastAutoTable.finalY + 8
+    })
+
+  // ============ PIE DE PÁGINA ============
+  doc.setFont(undefined, 'normal')
+  doc.setFontSize(9)
+
+  const today = new Date()
+  const day = today.getDate()
+  const month = getMonthName(today.getMonth())
+  const year = today.getFullYear()
+
+  doc.text(
+    `Se extiende la presente, a pedido del interesado, en Puerto Piray a los ${day} días del mes de ${month} del ${year} y para ser presentada ante las autoridades que la requieran.`,
+    20,
+    yPos,
+    { maxWidth: pageWidth - 40 }
+  )
+
+  // ============ FIRMA ============
+  const margenFirma = 60
+  const firmaY = pageHeight - margenFirma
+
+  doc.setLineWidth(0.3)
+  doc.line(pageWidth / 2 - 35, firmaY, pageWidth / 2 + 35, firmaY)
+
+  doc.setFontSize(10)
+  doc.text('Secretario Académico', pageWidth / 2, firmaY + 6, { align: 'center' })
+
+  doc.setFontSize(9)
+  doc.text('Instituto Superior de Informática (1206)', pageWidth / 2, firmaY + 11, { align: 'center' })
+
+  // Descargar
+  doc.save(`Certificado_Aprobadas_${student.apellido}_${student.nombre}.pdf`)
 }
 
 /**
@@ -248,25 +387,22 @@ export function generateConstancia(student: StudentData) {
   let yPos = 12
 
   // ============ LOGO ============
- try {
+  try {
+    const logoWidth = 35
+    const logoHeight = 35
+    const marginRight = 15
 
-  const logoWidth = 35
-  const logoHeight = 35
-
-  const marginRight = 15
-
-  doc.addImage(
-    '/logo.png',
-    'PNG',
-    pageWidth - logoWidth - marginRight,
-    yPos - 10,
-    logoWidth,
-    logoHeight
-  )
-
-} catch (err) {
-  console.error('Error adding logo:', err)
-}
+    doc.addImage(
+      '/logo.png',
+      'PNG',
+      pageWidth - logoWidth - marginRight,
+      yPos - 10,
+      logoWidth,
+      logoHeight
+    )
+  } catch (err) {
+    console.error('Error adding logo:', err)
+  }
 
   // ============ ENCABEZADO ============
   doc.setFontSize(10)
@@ -326,40 +462,18 @@ export function generateConstancia(student: StudentData) {
 
   doc.text(finalText, 20, yPos, { maxWidth: pageWidth - 40 })
 
-// ============ FIRMA ============
-// margen inferior de la firma
-const margenFirma = 60
+  // ============ FIRMA ============
+  const margenFirma = 60
+  const firmaY = pageHeight - margenFirma
 
-// posición vertical de la firma
-const firmaY = pageHeight - margenFirma
-// línea de firma
-doc.setLineWidth(0.3)
+  doc.setLineWidth(0.3)
+  doc.line(pageWidth / 2 - 35, firmaY, pageWidth / 2 + 35, firmaY)
 
-doc.line(
-  pageWidth / 2 - 35,
-  firmaY,
-  pageWidth / 2 + 35,
-  firmaY
-)
+  doc.setFontSize(10)
+  doc.text('Secretario Académico', pageWidth / 2, firmaY + 6, { align: 'center' })
 
-// texto firma
-doc.setFontSize(10)
-
-doc.text(
-  "Secretario Académico",
-  pageWidth / 2,
-  firmaY + 6,
-  { align: "center" }
-)
-
-doc.setFontSize(9)
-
-doc.text(
-  "Instituto Superior de Informática (1206)",
-  pageWidth / 2,
-  firmaY + 11,
-  { align: "center" }
-)
+  doc.setFontSize(9)
+  doc.text('Instituto Superior de Informática (1206)', pageWidth / 2, firmaY + 11, { align: 'center' })
 
   // Descargar
   doc.save(`Constancia_${student.apellido}_${student.nombre}.pdf`)
