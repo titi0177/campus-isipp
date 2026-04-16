@@ -1,4 +1,4 @@
-import { Workbook } from 'exceljs'
+import { read, write, utils } from 'xlsx'
 import type { ExamRecordStudentRow } from './generateExamRecordPdf'
 
 interface GenerateExamExcelParams {
@@ -12,64 +12,86 @@ interface GenerateExamExcelParams {
 }
 
 /**
- * Genera acta de examen en Excel preservando 100% del formato de la plantilla
+ * Genera acta de examen en Excel preservando el formato de la plantilla
  */
 export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
   try {
-    // Cargar plantilla
+    // Cargar plantilla XLS
     const templatePath = '/Acta de Examenes ISIPP 2026 MATEMATICA.xls'
     const response = await fetch(templatePath)
+    
+    if (!response.ok) {
+      throw new Error(`No se pudo cargar la plantilla: ${response.statusText}`)
+    }
+    
     const arrayBuffer = await response.arrayBuffer()
     
-    // Crear workbook desde buffer
-    const workbook = new Workbook()
-    await workbook.xlsx.load(arrayBuffer)
+    // Leer workbook con XLSX manteniendo formatos
+    const workbook = read(arrayBuffer, { 
+      type: 'array',
+      cellFormula: false,
+      cellStyles: false
+    })
     
     // Obtener primera hoja
-    const worksheet = workbook.worksheets[0]
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    
+    if (!worksheet) {
+      throw new Error('No se pudo acceder a la hoja de trabajo')
+    }
 
-    // Completar celdas específicas sin tocar nada más
-    // D7: Materia
-    worksheet.getCell('D7').value = params.subjectName
-    
-    // J7: Año
-    worksheet.getCell('J7').value = params.subjectYear
-    
-    // D49: Fecha
-    worksheet.getCell('D49').value = params.examDate
-    
-    // Presidente (B42:D42 - celdas fusionadas, solo poner en B42)
-    worksheet.getCell('B42').value = params.presidentName
-    
-    // Vocal 1 (F42:G42 - celdas fusionadas, solo poner en F42)
-    worksheet.getCell('F42').value = params.vocal1Name
-    
-    // Vocal 2 (I42:L42 - celdas fusionadas, solo poner en I42)
-    worksheet.getCell('I42').value = params.vocal2Name
+    // Función para establecer valor sin perder formato
+    const setCellValue = (cellAddress: string, value: any) => {
+      if (!worksheet[cellAddress]) {
+        worksheet[cellAddress] = {}
+      }
+      const cell = worksheet[cellAddress]
+      
+      // Preservar propiedades existentes (estilos, etc)
+      cell.v = value
+      
+      // Detectar tipo
+      if (typeof value === 'number') {
+        cell.t = 'n'
+      } else if (typeof value === 'boolean') {
+        cell.t = 'b'
+      } else {
+        cell.t = 's'
+      }
+    }
+
+    // Completar celdas específicas
+    setCellValue('D7', params.subjectName)
+    setCellValue('J7', params.subjectYear)
+    setCellValue('D49', params.examDate)
+    setCellValue('B42', params.presidentName)
+    setCellValue('F42', params.vocal1Name)
+    setCellValue('I42', params.vocal2Name)
     
     // Completar alumnos (D11-D37 DNI, E11-E37 Nombres)
-    const maxRows = 27 // D11 a D37 son 27 filas
+    const maxRows = 27
     for (let i = 0; i < maxRows; i++) {
       const row = 11 + i
       const student = params.students[i]
       
       if (student) {
-        // DNI en columna D
-        worksheet.getCell(`D${row}`).value = student.dni || ''
-        // Nombre en columna E
-        worksheet.getCell(`E${row}`).value = student.nombre || ''
+        setCellValue(`D${row}`, student.dni || '')
+        setCellValue(`E${row}`, student.nombre || '')
       } else {
-        // Limpiar filas vacías
-        worksheet.getCell(`D${row}`).value = ''
-        worksheet.getCell(`E${row}`).value = ''
+        setCellValue(`D${row}`, '')
+        setCellValue(`E${row}`, '')
       }
     }
 
-    // Generar buffer del archivo
-    const buffer = await workbook.xlsx.writeBuffer()
+    // Escribir archivo preservando formatos
+    const excelBuffer = write(workbook, { 
+      bookType: 'xlsx',
+      type: 'array'
+    })
     
-    // Descargar archivo
-    const blob = new Blob([buffer], { 
+    // Descargar
+    const blob = new Blob([excelBuffer], { 
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
     })
     const url = URL.createObjectURL(blob)
