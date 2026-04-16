@@ -71,6 +71,7 @@ function CertificatesPage() {
                 parcial: null,
                 final: grade.final_grade_exam,
                 estado: 'REGULAR',
+                condicion: 'APROBADO',
                 año: (enrollment.subject as any)?.year || 1,
               })
             }
@@ -94,34 +95,84 @@ function CertificatesPage() {
     }
 
     try {
-      // Obtener todas las calificaciones para el analítico
-      const { data: enrollmentsData } = await supabase
-        .from('enrollments')
+      // Obtener todas las calificaciones para el analítico (igual que historial)
+      const { data: gradesData, error: gradesError } = await supabase
+        .from('grades')
         .select(`
-          subject:subjects(code, name, year),
-          grades(partial_grade, final_grade_exam, status, updated_at)
+          id,
+          final_grade,
+          final_grade_exam,
+          created_at,
+          status,
+          enrollment_id,
+          enrollments!inner(
+            student_id,
+            subject_id,
+            subjects!inner(id, name, code, year, allows_promotion)
+          )
         `)
-        .eq('student_id', studentId)
 
-      if (enrollmentsData) {
-        const allGrades: GradeData[] = []
-        for (const enrollment of enrollmentsData) {
-          const grade = Array.isArray(enrollment.grades)
-            ? enrollment.grades[0]
-            : enrollment.grades
+      if (gradesError) {
+        console.error('Error fetching grades:', gradesError)
+        alert('Error al descargar el analítico')
+        return
+      }
+
+      if (!gradesData || gradesData.length === 0) {
+        alert('No hay calificaciones registradas')
+        return
+      }
+
+      const allGrades: GradeData[] = []
+
+      for (const grade of gradesData) {
+        const enrollment = (grade as any).enrollments
+        
+        // Filtrar solo del estudiante actual
+        if (!enrollment || enrollment.student_id !== studentId) continue
+
+        const subject = enrollment.subjects
+        if (!subject) continue
+
+        // Validar nota final >= 6
+        const finalGrade = grade.final_grade ?? grade.final_grade_exam
+        
+        if (
+          finalGrade !== null && 
+          finalGrade !== undefined && 
+          finalGrade >= 6
+        ) {
+          // Determinar condición: Promocional solo si permite Y nota >= 8
+          let condicion: string = 'APROBADO'
+          if (subject.allows_promotion && finalGrade >= 8) {
+            condicion = 'PROMOCIONAL'
+          }
+          if (!subject.allows_promotion) {
+            condicion = 'SIN PROMOCION'
+          }
 
           allGrades.push({
-            codigo: (enrollment.subject as any)?.code || '',
-            materia: (enrollment.subject as any)?.name || '',
-            parcial: grade?.partial_grade || null,
-            final: grade?.final_grade_exam || null,
-            estado: grade?.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
-            año: (enrollment.subject as any)?.year || 1,
-            updated_at: grade?.updated_at || undefined,
+            id: grade.id,
+            codigo: subject.code,
+            materia: subject.name,
+            parcial: null,
+            final: finalGrade,
+            estado: grade.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
+            condicion,
+            año: subject.year,
+            created_at: grade.created_at,
+            allows_promotion: subject.allows_promotion,
           })
         }
-        generateAnalytico(student, allGrades)
       }
+
+      // Ordenar por año, luego por fecha
+      allGrades.sort((a, b) => {
+        if (a.año !== b.año) return a.año - b.año
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      })
+
+      generateAnalytico(student, allGrades)
     } catch (err) {
       console.error('Error downloading analítico:', err)
       alert('Error al descargar el analítico')

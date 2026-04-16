@@ -17,14 +17,18 @@ export interface StudentData {
 }
 
 export interface GradeData {
+  id?: string
   codigo: string
   materia: string
   parcial: number | null
   final: number | null
   estado: string
+  condicion: string
   año: number
   mes?: string
   updated_at?: string
+  created_at?: string
+  allows_promotion?: boolean
 }
 
 /**
@@ -114,26 +118,18 @@ try {
     .forEach((year) => {
       const yearGrades = gradesByYear[year]
 
-      // Tabla de notas del año
       const tableData = yearGrades.map((g) => [
         g.codigo,
         g.materia,
-        g.parcial !== null ? g.parcial.toString() : '—',
         g.final !== null ? g.final.toString() : '—',
-        g.estado || 'REGULAR',
-        g.mes || '—',
+        g.condicion || 'REGULAR',
+        g.created_at ? formatDateForPdf(g.created_at) : '—',
         year,
       ])
 
       autoTable(doc, {
-        head: [['ASIGNATURA', 'CALIFICACION', 'CONDICION', 'MES', 'AÑO']],
-        body: tableData.map((row) => [
-          row[1], // materia
-          row[3] !== '—' ? row[3] : row[2], // calificación (final si existe, sino parcial)
-          row[4], // condición
-          row[5], // mes
-          row[6], // año
-        ]),
+        head: [['CÓDIGO', 'MATERIA', 'NOTA', 'CONDICIÓN', 'FECHA', 'AÑO']],
+        body: tableData,
         startY: yPos,
         margin: { left: 20, right: 20 },
         headStyles: {
@@ -151,10 +147,11 @@ try {
           fillColor: [240, 240, 240],
         },
         columnStyles: {
-          1: { halign: 'center' },
+          0: { halign: 'center' },
           2: { halign: 'center' },
           3: { halign: 'center' },
           4: { halign: 'center' },
+          5: { halign: 'center' },
         },
       })
 
@@ -369,8 +366,15 @@ doc.text(
 }
 
 /**
- * Obtiene el nombre del mes en español
+ * Formatea una fecha para mostrar en PDF
  */
+function formatDateForPdf(dateStr: string): string {
+  const date = new Date(dateStr)
+  const day = date.getDate()
+  const month = getMonthName(date.getMonth())
+  const year = date.getFullYear()
+  return `${day}/${month.substring(0, 3)}/${year}`
+}
 function getMonthName(month: number): string {
   const months = [
     'ENERO',
