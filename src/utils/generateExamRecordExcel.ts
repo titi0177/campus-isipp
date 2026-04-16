@@ -10,44 +10,94 @@ export const generateExamRecordExcel = async (data: any) => {
     const zip = await JSZip.loadAsync(buffer)
 
     const sheetPath = "xl/worksheets/sheet1.xml"
-    const sharedStringsPath = "xl/sharedStrings.xml"
 
     const sheetXml = await zip.file(sheetPath)?.async("string")
-    const sharedXml = await zip.file(sharedStringsPath)?.async("string")
 
-    if (!sheetXml || !sharedXml) {
-      throw new Error("No se pudo leer la plantilla Excel")
+    if (!sheetXml) {
+      throw new Error("No se pudo leer sheet1.xml")
     }
 
     const parser = new DOMParser()
-
     const sheetDoc = parser.parseFromString(sheetXml, "application/xml")
-    const sharedDoc = parser.parseFromString(sharedXml, "application/xml")
 
-    const sharedRoot = sharedDoc.querySelector("sst")
+    const findCell = (ref: string) => {
+      return sheetDoc.querySelector(`c[r="${ref}"]`)
+    }
 
-   const addSharedString = (text: string) => {
+    const setCell = (ref: string, value: string) => {
 
-  if (!sharedRoot) return 0
+      let cell = findCell(ref)
 
-  const si = sharedDoc.createElement("si")
-  const t = sharedDoc.createElement("t")
+      const rowNumber = ref.match(/\d+/)?.[0]
+      const row = sheetDoc.querySelector(`row[r="${rowNumber}"]`)
 
-  t.textContent = text
+      if (!row) return
 
-  si.appendChild(t)
-  sharedRoot.appendChild(si)
+      if (!cell) {
+        cell = sheetDoc.createElement("c")
+        cell.setAttribute("r", ref)
+        row.appendChild(cell)
+      }
 
-  const index = sharedRoot.children.length - 1
+      while (cell.firstChild) {
+        cell.removeChild(cell.firstChild)
+      }
 
-  // actualizar contadores requeridos por Excel
-  const count = Number(sharedRoot.getAttribute("count") || 0) + 1
-  const unique = Number(sharedRoot.getAttribute("uniqueCount") || 0) + 1
+      cell.setAttribute("t", "inlineStr")
 
-  sharedRoot.setAttribute("count", String(count))
-  sharedRoot.setAttribute("uniqueCount", String(unique))
+      const is = sheetDoc.createElement("is")
+      const t = sheetDoc.createElement("t")
 
-  return index
+      t.textContent = value
+
+      is.appendChild(t)
+      cell.appendChild(is)
+    }
+
+    // ===== DATOS PRINCIPALES =====
+
+    setCell("D7", data.subject)
+    setCell("J7", data.year)
+    setCell("D49", data.examDate)
+
+    // ===== PROFESORES =====
+
+    setCell("B42", data.president)
+    setCell("F42", data.firstVocal)
+    setCell("I42", data.secondVocal)
+
+    // ===== ALUMNOS =====
+
+    data.students.forEach((student: any, i: number) => {
+
+      const row = 11 + i
+
+      setCell(`D${row}`, student.dni)
+      setCell(`E${row}`, student.name)
+
+    })
+
+    const serializer = new XMLSerializer()
+
+    zip.file(sheetPath, serializer.serializeToString(sheetDoc))
+
+    const newFile = await zip.generateAsync({ type: "blob" })
+
+    const url = URL.createObjectURL(newFile)
+
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "Acta_Examen.xlsx"
+    a.click()
+
+    URL.revokeObjectURL(url)
+
+  } catch (err) {
+
+    console.error("Error generating Excel:", err)
+
+  }
+
 }
 
     const findCell = (ref: string) => {
