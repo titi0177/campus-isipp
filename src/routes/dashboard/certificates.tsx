@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { generateAnalytico, generateConstancia, StudentData, GradeData } from '@/lib/certificatosUtil'
+import { generateAnalytico, generateConstancia, StudentData, GradeData, getCondicion } from '@/lib/certificatosUtil'
 import { Award, FileText, Loader } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard/certificates')({
@@ -142,14 +142,7 @@ function CertificatesPage() {
           finalGrade !== undefined && 
           finalGrade >= 6
         ) {
-          // Determinar condición: Promocional solo si permite Y nota >= 8
-          let condicion: string = 'APROBADO'
-          if (subject.allows_promotion && finalGrade >= 8) {
-            condicion = 'PROMOCIONAL'
-          }
-          if (!subject.allows_promotion) {
-            condicion = 'SIN PROMOCION'
-          }
+          const condicion = getCondicion(finalGrade, subject.allows_promotion)
 
           allGrades.push({
             id: grade.id,

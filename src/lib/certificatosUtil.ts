@@ -84,7 +84,7 @@ try {
   doc.setLineWidth(0.5)
   doc.line(20, yPos, pageWidth - 20, yPos)
 
-  yPos += 12
+  yPos += 20
 
   // ============ DATOS DEL ALUMNO ============
   doc.setFontSize(10)
@@ -122,7 +122,7 @@ try {
         g.codigo,
         g.materia,
         g.final !== null ? g.final.toString() : '—',
-        g.condicion || 'REGULAR',
+        getCondicion(g.final, g.allows_promotion),
         g.created_at ? formatDateForPdf(g.created_at) : '—',
         year,
       ])
@@ -375,6 +375,17 @@ function formatDateForPdf(dateStr: string): string {
   const year = date.getFullYear()
   return `${day}/${month.substring(0, 3)}/${year}`
 }
+
+/**
+ * Obtiene la condición correcta basada en nota y allows_promotion
+ */
+export function getCondicion(nota: number | null, allows_promotion: boolean | undefined): string {
+  if (nota === null || nota === undefined) return 'N/A'
+  if (nota >= 8 && allows_promotion) return 'PROMOCIONAL'
+  if (nota >= 6) return 'APROBADO'
+  return 'DESAPROBADO'
+}
+
 function getMonthName(month: number): string {
   const months = [
     'ENERO',
