@@ -202,15 +202,31 @@ try {
   )
 
   // Línea de firma más abajo
-  yPos += 28
-  doc.setLineWidth(0.5)
-  doc.line(60, yPos, 120, yPos)
+  const firmaY = pageHeight - 40
 
-  yPos += 3
-  doc.setFont(undefined, 'bold')
-  doc.setFontSize(8)
-  doc.text('Dirección', 90, yPos, { align: 'center' })
+// línea
+doc.line(
+  pageWidth / 2 - 45,
+  firmaY,
+  pageWidth / 2 + 45,
+  firmaY
+)
 
+doc.setFontSize(10)
+
+doc.text(
+  "Firma Secretario Academico ",
+  pageWidth / 2,
+  firmaY + 6,
+  { align: "center" }
+)
+
+doc.text(
+  "ISIPP 1206",
+  pageWidth / 2,
+  firmaY + 12,
+  { align: "center" }
+)
   // Descargar
   doc.save(`Analítico_${student.apellido}_${student.nombre}.pdf`)
 }
@@ -304,14 +320,31 @@ export function generateConstancia(student: StudentData) {
   doc.text(finalText, 20, yPos, { maxWidth: pageWidth - 40 })
 
   // Línea de firma
-  yPos += 25
-  doc.setLineWidth(0.5)
-  doc.line(60, yPos, 120, yPos)
+  const firmaY = pageHeight - 40
 
-  yPos += 3
-  doc.setFont(undefined, 'bold')
-  doc.setFontSize(9)
-  doc.text('Dirección', 90, yPos, { align: 'center' })
+// línea
+doc.line(
+  pageWidth / 2 - 45,
+  firmaY,
+  pageWidth / 2 + 45,
+  firmaY
+)
+
+doc.setFontSize(10)
+
+doc.text(
+  "Firma Secretario Academico ",
+  pageWidth / 2,
+  firmaY + 6,
+  { align: "center" }
+)
+
+doc.text(
+  "ISIPP 1206",
+  pageWidth / 2,
+  firmaY + 12,
+  { align: "center" }
+)
 
   // Descargar
   doc.save(`Constancia_${student.apellido}_${student.nombre}.pdf`)
