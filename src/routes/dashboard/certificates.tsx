@@ -10,6 +10,7 @@ export const Route = createFileRoute('/dashboard/certificates')({
 
 function CertificatesPage() {
   const [student, setStudent] = useState<StudentData | null>(null)
+  const [studentId, setStudentId] = useState<string>('')
   const [grades, setGrades] = useState<GradeData[]>([])
   const [loading, setLoading] = useState(true)
   const [hasApprovedSubjects, setHasApprovedSubjects] = useState(false)
@@ -29,11 +30,12 @@ function CertificatesPage() {
       // Obtener datos del estudiante
       const { data: studentData } = await supabase
         .from('students')
-        .select('first_name, last_name, dni, legajo, year, program:programs(name), email')
+        .select('id, first_name, last_name, dni, legajo, year, program:programs(name), email')
         .eq('user_id', user.id)
         .single()
 
       if (studentData) {
+        setStudentId(studentData.id)
         setStudent({
           nombre: studentData.first_name,
           apellido: studentData.last_name,
@@ -82,6 +84,46 @@ function CertificatesPage() {
       console.error('Error loading data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDownloadAnalytico() {
+    if (!studentId || !student) {
+      alert('Error: No se encontró la información del estudiante')
+      return
+    }
+
+    try {
+      // Obtener todas las calificaciones para el analítico
+      const { data: enrollmentsData } = await supabase
+        .from('enrollments')
+        .select(`
+          subject:subjects(code, name, year),
+          grades(partial_grade, final_grade_exam, status)
+        `)
+        .eq('student_id', studentId)
+
+      if (enrollmentsData) {
+        const allGrades: GradeData[] = []
+        for (const enrollment of enrollmentsData) {
+          const grade = Array.isArray(enrollment.grades)
+            ? enrollment.grades[0]
+            : enrollment.grades
+
+          allGrades.push({
+            codigo: (enrollment.subject as any)?.code || '',
+            materia: (enrollment.subject as any)?.name || '',
+            parcial: grade?.partial_grade || null,
+            final: grade?.final_grade_exam || null,
+            estado: grade?.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
+            año: (enrollment.subject as any)?.year || 1,
+          })
+        }
+        generateAnalytico(student, allGrades)
+      }
+    } catch (err) {
+      console.error('Error downloading analítico:', err)
+      alert('Error al descargar el analítico')
     }
   }
 
@@ -181,36 +223,7 @@ function CertificatesPage() {
           </div>
 
           <button
-            onClick={() => {
-              // Obtener todas las calificaciones para el analítico
-              supabase
-                .from('enrollments')
-                .select(`
-                  subject:subjects(code, name, year),
-                  grades(partial_grade, final_grade_exam, status)
-                `)
-                .eq('student_id', student.legajo === '' ? '' : (student as any).id)
-                .then(({ data: enrollmentsData }) => {
-                  if (enrollmentsData) {
-                    const allGrades: GradeData[] = []
-                    for (const enrollment of enrollmentsData) {
-                      const grade = Array.isArray(enrollment.grades)
-                        ? enrollment.grades[0]
-                        : enrollment.grades
-
-                      allGrades.push({
-                        codigo: (enrollment.subject as any)?.code || '',
-                        materia: (enrollment.subject as any)?.name || '',
-                        parcial: grade?.partial_grade || null,
-                        final: grade?.final_grade_exam || null,
-                        estado: grade?.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
-                        año: (enrollment.subject as any)?.year || 1,
-                      })
-                    }
-                    generateAnalytico(student, allGrades)
-                  }
-                })
-            }}
+            onClick={handleDownloadAnalytico}
             className="w-full btn-primary flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700"
           >
             <FileText size={18} />
