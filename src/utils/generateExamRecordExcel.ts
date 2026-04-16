@@ -26,19 +26,29 @@ export const generateExamRecordExcel = async (data: any) => {
 
     const sharedRoot = sharedDoc.querySelector("sst")
 
-    const addSharedString = (text: string) => {
+   const addSharedString = (text: string) => {
 
-      const si = sharedDoc.createElement("si")
-      const t = sharedDoc.createElement("t")
+  if (!sharedRoot) return 0
 
-      t.textContent = text
+  const si = sharedDoc.createElement("si")
+  const t = sharedDoc.createElement("t")
 
-      si.appendChild(t)
-      sharedRoot?.appendChild(si)
+  t.textContent = text
 
-      return sharedRoot?.children.length! - 1
+  si.appendChild(t)
+  sharedRoot.appendChild(si)
 
-    }
+  const index = sharedRoot.children.length - 1
+
+  // actualizar contadores requeridos por Excel
+  const count = Number(sharedRoot.getAttribute("count") || 0) + 1
+  const unique = Number(sharedRoot.getAttribute("uniqueCount") || 0) + 1
+
+  sharedRoot.setAttribute("count", String(count))
+  sharedRoot.setAttribute("uniqueCount", String(unique))
+
+  return index
+}
 
     const findCell = (ref: string) => {
       return sheetDoc.querySelector(`c[r="${ref}"]`)
