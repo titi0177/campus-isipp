@@ -52,34 +52,41 @@ export const generateExamRecordExcel = async (data: any) => {
 
       is.appendChild(t)
       cell.appendChild(is)
+
     }
 
     // ===== DATOS PRINCIPALES =====
 
-    setCell("D7", data.subject)
-    setCell("J7", data.year)
-    setCell("D49", data.examDate)
+    setCell("D7", data.subject || "")
+    setCell("J7", data.year || "")
+    setCell("D49", data.examDate || "")
 
     // ===== PROFESORES =====
 
-    setCell("B42", data.president)
-    setCell("F42", data.firstVocal)
-    setCell("I42", data.secondVocal)
+    setCell("B42", data.president || "")
+    setCell("F42", data.firstVocal || "")
+    setCell("I42", data.secondVocal || "")
 
     // ===== ALUMNOS =====
 
-    data.students.forEach((student: any, i: number) => {
+    if (data.students) {
 
-      const row = 11 + i
+      data.students.forEach((student: any, i: number) => {
 
-      setCell(`D${row}`, student.dni)
-      setCell(`E${row}`, student.name)
+        const row = 11 + i
 
-    })
+        setCell(`D${row}`, student.dni || "")
+        setCell(`E${row}`, student.name || "")
+
+      })
+
+    }
 
     const serializer = new XMLSerializer()
 
-    zip.file(sheetPath, serializer.serializeToString(sheetDoc))
+    const updatedXml = serializer.serializeToString(sheetDoc)
+
+    zip.file(sheetPath, updatedXml)
 
     const newFile = await zip.generateAsync({ type: "blob" })
 
@@ -88,88 +95,10 @@ export const generateExamRecordExcel = async (data: any) => {
     const a = document.createElement("a")
     a.href = url
     a.download = "Acta_Examen.xlsx"
+
+    document.body.appendChild(a)
     a.click()
-
-    URL.revokeObjectURL(url)
-
-  } catch (err) {
-
-    console.error("Error generating Excel:", err)
-
-  }
-
-}
-
-    const findCell = (ref: string) => {
-      return sheetDoc.querySelector(`c[r="${ref}"]`)
-    }
-
-    const setCell = (ref: string, value: string) => {
-
-      let cell = findCell(ref)
-
-      const rowNumber = ref.match(/\d+/)?.[0]
-      const row = sheetDoc.querySelector(`row[r="${rowNumber}"]`)
-
-      if (!row) return
-
-      if (!cell) {
-        cell = sheetDoc.createElement("c")
-        cell.setAttribute("r", ref)
-        row.appendChild(cell)
-      }
-
-      while (cell.firstChild) {
-        cell.removeChild(cell.firstChild)
-      }
-
-      const index = addSharedString(value)
-
-      const v = sheetDoc.createElement("v")
-      v.textContent = String(index)
-
-      cell.setAttribute("t", "s")
-
-      cell.appendChild(v)
-
-    }
-
-    // ===== DATOS PRINCIPALES =====
-
-    setCell("D7", data.subject)
-    setCell("J7", data.year)
-    setCell("D49", data.examDate)
-
-    // ===== PROFESORES =====
-
-    setCell("B42", data.president)
-    setCell("F42", data.firstVocal)
-    setCell("I42", data.secondVocal)
-
-    // ===== ALUMNOS =====
-
-    data.students.forEach((student: any, i: number) => {
-
-      const row = 11 + i
-
-      setCell(`D${row}`, student.dni)
-      setCell(`E${row}`, student.name)
-
-    })
-
-    const serializer = new XMLSerializer()
-
-    zip.file(sheetPath, serializer.serializeToString(sheetDoc))
-    zip.file(sharedStringsPath, serializer.serializeToString(sharedDoc))
-
-    const newFile = await zip.generateAsync({ type: "blob" })
-
-    const url = URL.createObjectURL(newFile)
-
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "Acta_Examen.xlsx"
-    a.click()
+    a.remove()
 
     URL.revokeObjectURL(url)
 
