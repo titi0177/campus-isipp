@@ -1,4 +1,5 @@
-import { read, write, utils } from 'xlsx'
+import JSZip from 'jszip'
+import { read, write } from 'xlsx'
 import type { ExamRecordStudentRow } from './generateExamRecordPdf'
 
 interface GenerateExamExcelParams {
@@ -12,11 +13,12 @@ interface GenerateExamExcelParams {
 }
 
 /**
- * Genera acta de examen en Excel preservando el formato de la plantilla
+ * Genera acta de examen preservando 100% del formato original del XLS
+ * Descarga el archivo original y lo modifica a nivel de datos sin tocar formatos
  */
 export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
   try {
-    // Cargar plantilla XLS
+    // Descargar archivo template original
     const templatePath = '/Acta de Examenes ISIPP 2026 MATEMATICA.xls'
     const response = await fetch(templatePath)
     
@@ -26,78 +28,63 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
     
     const arrayBuffer = await response.arrayBuffer()
     
-    // Leer workbook con XLSX manteniendo formatos
-    const workbook = read(arrayBuffer, { 
+    // Leer el archivo XLS manteniendo toda su estructura
+    const workbook = read(new Uint8Array(arrayBuffer), {
       type: 'array',
-      cellFormula: false,
-      cellStyles: false
+      cellFormula: true,
+      cellStyles: true,
+      defval: ''
     })
     
-    // Obtener primera hoja
     const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
+    const ws = workbook.Sheets[sheetName]
     
-    if (!worksheet) {
-      throw new Error('No se pudo acceder a la hoja de trabajo')
-    }
-
-    // Función para establecer valor sin perder formato
-    const setCellValue = (cellAddress: string, value: any) => {
-      if (!worksheet[cellAddress]) {
-        worksheet[cellAddress] = {}
-      }
-      const cell = worksheet[cellAddress]
-      
-      // Preservar propiedades existentes (estilos, etc)
-      cell.v = value
-      
-      // Detectar tipo
-      if (typeof value === 'number') {
-        cell.t = 'n'
-      } else if (typeof value === 'boolean') {
-        cell.t = 'b'
+    // Modificar SOLO los valores de las celdas, sin tocar nada más
+    // Preservar todas las propiedades de la celda original
+    const updateCell = (address: string, newValue: any) => {
+      if (ws[address]) {
+        // Mantener la celda existente, solo cambiar el valor
+        ws[address].v = newValue
       } else {
-        cell.t = 's'
+        // Si la celda no existe, crearla con el mínimo
+        ws[address] = { v: newValue, t: typeof newValue === 'number' ? 'n' : 's' }
       }
     }
-
-    // Completar celdas específicas
-    setCellValue('D7', params.subjectName)
-    setCellValue('J7', params.subjectYear)
-    setCellValue('D49', params.examDate)
-    setCellValue('B42', params.presidentName)
-    setCellValue('F42', params.vocal1Name)
-    setCellValue('I42', params.vocal2Name)
     
-    // Completar alumnos (D11-D37 DNI, E11-E37 Nombres)
+    // Cargar datos
+    updateCell('D7', params.subjectName)
+    updateCell('J7', params.subjectYear)
+    updateCell('D49', params.examDate)
+    updateCell('B42', params.presidentName)
+    updateCell('F42', params.vocal1Name)
+    updateCell('I42', params.vocal2Name)
+    
+    // Alumnos
     const maxRows = 27
     for (let i = 0; i < maxRows; i++) {
       const row = 11 + i
       const student = params.students[i]
       
-      if (student) {
-        setCellValue(`D${row}`, student.dni || '')
-        setCellValue(`E${row}`, student.nombre || '')
-      } else {
-        setCellValue(`D${row}`, '')
-        setCellValue(`E${row}`, '')
-      }
+      updateCell(`D${row}`, student?.dni || '')
+      updateCell(`E${row}`, student?.nombre || '')
     }
-
-    // Escribir archivo preservando formatos
-    const excelBuffer = write(workbook, { 
-      bookType: 'xlsx',
-      type: 'array'
+    
+    // Escribir de vuelta preservando TODO el formato original
+    const outputBuffer = write(workbook, {
+      bookType: 'xls',
+      type: 'array',
+      cellFormula: true,
+      cellStyles: true
     })
     
     // Descargar
-    const blob = new Blob([excelBuffer], { 
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    const blob = new Blob([outputBuffer], {
+      type: 'application/vnd.ms-excel'
     })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `Acta_Examen_${params.subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    link.download = `Acta_Examen_${params.subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
