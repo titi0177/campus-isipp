@@ -37,52 +37,56 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
       throw new Error('No se pudo encontrar la hoja de trabajo')
     }
     
-    // Parsear y modificar XML como texto (más confiable que DOM)
-    let modifiedXml = sheetXml
+    // Parsear como XML para manipulación correcta
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(sheetXml, 'application/xml')
     
-    // Función para reemplazar o crear celda en el XML
-    const setCellValue = (xml: string, cellRef: string, value: string | number): string => {
+    // Namespace para XLSX
+    const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+    
+    // Función para actualizar celda existente o crearla
+    const updateCell = (cellRef: string, value: string | number) => {
       const stringValue = String(value)
       
-      // Buscar la celda existente
-      const cellPattern = new RegExp(`<c r="${cellRef}"[^>]*>.*?</c>`, 's')
+      // Buscar celda existente
+      let cell = xmlDoc.querySelector(`c[r="${cellRef}"]`)
       
-      if (cellPattern.test(xml)) {
-        // Reemplazar celda existente
-        const newCell = `<c r="${cellRef}" t="inlineStr"><is><r><t>${escapeXml(stringValue)}</t></r></is></c>`
-        return xml.replace(cellPattern, newCell)
+      if (cell) {
+        // Celda existe - limpiar y actualizar
+        while (cell.firstChild) {
+          cell.removeChild(cell.firstChild)
+        }
+        
+        // Agregar valor como texto simple
+        const v = xmlDoc.createElement('v')
+        v.textContent = stringValue
+        cell.setAttribute('t', 's') // String type
+        cell.appendChild(v)
       } else {
-        // Celda no existe, necesitamos insertarla en el <sheetData>
-        // Encontrar la última </c> en sheetData y insertar después
-        const sheetDataMatch = xml.match(/<sheetData>([\s\S]*?)<\/sheetData>/)
-        if (sheetDataMatch) {
-          const sheetDataContent = sheetDataMatch[1]
-          // Insertar la nueva celda antes de </sheetData>
-          const newCell = `<c r="${cellRef}" t="inlineStr"><is><r><t>${escapeXml(stringValue)}</t></r></is></c>`
-          const updatedSheetData = sheetDataContent + newCell
-          return xml.replace(/<sheetData>([\s\S]*?)<\/sheetData>/, `<sheetData>${updatedSheetData}</sheetData>`)
+        // Celda no existe - crearla
+        cell = xmlDoc.createElement('c')
+        cell.setAttribute('r', cellRef)
+        cell.setAttribute('t', 's') // String type
+        
+        const v = xmlDoc.createElement('v')
+        v.textContent = stringValue
+        cell.appendChild(v)
+        
+        // Insertar en sheetData
+        const sheetData = xmlDoc.querySelector('sheetData')
+        if (sheetData) {
+          sheetData.appendChild(cell)
         }
       }
-      return xml
-    }
-    
-    // Helper para escapar caracteres XML
-    const escapeXml = (str: string): string => {
-      return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;')
     }
     
     // Cargar todos los datos
-    modifiedXml = setCellValue(modifiedXml, 'D7', params.subjectName)
-    modifiedXml = setCellValue(modifiedXml, 'J7', String(params.subjectYear))
-    modifiedXml = setCellValue(modifiedXml, 'D49', params.examDate)
-    modifiedXml = setCellValue(modifiedXml, 'B42', params.presidentName)
-    modifiedXml = setCellValue(modifiedXml, 'F42', params.vocal1Name)
-    modifiedXml = setCellValue(modifiedXml, 'I42', params.vocal2Name)
+    updateCell('D7', params.subjectName)
+    updateCell('J7', String(params.subjectYear))
+    updateCell('D49', params.examDate)
+    updateCell('B42', params.presidentName)
+    updateCell('F42', params.vocal1Name)
+    updateCell('I42', params.vocal2Name)
     
     // Alumnos (D11-D37 DNI, E11-E37 Nombres)
     const maxRows = 27
@@ -90,11 +94,19 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
       const row = 11 + i
       const student = params.students[i]
       
-      modifiedXml = setCellValue(modifiedXml, `D${row}`, student?.dni || '')
-      modifiedXml = setCellValue(modifiedXml, `E${row}`, student?.nombre || '')
+      if (student?.dni) {
+        updateCell(`D${row}`, student.dni)
+      }
+      if (student?.nombre) {
+        updateCell(`E${row}`, student.nombre)
+      }
     }
     
-    // Actualizar ZIP con XML modificado
+    // Serializar XML
+    const serializer = new XMLSerializer()
+    const modifiedXml = serializer.serializeToString(xmlDoc.documentElement)
+    
+    // Actualizar ZIP
     xlsxZip.file('xl/worksheets/sheet1.xml', modifiedXml)
     
     // Generar archivo final
