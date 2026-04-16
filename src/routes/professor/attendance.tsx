@@ -2,6 +2,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Save, Download, BarChart3 } from 'lucide-react'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
+import { jsPDF as jsPDFConstructor } from 'jspdf'
 
 
 export const Route = createFileRoute('/professor/attendance')({
@@ -298,7 +301,7 @@ function ProfessorAttendancePage() {
       return
     }
 
-    const doc = new jsPDF('l')
+    const doc = new jsPDFConstructor('l')
     const currentDate = new Date().toLocaleDateString('es-AR')
 
     doc.setFontSize(16)

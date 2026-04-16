@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
 import { Save, Download } from 'lucide-react'
 import jsPDF from 'jspdf'
-import jsPDFAutoTable from 'jspdf-autotable'
+import 'jspdf-autotable'
+import { jsPDF as jsPDFConstructor } from 'jspdf'
 
 export const Route = createFileRoute('/admin/attendance')({
   component: AttendancePage,
@@ -166,7 +167,7 @@ function AttendancePage() {
       return
     }
 
-    const doc = new jsPDF()
+    const doc = new jsPDFConstructor()
     const currentDate = new Date().toLocaleDateString('es-AR')
 
     doc.setFontSize(16)

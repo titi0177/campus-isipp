@@ -4,7 +4,8 @@
  */
 
 import jsPDF from 'jspdf'
-import jsPDFAutoTable from 'jspdf-autotable'
+import 'jspdf-autotable'
+import { jsPDF as jsPDFConstructor } from 'jspdf'
 
 export interface StudentData {
   nombre: string
@@ -30,7 +31,7 @@ export interface GradeData {
  * Genera un analítico de calificaciones en PDF con diseño oficial
  */
 export function generateAnalytico(student: StudentData, grades: GradeData[]) {
-  const doc = new jsPDF('p', 'mm', 'a4')
+  const doc = new jsPDFConstructor('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   let yPos = 15
@@ -185,7 +186,7 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
  * Genera una constancia de alumno regular en PDF con diseño oficial
  */
 export function generateConstancia(student: StudentData) {
-  const doc = new jsPDF('p', 'mm', 'a4')
+  const doc = new jsPDFConstructor('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   let yPos = 20
