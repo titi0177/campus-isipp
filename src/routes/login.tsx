@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useState } from 'react'
 import React from 'react'
-import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail, ChevronDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from '@tanstack/react-router'
 
@@ -35,9 +35,12 @@ function LoginPage() {
     dni: '',
     legajo: '',
     programId: '',
+    year: '1',
+    selectedSubjects: [] as string[],
     accessCode: '',
   })
 
+  const [availableSubjects, setAvailableSubjects] = useState<Array<{ id: string; name: string; code: string }>>([])
   const [codeValidated, setCodeValidated] = useState(false)
   const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([])
 
@@ -49,6 +52,37 @@ function LoginPage() {
     }
     loadPrograms()
   }, [])
+
+  // Load subjects when program or year changes
+  React.useEffect(() => {
+    const loadSubjects = async () => {
+      if (!registerData.programId || !registerData.year) {
+        setAvailableSubjects([])
+        setRegisterData(prev => ({ ...prev, selectedSubjects: [] }))
+        return
+      }
+
+      const { data } = await supabase
+        .from('subjects')
+        .select('id, name, code')
+        .eq('program_id', registerData.programId)
+        .eq('year', parseInt(registerData.year))
+        .order('name')
+
+      if (data) {
+        setAvailableSubjects(data)
+        // Pre-seleccionar todas las materias
+        setRegisterData(prev => ({
+          ...prev,
+          selectedSubjects: data.map(s => s.id)
+        }))
+      } else {
+        setAvailableSubjects([])
+        setRegisterData(prev => ({ ...prev, selectedSubjects: [] }))
+      }
+    }
+    loadSubjects()
+  }, [registerData.programId, registerData.year])
 
   // Validate fixed access code
   const handleValidateAccessCode = () => {
@@ -150,6 +184,11 @@ function LoginPage() {
       return
     }
 
+    if (registerData.selectedSubjects.length === 0) {
+      setError('Debes seleccionar al menos una materia.')
+      return
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(registerData.email)) {
@@ -175,13 +214,13 @@ function LoginPage() {
               dni: registerData.dni,
               legajo: registerData.legajo,
               program_id: registerData.programId,
+              year: parseInt(registerData.year),
             },
           },
         },
       )
 
       if (authError) {
-        // Specific error handling
         if (authError.message.includes('already registered')) {
           setError('Este correo ya está registrado. Por favor inicia sesión.')
           setMode('login')
@@ -207,23 +246,48 @@ function LoginPage() {
 
       console.log('✅ Usuario Auth creado:', authData.user.id)
 
-      // El trigger en la BD crea automáticamente el registro en students
-      // No necesitamos hacer insert aquí
-
       // Create profile for user
       const profilePayload = {
         id: authData.user.id,
         email: registerData.email.trim().toLowerCase(),
         role: 'alumno',
       }
-      console.log('📝 Payload para profiles:', profilePayload)
 
       const { error: profileError } = await supabase.from('profiles').insert([profilePayload])
 
-      console.log('📊 Respuesta de profiles insert:', { error: profileError })
-
       if (profileError) {
         console.error('❌ Profile creation error:', profileError)
+      }
+
+      // Auto-inscribir en las materias seleccionadas
+      if (registerData.selectedSubjects.length > 0) {
+        // Esperar a que el trigger cree el registro en students
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Obtener el student_id
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('id')
+          .eq('user_id', authData.user.id)
+          .single()
+
+        if (studentData) {
+          // Crear inscripciones
+          const enrollments = registerData.selectedSubjects.map(subjectId => ({
+            student_id: studentData.id,
+            subject_id: subjectId,
+          }))
+
+          const { error: enrollError } = await supabase
+            .from('enrollments')
+            .insert(enrollments)
+
+          if (enrollError) {
+            console.error('❌ Error en inscripción de materias:', enrollError)
+          } else {
+            console.log('✅ Alumno inscrito en', registerData.selectedSubjects.length, 'materia(s)')
+          }
+        }
       }
 
       setSuccess('Cuenta creada exitosamente. Por favor inicia sesión.')
@@ -236,6 +300,8 @@ function LoginPage() {
         dni: '',
         legajo: '',
         programId: '',
+        year: '1',
+        selectedSubjects: [],
         accessCode: '',
       })
       setCodeValidated(false)
@@ -265,6 +331,15 @@ function LoginPage() {
     }
 
     setLoading(false)
+  }
+
+  const toggleSubject = (subjectId: string) => {
+    setRegisterData(prev => ({
+      ...prev,
+      selectedSubjects: prev.selectedSubjects.includes(subjectId)
+        ? prev.selectedSubjects.filter(id => id !== subjectId)
+        : [...prev.selectedSubjects, subjectId]
+    }))
   }
 
   return (
@@ -310,10 +385,10 @@ function LoginPage() {
           </div>
 
           {/* Right Panel - Form */}
-          <div className="w-full max-w-md mx-auto lg:mx-0">
+          <div className="w-full max-w-md mx-auto lg:mx-0 max-h-[90vh] overflow-y-auto">
             <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden">
               {/* Header */}
-              <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] p-8 text-center">
+              <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] p-8 text-center sticky top-0">
                 <div className="mb-3">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20">
                     <Mail className="w-8 h-8 text-white" />
@@ -430,7 +505,7 @@ function LoginPage() {
                     <h3 className="text-lg font-bold text-slate-900 mb-1">Crear cuenta</h3>
                     <p className="text-sm text-slate-600 mb-6">Completa el formulario para registrarte</p>
                     <form onSubmit={handleRegister} className="space-y-4">
-                      {/* Access Code Section - Always visible until validated */}
+                      {/* Access Code Section */}
                       {!codeValidated && (
                         <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-lg">
                           <label className="block text-sm font-semibold text-slate-900 mb-3">🔐 Código de Acceso</label>
@@ -462,7 +537,7 @@ function LoginPage() {
                         </div>
                       )}
 
-                      {/* Registration Form Fields - Only show after code validation */}
+                      {/* Registration Form Fields */}
                       {codeValidated && (
                         <>
                           <div className="grid grid-cols-2 gap-3">
@@ -526,6 +601,45 @@ function LoginPage() {
                               ))}
                             </select>
                           </div>
+
+                          {registerData.programId && (
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-900 mb-1.5">Año</label>
+                              <select
+                                value={registerData.year}
+                                onChange={e => setRegisterData({ ...registerData, year: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--siu-blue)]"
+                              >
+                                <option value="1">1° Año</option>
+                                <option value="2">2° Año</option>
+                                <option value="3">3° Año</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {availableSubjects.length > 0 && (
+                            <div className="border-t pt-4">
+                              <label className="block text-xs font-semibold text-slate-900 mb-3">
+                                Selecciona materias ({registerData.selectedSubjects.length}/{availableSubjects.length})
+                              </label>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {availableSubjects.map(subject => (
+                                  <label key={subject.id} className="flex items-center gap-3 p-2 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
+                                    <input
+                                      type="checkbox"
+                                      checked={registerData.selectedSubjects.includes(subject.id)}
+                                      onChange={() => toggleSubject(subject.id)}
+                                      className="w-4 h-4 text-[var(--siu-blue)] rounded border-slate-300 focus:ring-2 focus:ring-[var(--siu-blue)]"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-slate-900 truncate">{subject.name}</p>
+                                      <p className="text-xs text-slate-500">{subject.code}</p>
+                                    </div>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           <div>
                             <label className="block text-xs font-semibold text-slate-900 mb-1.5">Correo electrónico</label>
@@ -637,9 +751,9 @@ function LoginPage() {
             <p className="mt-6 text-center text-xs text-slate-400">
               © {new Date().getFullYear()} Instituto Superior de Informática Puerto Piray 
               <br />
-  <span className="text-lg">•</span>
-  <br />
-  Created and developed by <strong>Cristian L. Medina</strong>
+              <span className="text-lg">•</span>
+              <br />
+              Created and developed by <strong>Cristian L. Medina</strong>
             </p>
           </div>
         </div>
