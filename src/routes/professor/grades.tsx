@@ -95,11 +95,7 @@ function ProfessorGradesPage() {
         .eq('subject_id', subjectId)
         .order('student(last_name)')
 
-      const query = division 
-        ? baseQuery.eq('division', division)
-        : baseQuery
-
-      const { data: enrollmentsData, error } = await query
+      const { data: allEnrollmentsData, error } = await baseQuery
 
       if (error) {
         console.error('Error loading students:', error)
@@ -107,6 +103,11 @@ function ProfessorGradesPage() {
         setStudents([])
         return
       }
+
+      // Filtrar por división en memoria si es necesario
+      const enrollmentsData = division && allEnrollmentsData
+        ? allEnrollmentsData.filter(e => e.division === division)
+        : allEnrollmentsData
 
       const hasNewSchema = enrollmentsData && enrollmentsData.length > 0 && 
         enrollmentsData[0].grades && 

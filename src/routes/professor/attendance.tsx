@@ -95,16 +95,17 @@ function ProfessorAttendancePage() {
         .eq('subject_id', subjectId)
         .order('student(last_name)', { ascending: true })
 
-      const query = division
-        ? baseQuery.eq('division', division)
-        : baseQuery
-
-      const { data: enrollmentsData, error: enrollError } = await query
+      const { data: allEnrollmentsData, error: enrollError } = await baseQuery
 
       if (enrollError) {
         console.error('Error loading enrollments:', enrollError)
         return
       }
+
+      // Filtrar por división en memoria si es necesario
+      const enrollmentsData = division && allEnrollmentsData
+        ? allEnrollmentsData.filter(e => e.division === division)
+        : allEnrollmentsData
 
       if (enrollmentsData && enrollmentsData.length > 0) {
         const enrollmentIds = enrollmentsData.map(e => e.id)
