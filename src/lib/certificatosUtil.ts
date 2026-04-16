@@ -202,7 +202,11 @@ try {
   )
 
 // ============ FIRMA ============
-const firmaY = pageHeight - 35
+// margen inferior de la firma
+const margenFirma = 60
+
+// posición vertical de la firma
+const firmaY = pageHeight - margenFirma
 
 // línea de firma
 doc.setLineWidth(0.3)
@@ -326,8 +330,11 @@ export function generateConstancia(student: StudentData) {
   doc.text(finalText, 20, yPos, { maxWidth: pageWidth - 40 })
 
 // ============ FIRMA ============
-const firmaY = pageHeight - 35
+// margen inferior de la firma
+const margenFirma = 60
 
+// posición vertical de la firma
+const firmaY = pageHeight - margenFirma
 // línea de firma
 doc.setLineWidth(0.3)
 
