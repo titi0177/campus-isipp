@@ -99,7 +99,7 @@ function CertificatesPage() {
         .from('enrollments')
         .select(`
           subject:subjects(code, name, year),
-          grades(partial_grade, final_grade_exam, status)
+          grades(partial_grade, final_grade_exam, status, updated_at)
         `)
         .eq('student_id', studentId)
 
@@ -117,6 +117,7 @@ function CertificatesPage() {
             final: grade?.final_grade_exam || null,
             estado: grade?.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
             año: (enrollment.subject as any)?.year || 1,
+            updated_at: grade?.updated_at || undefined,
           })
         }
         generateAnalytico(student, allGrades)

@@ -24,6 +24,7 @@ export interface GradeData {
   estado: string
   año: number
   mes?: string
+  updated_at?: string
 }
 
 /**
@@ -33,7 +34,16 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
   const doc = new jsPDF('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  let yPos = 15
+  let yPos = 12
+
+  // ============ LOGO ============
+  try {
+    doc.addImage('/logo.png', 'PNG', pageWidth / 2 - 10, yPos, 20, 20)
+    yPos += 22
+  } catch (err) {
+    console.error('Error adding logo:', err)
+    yPos += 5
+  }
 
   // ============ ENCABEZADO ============
   doc.setFontSize(10)
@@ -155,10 +165,23 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
   doc.setFont(undefined, 'normal')
   doc.setFontSize(9)
 
-  const today = new Date()
-  const day = today.getDate()
-  const month = getMonthName(today.getMonth())
-  const year = today.getFullYear()
+  // Obtener fecha de carga de la nota final más reciente
+  const latestGrade = grades
+    .filter((g) => g.updated_at)
+    .sort((a, b) => {
+      const dateA = new Date(a.updated_at || 0).getTime()
+      const dateB = new Date(b.updated_at || 0).getTime()
+      return dateB - dateA
+    })[0]
+
+  let displayDate = new Date()
+  if (latestGrade?.updated_at) {
+    displayDate = new Date(latestGrade.updated_at)
+  }
+
+  const day = displayDate.getDate()
+  const month = getMonthName(displayDate.getMonth())
+  const year = displayDate.getFullYear()
 
   doc.text(
     `Se extiende la presente, a pedido del interesado, en Puerto Piray a los ${day} días del mes de ${month} del ${year} y para ser presentada ante las autoridades que la requieran.`,
@@ -167,8 +190,8 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
     { maxWidth: pageWidth - 40 }
   )
 
-  // Línea de firma
-  yPos += 20
+  // Línea de firma más abajo
+  yPos += 28
   doc.setLineWidth(0.5)
   doc.line(60, yPos, 120, yPos)
 
@@ -188,7 +211,16 @@ export function generateConstancia(student: StudentData) {
   const doc = new jsPDF('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  let yPos = 20
+  let yPos = 12
+
+  // ============ LOGO ============
+  try {
+    doc.addImage('/logo.png', 'PNG', pageWidth / 2 - 10, yPos, 20, 20)
+    yPos += 22
+  } catch (err) {
+    console.error('Error adding logo:', err)
+    yPos += 5
+  }
 
   // ============ ENCABEZADO ============
   doc.setFontSize(10)
