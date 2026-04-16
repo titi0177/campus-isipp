@@ -1,10 +1,9 @@
 import JSZip from "jszip"
 
-export const generarActaExcel = async (data: any) => {
-
+export const generateExamRecordExcel = async (data: any) => {
   try {
 
-    // cargar plantilla
+    // cargar plantilla excel
     const response = await fetch("/Acta de Examenes ISIPP 2026 MATEMATICA.xlsx")
     const buffer = await response.arrayBuffer()
 
@@ -26,13 +25,12 @@ export const generarActaExcel = async (data: any) => {
       return xmlDoc.querySelector(`c[r="${cellRef}"]`)
     }
 
-    // establecer valor de celda
+    // establecer valor en celda
     const setCellValue = (cellRef: string, value: string | number) => {
 
       let cell = findCell(cellRef)
 
       const rowNumber = cellRef.match(/\d+/)?.[0]
-
       const row = xmlDoc.querySelector(`row[r="${rowNumber}"]`)
 
       if (!row) return
@@ -53,36 +51,36 @@ export const generarActaExcel = async (data: any) => {
       cell.appendChild(v)
     }
 
-    // ===== DATOS PRINCIPALES =====
+    // ===== DATOS GENERALES =====
 
-    setCellValue("D7", data.materia)
-    setCellValue("J7", data.anio)
-    setCellValue("D49", data.fecha)
+    setCellValue("D7", data.subject)
+    setCellValue("J7", data.year)
+    setCellValue("D49", data.examDate)
 
-    // ===== PRESIDENTE Y VOCALES =====
+    // ===== AUTORIDADES =====
 
-    setCellValue("B42", data.presidente)
-    setCellValue("F42", data.vocal1)
-    setCellValue("I42", data.vocal2)
+    setCellValue("B42", data.president)
+    setCellValue("F42", data.firstVocal)
+    setCellValue("I42", data.secondVocal)
 
     // ===== ALUMNOS =====
 
-    data.alumnos.forEach((alumno: any, index: number) => {
+    data.students.forEach((student: any, index: number) => {
 
       const fila = 11 + index
 
-      setCellValue(`D${fila}`, alumno.dni)
-      setCellValue(`E${fila}`, alumno.nombre)
+      setCellValue(`D${fila}`, student.dni)
+      setCellValue(`E${fila}`, student.name)
 
     })
 
-    // guardar XML modificado
+    // serializar XML modificado
     const serializer = new XMLSerializer()
     const newSheetXml = serializer.serializeToString(xmlDoc)
 
     zip.file(sheetPath, newSheetXml)
 
-    // generar excel final
+    // generar nuevo excel
     const newFile = await zip.generateAsync({ type: "blob" })
 
     const url = window.URL.createObjectURL(newFile)
@@ -91,7 +89,9 @@ export const generarActaExcel = async (data: any) => {
     a.href = url
     a.download = "Acta_Examen.xlsx"
 
+    document.body.appendChild(a)
     a.click()
+    a.remove()
 
     window.URL.revokeObjectURL(url)
 
@@ -100,5 +100,4 @@ export const generarActaExcel = async (data: any) => {
     console.error("Error generating Excel:", error)
 
   }
-
 }
