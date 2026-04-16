@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, UserCheck,
   ClipboardList, Star, Calendar, FileText, Bell, Settings,
   ChevronRight, LogOut, BookMarked, BarChart3, ClipboardCheck,
-  Link2, MessageCircle, DollarSign
+  Link2, MessageCircle, DollarSign, Award
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
@@ -57,6 +57,7 @@ const studentNav: NavItem[] = [
   { label: 'Historial académico', href: '/dashboard/history', icon: <FileText size={18} /> },
   { label: 'Inscripción a exámenes', href: '/dashboard/exams', icon: <BookMarked size={18} /> },
   { label: 'Estado de pagos', href: '/dashboard/payments', icon: <DollarSign size={18} /> },
+  { label: 'Certificados', href: '/dashboard/certificates', icon: <Award size={18} /> },
   { label: 'Materiales de clase', href: '/dashboard/materials', icon: <BookOpen size={18} /> },
   { label: 'Mensajes', href: '/dashboard/messages', icon: <MessageCircle size={18} /> },
   { label: 'Novedades', href: '/dashboard/announcements', icon: <Bell size={18} /> },

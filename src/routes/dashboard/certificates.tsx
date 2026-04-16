@@ -1,99 +1,258 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { generateRegularCertificate } from '@/utils/generateRegularCertificate'
-import { generateApprovedSubjects } from '@/utils/generateApprovedSubjects'
+import { generateAnalytico, generateConstancia, StudentData, GradeData } from '@/lib/certificatosUtil'
+import { Award, FileText, Loader } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard/certificates')({
-component: CertificatesPage,
+  component: CertificatesPage,
 })
 
-function CertificatesPage(){
+function CertificatesPage() {
+  const [student, setStudent] = useState<StudentData | null>(null)
+  const [grades, setGrades] = useState<GradeData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [hasApprovedSubjects, setHasApprovedSubjects] = useState(false)
 
-const [student,setStudent] = useState<any>(null)
-const [subjects,setSubjects] = useState<any[]>([])
+  useEffect(() => {
+    loadData()
+  }, [])
 
-useEffect(()=>{
-load()
-},[])
+  async function loadData() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        setLoading(false)
+        return
+      }
 
-async function load(){
+      // Obtener datos del estudiante
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('first_name, last_name, dni, legajo, year, program:programs(name), email')
+        .eq('user_id', user.id)
+        .single()
 
-const { data:userData } = await supabase.auth.getUser()
+      if (studentData) {
+        setStudent({
+          nombre: studentData.first_name,
+          apellido: studentData.last_name,
+          dni: studentData.dni,
+          legajo: studentData.legajo,
+          carrera: (studentData.program as any)?.name || '',
+          año: studentData.year,
+          email: studentData.email,
+        })
 
-const { data: studentData } = await supabase
-  .from('students')
-  .select(`
-    *,
-    program:programs(name)
-  `)
-  .eq('user_id', userData.user?.id)
-  .single()
+        // Obtener calificaciones finales aprobadas
+        const { data: enrollmentsData } = await supabase
+          .from('enrollments')
+          .select(`
+            id,
+            subject:subjects(code, name, year),
+            grades(final_grade_exam, status)
+          `)
+          .eq('student_id', studentData.id)
 
-setStudent(studentData)
+        if (enrollmentsData && enrollmentsData.length > 0) {
+          const approvedGrades: GradeData[] = []
 
-if (!studentData?.id) {
-  setSubjects([])
-  return
-}
+          for (const enrollment of enrollmentsData) {
+            const grade = Array.isArray(enrollment.grades) 
+              ? enrollment.grades[0] 
+              : enrollment.grades
+            
+            if (grade && grade.final_grade_exam && grade.final_grade_exam >= 6) {
+              approvedGrades.push({
+                codigo: (enrollment.subject as any)?.code || '',
+                materia: (enrollment.subject as any)?.name || '',
+                parcial: null,
+                final: grade.final_grade_exam,
+                estado: 'REGULAR',
+                año: (enrollment.subject as any)?.year || 1,
+              })
+            }
+          }
 
-const { data } = await supabase
-  .from('grades')
-  .select(`
-    final_grade,
-    enrollment:enrollments(
-      subject:subjects(name)
+          setGrades(approvedGrades)
+          setHasApprovedSubjects(approvedGrades.length > 0)
+        }
+      }
+    } catch (err) {
+      console.error('Error loading data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <Loader className="animate-spin h-8 w-8 mx-auto text-indigo-600 mb-4" />
+          <p className="text-gray-600">Cargando certificados...</p>
+        </div>
+      </div>
     )
-  `)
-  .eq('enrollment.student_id', studentData.id)
+  }
 
-const formatted = data?.map((g:any)=>({
-  name:g.enrollment?.subject?.name,
-  final_grade:g.final_grade
-})).filter((x: any) => x.name != null)
+  if (!student) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-gray-600">No se encontraron datos del estudiante</p>
+      </div>
+    )
+  }
 
-setSubjects(formatted || [])
-
-}
-
-if (!student) {
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Certificados</h1>
-      <p className="text-gray-600 text-sm">No se encontró tu ficha de estudiante. Contactá a secretaría.</p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-indigo-100 text-sm font-semibold mb-2">Documentación Académica</p>
+            <h1 className="text-5xl font-black mb-3">Mis Certificados</h1>
+            <p className="text-indigo-100 text-lg">Descarga tus certificados y constancias académicas</p>
+          </div>
+          <Award size={80} className="opacity-20" />
+        </div>
+      </div>
+
+      {/* Información del Alumno */}
+      <div className="card p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-indigo-200">
+        <h2 className="text-lg font-bold text-gray-900 mb-4">Datos del Alumno</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-gray-600 font-semibold">Nombre</p>
+            <p className="text-lg font-bold text-gray-900">{student.apellido.toUpperCase()} {student.nombre.toUpperCase()}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 font-semibold">DNI</p>
+            <p className="text-lg font-bold text-gray-900">{student.dni}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 font-semibold">Legajo</p>
+            <p className="text-lg font-bold text-gray-900">{student.legajo}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 font-semibold">Carrera</p>
+            <p className="text-lg font-bold text-gray-900">{student.carrera}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 font-semibold">Año Actual</p>
+            <p className="text-lg font-bold text-gray-900">{student.año}°</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600 font-semibold">Email</p>
+            <p className="text-lg font-bold text-gray-900">{student.email}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Certificados disponibles */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Constancia de Alumno Regular */}
+        <div className="card p-8 rounded-2xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 hover:shadow-lg transition-shadow">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2">Constancia de Alumno Regular</h3>
+              <p className="text-sm text-gray-600">Certifica tu estado de alumno regular en el instituto</p>
+            </div>
+            <FileText size={40} className="text-green-600 opacity-30" />
+          </div>
+
+          <button
+            onClick={() => generateConstancia(student)}
+            className="w-full btn-primary flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700"
+          >
+            <FileText size={18} />
+            Descargar PDF
+          </button>
+        </div>
+
+        {/* Analítico de Calificaciones */}
+        <div className="card p-8 rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-lg transition-shadow">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 mb-2">Analítico de Calificaciones</h3>
+              <p className="text-sm text-gray-600">Histórico completo de todas tus calificaciones</p>
+            </div>
+            <FileText size={40} className="text-blue-600 opacity-30" />
+          </div>
+
+          <button
+            onClick={() => {
+              // Obtener todas las calificaciones para el analítico
+              supabase
+                .from('enrollments')
+                .select(`
+                  subject:subjects(code, name, year),
+                  grades(partial_grade, final_grade_exam, status)
+                `)
+                .eq('student_id', student.legajo === '' ? '' : (student as any).id)
+                .then(({ data: enrollmentsData }) => {
+                  if (enrollmentsData) {
+                    const allGrades: GradeData[] = []
+                    for (const enrollment of enrollmentsData) {
+                      const grade = Array.isArray(enrollment.grades)
+                        ? enrollment.grades[0]
+                        : enrollment.grades
+
+                      allGrades.push({
+                        codigo: (enrollment.subject as any)?.code || '',
+                        materia: (enrollment.subject as any)?.name || '',
+                        parcial: grade?.partial_grade || null,
+                        final: grade?.final_grade_exam || null,
+                        estado: grade?.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
+                        año: (enrollment.subject as any)?.year || 1,
+                      })
+                    }
+                    generateAnalytico(student, allGrades)
+                  }
+                })
+            }}
+            className="w-full btn-primary flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700"
+          >
+            <FileText size={18} />
+            Descargar PDF
+          </button>
+        </div>
+
+        {/* Certificado de Materias Aprobadas */}
+        {hasApprovedSubjects && (
+          <div className="card p-8 rounded-2xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-lg transition-shadow md:col-span-2">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-gray-900 mb-2">Certificado de Materias Aprobadas</h3>
+                <p className="text-sm text-gray-600">Listado completo de materias aprobadas con calificaciones</p>
+              </div>
+              <Award size={40} className="text-purple-600 opacity-30" />
+            </div>
+
+            <button
+              onClick={() => generateAnalytico(student, grades)}
+              className="w-full btn-primary flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700"
+            >
+              <FileText size={18} />
+              Descargar PDF ({grades.length} materias)
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Info Box */}
+      <div className="card p-6 bg-amber-50 border-2 border-amber-200 rounded-xl">
+        <h3 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
+          ℹ️ Información Importante
+        </h3>
+        <ul className="text-sm text-amber-900 space-y-2 list-disc list-inside">
+          <li><strong>Constancia de Alumno Regular:</strong> Acredita tu condición de alumno activo en el instituto</li>
+          <li><strong>Analítico de Calificaciones:</strong> Documento con todas tus notas parciales y finales</li>
+          <li><strong>Certificado de Materias Aprobadas:</strong> Solo aparece si tienes materias aprobadas</li>
+          <li>Los certificados son válidos para presentar ante autoridades que los requieran</li>
+          <li>Se generan automáticamente con la fecha actual de emisión</li>
+        </ul>
+      </div>
     </div>
   )
-}
-
-return(
-
-<div className="space-y-6">
-
-  <h1 className="text-2xl font-bold">
-    Certificados
-  </h1>
-
-  <div className="bg-white p-6 rounded-lg shadow space-y-4">
-
-    <button
-      type="button"
-      onClick={()=>generateRegularCertificate(student,student.program)}
-      className="inline-flex items-center justify-center rounded-sm border border-emerald-900 bg-emerald-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800"
-    >
-      Descargar Certificado Alumno Regular
-    </button>
-
-    <button
-      type="button"
-      onClick={()=>generateApprovedSubjects(student,subjects)}
-      className="btn-primary px-4 py-2"
-    >
-      Descargar Certificado Materias Aprobadas
-    </button>
-
-  </div>
-
-</div>
-
-)
 }
