@@ -1,5 +1,4 @@
 import JSZip from 'jszip'
-import { read, write } from 'xlsx'
 import type { ExamRecordStudentRow } from './generateExamRecordPdf'
 
 interface GenerateExamExcelParams {
@@ -13,13 +12,12 @@ interface GenerateExamExcelParams {
 }
 
 /**
- * Genera acta de examen preservando 100% del formato original del XLS
- * Descarga el archivo original y lo modifica a nivel de datos sin tocar formatos
+ * Genera acta de examen en XLSX preservando 100% del formato original
  */
 export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
   try {
-    // Descargar archivo template original
-    const templatePath = '/Acta de Examenes ISIPP 2026 MATEMATICA.xls'
+    // Cargar plantilla XLSX
+    const templatePath = '/Acta de Examenes ISIPP 2026 MATEMATICA.xlsx'
     const response = await fetch(templatePath)
     
     if (!response.ok) {
@@ -28,38 +26,70 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
     
     const arrayBuffer = await response.arrayBuffer()
     
-    // Leer el archivo XLS manteniendo toda su estructura
-    const workbook = read(new Uint8Array(arrayBuffer), {
-      type: 'array',
-      cellFormula: true,
-      cellStyles: true,
-      defval: ''
-    })
+    // Descomprimir XLSX (que es un ZIP)
+    const zip = new JSZip()
+    const xlsxZip = await zip.loadAsync(arrayBuffer)
     
-    const sheetName = workbook.SheetNames[0]
-    const ws = workbook.Sheets[sheetName]
+    // Leer el archivo XML de la hoja
+    const sheetXml = await xlsxZip.file('xl/worksheets/sheet1.xml')?.async('string')
     
-    // Modificar SOLO los valores de las celdas, sin tocar nada más
-    // Preservar todas las propiedades de la celda original
-    const updateCell = (address: string, newValue: any) => {
-      if (ws[address]) {
-        // Mantener la celda existente, solo cambiar el valor
-        ws[address].v = newValue
-      } else {
-        // Si la celda no existe, crearla con el mínimo
-        ws[address] = { v: newValue, t: typeof newValue === 'number' ? 'n' : 's' }
+    if (!sheetXml) {
+      throw new Error('No se pudo encontrar la hoja de trabajo')
+    }
+    
+    // Parsear XML
+    const parser = new DOMParser()
+    const xmlDoc = parser.parseFromString(sheetXml, 'application/xml')
+    
+    // Función para encontrar y actualizar celda por dirección (D7, J7, etc)
+    const updateCell = (cellAddress: string, value: string | number) => {
+      // Buscar celda por referencia r="D7"
+      let cell = xmlDoc.querySelector(`c[r="${cellAddress}"]`)
+      
+      if (!cell) {
+        // Si no existe, crear la celda
+        const sheetData = xmlDoc.querySelector('sheetData')
+        if (sheetData) {
+          cell = xmlDoc.createElement('c')
+          cell.setAttribute('r', cellAddress)
+          cell.setAttribute('t', 'inlineStr')
+          sheetData.appendChild(cell)
+        }
+      }
+      
+      if (cell) {
+        // Limpiar contenido anterior
+        const oldValue = cell.querySelector('v')
+        if (oldValue) {
+          oldValue.remove()
+        }
+        const oldIs = cell.querySelector('is')
+        if (oldIs) {
+          oldIs.remove()
+        }
+        
+        // Crear nuevo valor con estructura XML correcta
+        const valueElem = xmlDoc.createElement('is')
+        const rElem = xmlDoc.createElement('r')
+        const textElem = xmlDoc.createElement('t')
+        textElem.textContent = String(value)
+        
+        rElem.appendChild(textElem)
+        valueElem.appendChild(rElem)
+        cell.appendChild(valueElem)
+        cell.setAttribute('t', 'inlineStr')
       }
     }
     
-    // Cargar datos
+    // Cargar todos los datos
     updateCell('D7', params.subjectName)
-    updateCell('J7', params.subjectYear)
+    updateCell('J7', String(params.subjectYear))
     updateCell('D49', params.examDate)
     updateCell('B42', params.presidentName)
     updateCell('F42', params.vocal1Name)
     updateCell('I42', params.vocal2Name)
     
-    // Alumnos
+    // Alumnos (D11-D37 DNI, E11-E37 Nombres)
     const maxRows = 27
     for (let i = 0; i < maxRows; i++) {
       const row = 11 + i
@@ -69,22 +99,21 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
       updateCell(`E${row}`, student?.nombre || '')
     }
     
-    // Escribir de vuelta preservando TODO el formato original
-    const outputBuffer = write(workbook, {
-      bookType: 'xls',
-      type: 'array',
-      cellFormula: true,
-      cellStyles: true
-    })
+    // Serializar XML modificado
+    const serializer = new XMLSerializer()
+    const modifiedSheetXml = serializer.serializeToString(xmlDoc)
+    
+    // Actualizar ZIP con XML modificado
+    xlsxZip.file('xl/worksheets/sheet1.xml', modifiedSheetXml)
+    
+    // Generar archivo final
+    const blob = await xlsxZip.generateAsync({ type: 'blob' })
     
     // Descargar
-    const blob = new Blob([outputBuffer], {
-      type: 'application/vnd.ms-excel'
-    })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `Acta_Examen_${params.subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`
+    link.download = `Acta_Examen_${params.subjectName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
