@@ -1,9 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Edit2, Save, X, Download, BarChart3 } from 'lucide-react'
+import { Edit2, Save, X, Download, BarChart3, FileDown } from 'lucide-react'
 import { calculatePaymentWithSurcharge, formatDateES } from '@/lib/paymentUtils'
-import { useExcelExport } from '@/hooks/useExcelExport'
+import { exportPaymentsToCSV, exportStudentPaymentsToCSV } from '@/lib/exportPaymentsUtil'
 
 export const Route = createFileRoute('/treasurer/payments')({
   component: TreasurerPayments,
@@ -52,6 +52,7 @@ function TreasurerPayments() {
   const [selectedCareerYear, setSelectedCareerYear] = useState<number | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
+  const [programName, setProgramName] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [loadingProgram, setLoadingProgram] = useState(false)
@@ -63,8 +64,6 @@ function TreasurerPayments() {
   const [editAmount, setEditAmount] = useState<number>(0)
   const [editStatus, setEditStatus] = useState<string>('')
   const [editPaymentMethod, setEditPaymentMethod] = useState<string>('efectivo')
-
-  const { exportToExcel } = useExcelExport()
 
   const paymentMethods = [
     { value: 'efectivo', label: 'Efectivo' },
@@ -89,6 +88,7 @@ function TreasurerPayments() {
       setCareerYears([])
       setSelectedCareerYear(null)
       setSelectedStudent(null)
+      setProgramName('')
     }
   }, [selectedProgram])
 
@@ -118,6 +118,7 @@ function TreasurerPayments() {
         // Generar años de carrera (1 a duration_years)
         const years = Array.from({ length: program.duration_years }, (_, i) => i + 1)
         setCareerYears(years)
+        setProgramName(program.name)
       }
 
       // Cargar configuración de pagos
@@ -306,51 +307,24 @@ function TreasurerPayments() {
     )
   }
 
-  const exportDailySummaryToExcel = () => {
-    const summary = calculateDailySummary()
-    const exportData = summary.flatMap((day) => {
-      const dayData = [
-        {
-          Fecha: day.date,
-          'Método de Pago': '',
-          Cantidad: '',
-          Total: '',
-        },
-      ]
+  const exportAllPayments = () => {
+    try {
+      exportPaymentsToCSV(students, programName, paymentConfig)
+    } catch (err) {
+      alert('Error al exportar: ' + String(err))
+    }
+  }
 
-      Object.entries(day.methods).forEach(([method, data]) => {
-        dayData.push({
-          Fecha: '',
-          'Método de Pago': getPaymentMethodLabel(method),
-          Cantidad: data.count.toString(),
-          Total: `$${data.total.toFixed(2)}`,
-        })
-      })
-
-      dayData.push({
-        Fecha: 'TOTAL DEL DÍA',
-        'Método de Pago': '',
-        Cantidad: Object.values(day.methods)
-          .reduce((sum, m) => sum + m.count, 0)
-          .toString(),
-        Total: `$${day.grandTotal.toFixed(2)}`,
-      })
-
-      dayData.push({
-        Fecha: '',
-        'Método de Pago': '',
-        Cantidad: '',
-        Total: '',
-      })
-
-      return dayData
-    })
-
-    exportToExcel(
-      exportData,
-      `resumen_pagos_${new Date().toISOString().split('T')[0]}`,
-      'Resumen Diario'
-    )
+  const exportStudentPayments = () => {
+    if (!selectedStudentData) {
+      alert('Selecciona un estudiante')
+      return
+    }
+    try {
+      exportStudentPaymentsToCSV(selectedStudentData, programName, paymentConfig)
+    } catch (err) {
+      alert('Error al exportar: ' + String(err))
+    }
   }
 
   const dailySummary = calculateDailySummary()
@@ -364,13 +338,24 @@ function TreasurerPayments() {
             Selecciona carrera, año de carrera y estudiante para gestionar pagos
           </p>
         </div>
-        <button
-          onClick={() => setShowSummary(!showSummary)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <BarChart3 size={16} />
-          {showSummary ? 'Ver Listado' : 'Ver Resumen Diario'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportAllPayments}
+            disabled={!selectedProgram}
+            className="btn-secondary flex items-center gap-2"
+            title="Exportar todos los pagos de la carrera seleccionada"
+          >
+            <FileDown size={16} />
+            Exportar Carrera
+          </button>
+          <button
+            onClick={() => setShowSummary(!showSummary)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <BarChart3 size={16} />
+            {showSummary ? 'Ver Listado' : 'Ver Resumen Diario'}
+          </button>
+        </div>
       </div>
 
       {/* FILTROS: Carrera, Año de Carrera, Estudiante */}
@@ -459,16 +444,6 @@ function TreasurerPayments() {
       {showSummary ? (
         // RESUMEN DIARIO
         <div className="space-y-6">
-          <div className="flex justify-end">
-            <button
-              onClick={exportDailySummaryToExcel}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Download size={16} />
-              Exportar a Excel
-            </button>
-          </div>
-
           {dailySummary.length === 0 ? (
             <div className="card text-center py-8">
               <p className="text-gray-500">No hay pagos realizados</p>
@@ -532,9 +507,22 @@ function TreasurerPayments() {
             </div>
           ) : selectedStudentData ? (
             <div className="card p-6">
-              <h2 className="text-lg font-bold mb-4 border-b pb-2">
-                {selectedStudentData.name} ({selectedStudentData.legajo}) - {getCareerYearLabel(selectedCareerYear!)}
-              </h2>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-bold">
+                    {selectedStudentData.name} ({selectedStudentData.legajo})
+                  </h2>
+                  <p className="text-sm text-gray-600">{getCareerYearLabel(selectedCareerYear!)}</p>
+                </div>
+                <button
+                  onClick={exportStudentPayments}
+                  className="btn-secondary flex items-center gap-2"
+                  title="Descargar pagos de este estudiante"
+                >
+                  <FileDown size={16} />
+                  Descargar Pagos
+                </button>
+              </div>
 
               {selectedStudentData.payments.length === 0 ? (
                 <p className="text-gray-500 text-center py-6">
@@ -751,9 +739,9 @@ function TreasurerPayments() {
             • <strong>Cuota Base:</strong> Es el monto base configurado para esta carrera
             {paymentConfig && (
               <ul className="ml-4 mt-1">
-                <li>- Seguro: ${paymentConfig.insurance_amount.toFixed(2)}</li>
-                <li>- Inscripción: ${paymentConfig.enrollment_amount.toFixed(2)}</li>
-                <li>- Cuota Mensual: ${paymentConfig.monthly_quota_amount.toFixed(2)}</li>
+                <li>- Seguro (Marzo): ${paymentConfig.insurance_amount.toFixed(2)}</li>
+                <li>- Inscripción (Marzo): ${paymentConfig.enrollment_amount.toFixed(2)}</li>
+                <li>- Cuota Mensual (Abr-Dic, vence día 10): ${paymentConfig.monthly_quota_amount.toFixed(2)}</li>
               </ul>
             )}
           </li>
@@ -762,7 +750,7 @@ function TreasurerPayments() {
             después del primer día hábil a partir del 10 del mes ({paymentConfig?.increment_percentage}%)
           </li>
           <li>
-            • Registra el <strong>método de pago</strong> cuando marques un pago como realizado
+            • <strong>Exportar:</strong> Botón "Exportar Carrera" genera CSV detallado de todos los estudiantes. Botón "Descargar Pagos" para estudiante individual.
           </li>
           <li>
             • El <strong>resumen diario</strong> agrupa los pagos por fecha y método de pago
