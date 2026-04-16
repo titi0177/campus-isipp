@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
 import { Save, Download } from 'lucide-react'
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import jsPDFAutoTable from 'jspdf-autotable'
 
 export const Route = createFileRoute('/admin/attendance')({
   component: AttendancePage,

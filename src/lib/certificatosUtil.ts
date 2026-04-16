@@ -4,7 +4,7 @@
  */
 
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import jsPDFAutoTable from 'jspdf-autotable'
 
 export interface StudentData {
   nombre: string

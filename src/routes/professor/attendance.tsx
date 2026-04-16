@@ -2,8 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Save, Download, BarChart3 } from 'lucide-react'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+
 
 export const Route = createFileRoute('/professor/attendance')({
   component: ProfessorAttendancePage,
