@@ -3,9 +3,8 @@
  * Basado en modelos oficiales del Instituto Superior de Informática
  */
 
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
-import { jsPDF as jsPDFConstructor } from 'jspdf'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export interface StudentData {
   nombre: string
@@ -31,7 +30,7 @@ export interface GradeData {
  * Genera un analítico de calificaciones en PDF con diseño oficial
  */
 export function generateAnalytico(student: StudentData, grades: GradeData[]) {
-  const doc = new jsPDFConstructor('p', 'mm', 'a4')
+  const doc = new jsPDF('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   let yPos = 15
@@ -105,7 +104,7 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
         year,
       ])
 
-      ;(doc as any).autoTable({
+      autoTable(doc, {
         head: [['ASIGNATURA', 'CALIFICACION', 'CONDICION', 'MES', 'AÑO']],
         body: tableData.map((row) => [
           row[1], // materia
@@ -186,7 +185,7 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
  * Genera una constancia de alumno regular en PDF con diseño oficial
  */
 export function generateConstancia(student: StudentData) {
-  const doc = new jsPDFConstructor('p', 'mm', 'a4')
+  const doc = new jsPDF('p', 'mm', 'a4')
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   let yPos = 20
