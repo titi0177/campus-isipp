@@ -30,11 +30,29 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
     const zip = new JSZip()
     const xlsxZip = await zip.loadAsync(arrayBuffer)
     
+    // Leer workbook.xml para encontrar el nombre de la hoja
+    const workbookXml = await xlsxZip.file('xl/workbook.xml')?.async('string')
+    if (!workbookXml) {
+      throw new Error('No se pudo encontrar workbook.xml')
+    }
+    
+    // Extraer el nombre del archivo de la hoja desde workbook.xml
+    const sheetMatch = workbookXml.match(/r:id="rId1"/)
+    const relsXml = await xlsxZip.file('xl/_rels/workbook.xml.rels')?.async('string')
+    if (!relsXml) {
+      throw new Error('No se pudo encontrar rels')
+    }
+    
+    // Obtener la ruta del archivo de la hoja activa
+    const sheetPathMatch = relsXml.match(/Id="rId1"[^>]*Target="([^"]+)"/)
+    let sheetPath = sheetPathMatch ? sheetPathMatch[1] : 'worksheets/sheet1.xml'
+    sheetPath = `xl/${sheetPath}`
+    
     // Leer el archivo XML de la hoja
-    let sheetXml = await xlsxZip.file('xl/worksheets/sheet1.xml')?.async('string')
+    let sheetXml = await xlsxZip.file(sheetPath)?.async('string')
     
     if (!sheetXml) {
-      throw new Error('No se pudo encontrar la hoja de trabajo')
+      throw new Error(`No se pudo encontrar la hoja de trabajo en ${sheetPath}`)
     }
     
     // Usar DOMParser para manipular XML de forma segura
@@ -99,8 +117,8 @@ export async function generateExamRecordExcel(params: GenerateExamExcelParams) {
     const serializer = new XMLSerializer()
     const modifiedXml = serializer.serializeToString(xmlDoc)
     
-    // Actualizar ZIP
-    xlsxZip.file('xl/worksheets/sheet1.xml', modifiedXml)
+    // Actualizar ZIP con la hoja correcta
+    xlsxZip.file(sheetPath, modifiedXml)
     
     // Generar archivo final
     const blob = await xlsxZip.generateAsync({ type: 'blob' })
