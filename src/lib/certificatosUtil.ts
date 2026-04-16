@@ -37,17 +37,25 @@ export function generateAnalytico(student: StudentData, grades: GradeData[]) {
   let yPos = 12
 
   // ============ LOGO ============
- try {
-  const logoWidth = 20
-  const marginRight = 10
+try {
 
-  doc.addImage('/logo.png', 'PNG', pageWidth - logoWidth - marginRight, yPos, logoWidth, 20)
-  yPos += 22
+  const logoWidth = 35
+  const logoHeight = 35
+
+  const marginRight = 15
+
+  doc.addImage(
+    '/logo.png',
+    'PNG',
+    pageWidth - logoWidth - marginRight,
+    yPos - 10,
+    logoWidth,
+    logoHeight
+  )
+
 } catch (err) {
   console.error('Error adding logo:', err)
-  yPos += 5
 }
-
   // ============ ENCABEZADO ============
   doc.setFontSize(10)
   doc.setFont(undefined, 'bold')
@@ -218,14 +226,23 @@ export function generateConstancia(student: StudentData) {
 
   // ============ LOGO ============
  try {
-  const logoWidth = 20
-  const marginRight = 10
 
-  doc.addImage('/logo.png', 'PNG', pageWidth - logoWidth - marginRight, yPos, logoWidth, 20)
-  yPos += 22
+  const logoWidth = 35
+  const logoHeight = 35
+
+  const marginRight = 15
+
+  doc.addImage(
+    '/logo.png',
+    'PNG',
+    pageWidth - logoWidth - marginRight,
+    yPos - 10,
+    logoWidth,
+    logoHeight
+  )
+
 } catch (err) {
   console.error('Error adding logo:', err)
-  yPos += 5
 }
 
   // ============ ENCABEZADO ============
