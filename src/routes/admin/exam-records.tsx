@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { generateExamRecordPdf, type ExamRecordStudentRow } from '@/utils/generateExamRecordPdf'
+import type { ExamRecordStudentRow } from '@/utils/generateExamRecordPdf'
+import { generateExamRecordExcel } from '@/utils/generateExamRecordExcel'
 import { FileDown, Plus, Trash2 } from 'lucide-react'
 
 const INSTITUTION = 'Instituto Superior de Informática Puerto Piray (ISIPP 1206)'
@@ -53,7 +54,7 @@ function ExamRecordsAdminPage() {
           // Obtener todos los subjects de una vez
           const { data: subjectsData } = await supabase
             .from('subjects')
-            .select('id, name, code')
+            .select('id, name, code, year')
             .in('id', subjectIds)
 
           subjectsMap = new Map(subjectsData?.map(s => [s.id, s]) ?? [])
@@ -62,7 +63,7 @@ function ExamRecordsAdminPage() {
         // Construir mesas con subject info
         const mesasWithSubjects = mesasData.map(m => ({
           ...m,
-          subject: subjectsMap.get(m.subject_id) || { name: 'Materia desconocida', code: '—' }
+          subject: subjectsMap.get(m.subject_id) || { name: 'Materia desconocida', code: '—', year: 1 }
         }))
 
         setMesas(mesasWithSubjects)
@@ -117,7 +118,7 @@ function ExamRecordsAdminPage() {
     // Obtener subject info
     const { data: subject } = await supabase
       .from('subjects')
-      .select('name, code, program_id')
+      .select('name, code, year, program_id')
       .eq('id', mesa.subject_id)
       .single()
 
@@ -126,32 +127,47 @@ function ExamRecordsAdminPage() {
       return
     }
 
-    // Obtener program info
-    let program = null
-    if (subject.program_id) {
-      const { data: prog } = await supabase
-        .from('programs')
+    // Obtener datos de presidente y vocales
+    let presidentName = ''
+    let vocal1Name = ''
+    let vocal2Name = ''
+
+    if (mesa.president_id) {
+      const { data: pres } = await supabase
+        .from('professors')
         .select('name')
-        .eq('id', subject.program_id)
+        .eq('id', mesa.president_id)
         .single()
-      program = prog
+      presidentName = pres?.name || ''
     }
 
-    // Obtener profesor
-    const { data: professor } = await supabase
-      .from('professors')
-      .select('name')
-      .eq('id', mesa.professor_id)
-      .maybeSingle()
+    if (mesa.vocal1_id) {
+      const { data: v1 } = await supabase
+        .from('professors')
+        .select('name')
+        .eq('id', mesa.vocal1_id)
+        .single()
+      vocal1Name = v1?.name || ''
+    }
+
+    if (mesa.vocal2_id) {
+      const { data: v2 } = await supabase
+        .from('professors')
+        .select('name')
+        .eq('id', mesa.vocal2_id)
+        .single()
+      vocal2Name = v2?.name || ''
+    }
 
     const students = await buildRowsForMesa(mesa)
     const examDateIso = mesa.exam_date
 
+    // Insertar acta en DB
     const { data: inserted, error } = await supabase
       .from('exam_records')
       .insert({
         subject_id: mesa.subject_id,
-        professor_id: mesa.professor_id,
+        professor_id: mesa.president_id,
         final_exam_id: mesa.id,
         exam_date: examDateIso,
         title: 'ACTA DE EXAMEN FINAL',
@@ -167,39 +183,28 @@ function ExamRecordsAdminPage() {
       return
     }
 
-    showToast('Acta creada en estado borrador.')
+    showToast('Acta generada en Excel.')
     void load()
 
+    // Generar Excel
     if (inserted?.id) {
-      descargarPdf({
-        id: inserted.id,
-        exam_date: examDateIso,
-        title: 'ACTA DE EXAMEN FINAL',
-        subject: subject,
-        program: program,
-        professor: professor,
-        students_grades: students,
-      })
+      const examDate = new Date(examDateIso).toLocaleDateString('es-AR')
+      
+      try {
+        await generateExamRecordExcel({
+          subjectName: subject.name,
+          subjectYear: subject.year || 1,
+          students,
+          examDate,
+          presidentName,
+          vocal1Name,
+          vocal2Name,
+        })
+      } catch (err) {
+        console.error('Error generating Excel:', err)
+        showToast('Error al generar Excel', 'error')
+      }
     }
-  }
-
-  function descargarPdf(rec: any) {
-    const students: ExamRecordStudentRow[] = Array.isArray(rec.students_grades)
-      ? rec.students_grades
-      : typeof rec.students_grades === 'string'
-        ? JSON.parse(rec.students_grades)
-        : []
-
-    generateExamRecordPdf({
-      title: rec.title ?? 'ACTA DE EXAMEN FINAL',
-      institution: INSTITUTION,
-      career: rec.program?.name,
-      subjectName: rec.subject?.name ?? 'Materia',
-      subjectCode: rec.subject?.code,
-      examDate: new Date(rec.exam_date).toLocaleString('es-AR'),
-      professorName: rec.professor?.name,
-      students,
-    })
   }
 
   async function deleteRecord(id: string) {
@@ -224,7 +229,7 @@ function ExamRecordsAdminPage() {
       <div>
         <h1 className="text-2xl font-bold">Actas de examen final</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Generá actas oficiales con alumnos inscriptos a la mesa y notas del cursado. Podés imprimir o guardar PDF.
+          Generá actas oficiales en Excel con alumnos inscriptos a la mesa de examen.
         </p>
       </div>
 
@@ -257,7 +262,7 @@ function ExamRecordsAdminPage() {
             disabled={!mesaId}
           >
             <Plus size={18} />
-            Crear acta y PDF
+            Crear acta Excel
           </button>
         </div>
       </div>
@@ -283,14 +288,6 @@ function ExamRecordsAdminPage() {
                     <td className="px-4 py-2 capitalize">{rec.estado_acta}</td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--siu-blue)] hover:underline"
-                          onClick={() => descargarPdf(rec)}
-                        >
-                          <FileDown size={16} />
-                          PDF / imprimir
-                        </button>
                         <button
                           type="button"
                           onClick={() => deleteRecord(rec.id)}
