@@ -249,6 +249,7 @@ function LoginPage() {
             const enrollments = subjectsYear1.map(subject => ({
               student_id: studentData.id,
               subject_id: subject.id,
+              academic_year: new Date().getFullYear(),
             }))
 
             const { error: enrollError } = await supabase
@@ -272,6 +273,7 @@ function LoginPage() {
             const enrollments = subjectsYear1And2.map(subject => ({
               student_id: studentData.id,
               subject_id: subject.id,
+              academic_year: new Date().getFullYear(),
             }))
 
             const { error: enrollError } = await supabase
