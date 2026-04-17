@@ -196,6 +196,7 @@ function LoginPage() {
 
       console.log('✅ Usuario Auth creado:', authData.user.id)
 
+      // Crear perfil en profiles
       const profilePayload = {
         id: authData.user.id,
         email: registerData.email.trim().toLowerCase(),
@@ -208,83 +209,93 @@ function LoginPage() {
         console.error('❌ Profile creation error:', profileError)
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // CAMBIO IMPORTANTE: Insertar estudiante en lugar de buscar y actualizar
+      // Esto dispara el trigger on_student_created que genera los pagos automáticamente
+      const studentPayload = {
+        user_id: authData.user.id,
+        first_name: registerData.firstName,
+        last_name: registerData.lastName,
+        email: registerData.email.trim().toLowerCase(),
+        dni: registerData.dni,
+        legajo: registerData.legajo,
+        program_id: registerData.programId,
+        year: parseInt(registerData.year),
+        status: 'active',
+      }
 
-      const { data: studentData } = await supabase
+      const { data: insertedStudent, error: insertError } = await supabase
         .from('students')
+        .insert([studentPayload])
         .select('id')
-        .eq('user_id', authData.user.id)
         .single()
 
-      if (studentData) {
-        // Actualizar el estudiante con programa_id, dni, legajo y year
-        const { error: updateError } = await supabase
-          .from('students')
-          .update({
-            program_id: registerData.programId,
-            dni: registerData.dni,
-            legajo: registerData.legajo,
-            year: parseInt(registerData.year),
-          })
-          .eq('id', studentData.id)
+      if (insertError) {
+        console.error('❌ Student insertion error:', insertError)
+        setError('Error al crear el registro de estudiante: ' + insertError.message)
+        setLoading(false)
+        return
+      }
 
-        if (updateError) {
-          console.error('❌ Error updating student:', updateError)
-        } else {
-          console.log('✅ Estudiante actualizado con datos')
-        }
+      if (!insertedStudent) {
+        setError('No se pudo crear el registro de estudiante')
+        setLoading(false)
+        return
+      }
 
-        const selectedYear = parseInt(registerData.year)
+      console.log('✅ Estudiante creado en public.students:', insertedStudent.id)
+      console.log('✅ Trigger de pagos debería haber ejecutado automáticamente')
 
-        if (selectedYear === 1) {
-          console.log('✅ Alumno de 1° año sin inscripciones automáticas')
-        } else if (selectedYear === 2) {
-          const { data: subjectsYear1 } = await supabase
-            .from('subjects')
-            .select('id')
-            .eq('program_id', registerData.programId)
-            .eq('year', 1)
+      // Ahora manejar inscripciones automáticas según el año
+      const selectedYear = parseInt(registerData.year)
 
-          if (subjectsYear1 && subjectsYear1.length > 0) {
-            const enrollments = subjectsYear1.map(subject => ({
-              student_id: studentData.id,
-              subject_id: subject.id,
-              academic_year: new Date().getFullYear(),
-            }))
+      if (selectedYear === 1) {
+        console.log('✅ Alumno de 1° año - sin inscripciones automáticas')
+      } else if (selectedYear === 2) {
+        const { data: subjectsYear1 } = await supabase
+          .from('subjects')
+          .select('id')
+          .eq('program_id', registerData.programId)
+          .eq('year', 1)
 
-            const { error: enrollError } = await supabase
-              .from('enrollments')
-              .insert(enrollments)
+        if (subjectsYear1 && subjectsYear1.length > 0) {
+          const enrollments = subjectsYear1.map(subject => ({
+            student_id: insertedStudent.id,
+            subject_id: subject.id,
+            academic_year: new Date().getFullYear(),
+          }))
 
-            if (enrollError) {
-              console.error('❌ Error en inscripción de 1° año:', enrollError)
-            } else {
-              console.log('✅ Alumno inscrito en todas las materias de 1° año')
-            }
+          const { error: enrollError } = await supabase
+            .from('enrollments')
+            .insert(enrollments)
+
+          if (enrollError) {
+            console.error('❌ Error en inscripción de 1° año:', enrollError)
+          } else {
+            console.log('✅ Alumno inscrito en todas las materias de 1° año')
           }
-        } else if (selectedYear === 3) {
-          const { data: subjectsYear1And2 } = await supabase
-            .from('subjects')
-            .select('id')
-            .eq('program_id', registerData.programId)
-            .in('year', [1, 2])
+        }
+      } else if (selectedYear === 3) {
+        const { data: subjectsYear1And2 } = await supabase
+          .from('subjects')
+          .select('id')
+          .eq('program_id', registerData.programId)
+          .in('year', [1, 2])
 
-          if (subjectsYear1And2 && subjectsYear1And2.length > 0) {
-            const enrollments = subjectsYear1And2.map(subject => ({
-              student_id: studentData.id,
-              subject_id: subject.id,
-              academic_year: new Date().getFullYear(),
-            }))
+        if (subjectsYear1And2 && subjectsYear1And2.length > 0) {
+          const enrollments = subjectsYear1And2.map(subject => ({
+            student_id: insertedStudent.id,
+            subject_id: subject.id,
+            academic_year: new Date().getFullYear(),
+          }))
 
-            const { error: enrollError } = await supabase
-              .from('enrollments')
-              .insert(enrollments)
+          const { error: enrollError } = await supabase
+            .from('enrollments')
+            .insert(enrollments)
 
-            if (enrollError) {
-              console.error('❌ Error en inscripción de 1° y 2° año:', enrollError)
-            } else {
-              console.log('✅ Alumno inscrito en todas las materias de 1° y 2° año')
-            }
+          if (enrollError) {
+            console.error('❌ Error en inscripción de 1° y 2° año:', enrollError)
+          } else {
+            console.log('✅ Alumno inscrito en todas las materias de 1° y 2° año')
           }
         }
       }
