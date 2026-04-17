@@ -69,8 +69,10 @@ function getProgramType(programName: string): string {
   return 'other'
 }
 
-function shouldShowDivision(programName: string): boolean {
-  return programName.toLowerCase().includes('analista de sistemas')
+function shouldShowDivision(programName: string, year: string): boolean {
+  const isAnalista = programName.toLowerCase().includes('analista de sistemas')
+  const isFirstYear = year === '1'
+  return isAnalista && isFirstYear
 }
 
 function AdminSchedulesPage() {
@@ -206,7 +208,7 @@ function AdminSchedulesPage() {
     e.preventDefault()
 
     const program = programs.find(p => p.id === formData.program_id)
-    const needsDivision = program && shouldShowDivision(program.name)
+    const needsDivision = program && shouldShowDivision(program.name, formData.year)
 
     if (
       !formData.professor_id ||
@@ -336,7 +338,7 @@ function AdminSchedulesPage() {
   }
 
   const selectedProgram = programs.find(p => p.id === formData.program_id)
-  const showDivision = selectedProgram && shouldShowDivision(selectedProgram.name)
+  const showDivision = selectedProgram && shouldShowDivision(selectedProgram.name, formData.year)
 
   if (loading) {
     return <p className="text-slate-600">Cargando...</p>
@@ -442,7 +444,7 @@ function AdminSchedulesPage() {
                   <select
                     id="year-select"
                     value={formData.year}
-                    onChange={e => setFormData({ ...formData, year: e.target.value, subject_id: '' })}
+                    onChange={e => setFormData({ ...formData, year: e.target.value, subject_id: '', division: '' })}
                     className="form-input"
                   >
                     <option value="">-- Selecciona año --</option>
