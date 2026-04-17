@@ -1,0 +1,67 @@
+-- DIAGNÓSTICO Y SOLUCIÓN: Pagos no se generan al registrar alumno
+
+El problema es que el trigger `on_student_created` que debería generar los pagos
+automáticamente al insertar un estudiante NO ESTÁ EJECUTÁNDOSE correctamente.
+
+CAUSAS POSIBLES:
+1. El trigger no existe o fue eliminado accidentalmente
+2. La tabla `payment_configuration` no tiene configuración para el programa
+3. El trigger tiene errores de sintaxis y falla silenciosamente
+4. La función trigger está deshabilitada
+
+SOLUCIÓN:
+
+1. EJECUTAR en Supabase SQL Editor el archivo:
+   supabase/migrations/fix_payment_trigger.sql
+
+   Este archivo:
+   - Recrea el trigger con mejor manejo de errores
+   - Crea función para generar pagos retroactivamente
+   - Incluye diagnostico SQL
+
+2. VERIFICAR que existe configuración de pagos:
+
+   SELECT * FROM public.payment_configuration;
+
+   Si no hay resultados, hay que crear configuración:
+   
+   INSERT INTO public.payment_configuration (
+     program_id,
+     monthly_quota_amount,
+     insurance_amount,
+     enrollment_amount,
+     increment_percentage
+   )
+   SELECT 
+     p.id,
+     1000.00,        -- Monto cuota mensual
+     500.00,         -- Monto seguro
+     200.00,         -- Monto inscripción
+     15              -- Incremento 15%
+   FROM public.programs p
+   WHERE p.id NOT IN (SELECT program_id FROM public.payment_configuration);
+
+3. GENERAR PAGOS RETROACTIVAMENTE para estudiantes sin pagos:
+
+   SELECT * FROM create_missing_payments_for_students();
+
+4. VERIFICAR que se crearon los pagos:
+
+   SELECT s.id, s.first_name, COUNT(p.id) as total_payments
+   FROM public.students s
+   LEFT JOIN public.payments p ON s.id = p.student_id
+   GROUP BY s.id
+   ORDER BY s.created_at DESC;
+
+VERIFICACIÓN FINAL:
+
+- Los nuevos alumnos que se registren ahora deberían tener pagos generados
+- Cada alumno debe tener 11 registros de pago:
+  * 1 seguro
+  * 1 inscripción  
+  * 9 cuotas mensuales (abril a diciembre)
+
+Si aún no funciona después de ejecutar fix_payment_trigger.sql:
+- Contactar a Supabase support
+- Revisar los logs de triggers en Supabase Dashboard
+- Verificar que el rol SECURITY DEFINER tiene permisos adecuados
