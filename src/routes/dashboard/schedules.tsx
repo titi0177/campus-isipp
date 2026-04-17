@@ -69,7 +69,7 @@ function StudentSchedulesPage() {
 
       const { data: enrollments } = await supabase
         .from('enrollments')
-        .select('subject_id')
+        .select('subject_id, division')
         .eq('student_id', student.id)
 
       if (!enrollments || enrollments.length === 0) {
@@ -77,6 +77,12 @@ function StudentSchedulesPage() {
         setLoading(false)
         return
       }
+
+      // Create a map of subject_id -> division for filtering
+      const enrollmentDivisionMap: Record<string, string | null> = {}
+      enrollments.forEach(e => {
+        enrollmentDivisionMap[e.subject_id] = e.division
+      })
 
       const subjectIds = enrollments.map(e => e.subject_id)
 
@@ -98,7 +104,16 @@ function StudentSchedulesPage() {
         .order('start_time')
 
       if (data) {
-        const formatted: Schedule[] = data.map((s: any) => ({
+        // Filter schedules based on student's division choice
+        const filtered = data.filter((s: any) => {
+          const studentDivision = enrollmentDivisionMap[s.subject_id]
+          // If schedule has no division (year 2+), include it
+          if (!s.division) return true
+          // If schedule has division, only include if it matches student's division
+          return s.division === studentDivision
+        })
+
+        const formatted: Schedule[] = filtered.map((s: any) => ({
           id: s.id,
           subject_name: s.subject?.name,
           subject_code: s.subject?.code,
