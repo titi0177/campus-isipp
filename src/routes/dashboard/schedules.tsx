@@ -13,6 +13,7 @@ type Schedule = {
   subject_name: string
   subject_code: string
   professor_name?: string
+  division?: string
   day: string
   start_time: string
   end_time: string
@@ -89,7 +90,8 @@ function StudentSchedulesPage() {
           day,
           start_time,
           end_time,
-          classroom
+          classroom,
+          division
         `)
         .in('subject_id', subjectIds)
         .order('day')
@@ -102,6 +104,7 @@ function StudentSchedulesPage() {
           subject_code: s.subject?.code,
           year: s.subject?.year,
           professor_name: s.professor?.name,
+          division: s.division,
           day: s.day,
           start_time: s.start_time,
           end_time: s.end_time,
@@ -242,6 +245,11 @@ function StudentSchedulesPage() {
                                 <span className="font-semibold">{s.professor_name}</span>
                               </div>
                             )}
+                            {s.year === 1 && s.division && (
+                              <div className="flex items-center gap-2 text-gray-700 pt-1">
+                                <span className="inline-block bg-amber-100 text-amber-700 text-xs font-bold px-2 py-1 rounded">División {s.division}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -301,7 +309,14 @@ function StudentSchedulesPage() {
                               {s.classroom}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center font-bold text-gray-900">{s.year}°</td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="font-bold text-gray-900">{s.year}°</span>
+                              {s.year === 1 && s.division && (
+                                <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded">Div. {s.division}</span>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                   </tbody>
