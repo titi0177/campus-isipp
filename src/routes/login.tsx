@@ -157,7 +157,6 @@ function LoginPage() {
     try {
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      // Auth signUp con solo nombre y apellido
       const { data: authData, error: authError } = await supabase.auth.signUp(
         {
           email: registerData.email.trim().toLowerCase(),
@@ -218,6 +217,23 @@ function LoginPage() {
         .single()
 
       if (studentData) {
+        // Actualizar el estudiante con programa_id, dni, legajo y year
+        const { error: updateError } = await supabase
+          .from('students')
+          .update({
+            program_id: registerData.programId,
+            dni: registerData.dni,
+            legajo: registerData.legajo,
+            year: parseInt(registerData.year),
+          })
+          .eq('id', studentData.id)
+
+        if (updateError) {
+          console.error('❌ Error updating student:', updateError)
+        } else {
+          console.log('✅ Estudiante actualizado con datos')
+        }
+
         const selectedYear = parseInt(registerData.year)
 
         if (selectedYear === 1) {
