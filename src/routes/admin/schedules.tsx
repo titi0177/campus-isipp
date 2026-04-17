@@ -140,24 +140,12 @@ function AdminSchedulesPage() {
       const { data: progsData } = await supabase.from('programs').select('id, name').order('name')
       setPrograms(progsData || [])
 
+      // Select string sin multiline para evitar problemas con Supabase PostgREST
+      const selectStr = 'id,subject_id,subject:subjects(name,code,year),professor_id,professor:professors(name),program_id,program:programs(name),division,day,start_time,end_time,classroom'
+      
       const { data } = await supabase
         .from('schedules')
-        .select(
-          `
-          id,
-          subject_id,
-          subject:subjects(name, code, year),
-          professor_id,
-          professor:professors(name),
-          program_id,
-          program:programs(name),
-          division,
-          day,
-          start_time,
-          end_time,
-          classroom
-        `,
-        )
+        .select(selectStr)
         .order('day', { ascending: true })
 
       if (data) {
