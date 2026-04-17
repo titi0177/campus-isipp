@@ -5,6 +5,7 @@ import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
 import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
+import { provisionProfessorWithAuth } from '@/lib/provision-professor'
 import type { Professor } from '@/types'
 
 
