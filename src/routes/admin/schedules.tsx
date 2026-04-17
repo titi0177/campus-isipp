@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Trash2, Plus, Clock, ChevronDown } from 'lucide-react'
+import { Trash2, Plus, Clock } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/schedules')({
   component: AdminSchedulesPage,
@@ -17,6 +17,7 @@ type Schedule = {
   professor_name?: string
   program_id?: string
   program_name?: string
+  division?: string
   day: string
   start_time: string
   end_time: string
@@ -24,28 +25,16 @@ type Schedule = {
   year: number
 }
 
-type Professor = {
-  id: string
-  name: string
-}
-
-type Subject = {
-  id: string
-  name: string
-  code: string
-  year: number
-}
-
-type Program = {
-  id: string
-  name: string
-}
+type Professor = { id: string; name: string }
+type Subject = { id: string; name: string; code: string; year: number }
+type Program = { id: string; name: string }
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const DIVISIONS = ['A', 'B']
 
 const SCHEDULE_BLOCKS: Record<string, Record<string, Array<{ start: string; end: string }>>> = {
-  'seguridad': {
-    'manana': [
+  seguridad: {
+    manana: [
       { start: '07:00', end: '07:45' },
       { start: '07:45', end: '08:30' },
       { start: '08:30', end: '09:15' },
@@ -53,7 +42,7 @@ const SCHEDULE_BLOCKS: Record<string, Record<string, Array<{ start: string; end:
       { start: '10:15', end: '11:00' },
       { start: '11:00', end: '11:45' },
     ],
-    'tarde': [
+    tarde: [
       { start: '17:40', end: '18:25' },
       { start: '18:25', end: '19:10' },
       { start: '19:20', end: '20:05' },
@@ -62,8 +51,8 @@ const SCHEDULE_BLOCKS: Record<string, Record<string, Array<{ start: string; end:
       { start: '21:40', end: '22:25' },
     ],
   },
-  'other': {
-    'tarde': [
+  other: {
+    tarde: [
       { start: '17:40', end: '18:25' },
       { start: '18:25', end: '19:10' },
       { start: '19:20', end: '20:05' },
@@ -80,12 +69,15 @@ function getProgramType(programName: string): string {
   return 'other'
 }
 
+function shouldShowDivision(programName: string): boolean {
+  return programName.toLowerCase().includes('analista de sistemas')
+}
+
 function AdminSchedulesPage() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [professors, setProfessors] = useState<Professor[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
   const [subjects, setSubjects] = useState<Subject[]>([])
-
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
 
@@ -94,9 +86,10 @@ function AdminSchedulesPage() {
     program_id: '',
     year: '',
     subject_id: '',
+    division: '',
     day: '',
     shift: '',
-    selectedBlocks: [] as number[], // Índices de bloques seleccionados
+    selectedBlocks: [] as number[],
     classroom: '',
   })
 
@@ -119,10 +112,7 @@ function AdminSchedulesPage() {
         const programType = getProgramType(program.name)
         const blocks = SCHEDULE_BLOCKS[programType][formData.shift]
         if (blocks && blocks.length > 0) {
-          setFormData(prev => ({
-            ...prev,
-            selectedBlocks: [0],
-          }))
+          setFormData(prev => ({ ...prev, selectedBlocks: [0] }))
         }
       }
     } else if (formData.program_id && !formData.shift) {
@@ -133,11 +123,7 @@ function AdminSchedulesPage() {
           const programType = getProgramType(program.name)
           const blocks = SCHEDULE_BLOCKS[programType][shifts[0]]
           if (blocks && blocks.length > 0) {
-            setFormData(prev => ({
-              ...prev,
-              shift: shifts[0],
-              selectedBlocks: [0],
-            }))
+            setFormData(prev => ({ ...prev, shift: shifts[0], selectedBlocks: [0] }))
           }
         }
       }
@@ -146,21 +132,16 @@ function AdminSchedulesPage() {
 
   async function loadData() {
     try {
-      const { data: profsData } = await supabase
-        .from('professors')
-        .select('id, name')
-        .order('name')
+      const { data: profsData } = await supabase.from('professors').select('id, name').order('name')
       setProfessors(profsData || [])
 
-      const { data: progsData } = await supabase
-        .from('programs')
-        .select('id, name')
-        .order('name')
+      const { data: progsData } = await supabase.from('programs').select('id, name').order('name')
       setPrograms(progsData || [])
 
       const { data } = await supabase
         .from('schedules')
-        .select(`
+        .select(
+          `
           id,
           subject_id,
           subject:subjects(name, code, year),
@@ -168,11 +149,13 @@ function AdminSchedulesPage() {
           professor:professors(name),
           program_id,
           program:programs(name),
+          division,
           day,
           start_time,
           end_time,
           classroom
-        `)
+        `,
+        )
         .order('day')
         .order('start_time')
 
@@ -187,6 +170,7 @@ function AdminSchedulesPage() {
           professor_name: s.professor?.name,
           program_id: s.program_id,
           program_name: s.program?.name,
+          division: s.division,
           day: s.day,
           start_time: s.start_time,
           end_time: s.end_time,
@@ -221,7 +205,19 @@ function AdminSchedulesPage() {
   async function handleAddSchedule(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!formData.professor_id || !formData.program_id || !formData.year || !formData.subject_id || !formData.day || formData.selectedBlocks.length === 0 || !formData.classroom) {
+    const program = programs.find(p => p.id === formData.program_id)
+    const needsDivision = program && shouldShowDivision(program.name)
+
+    if (
+      !formData.professor_id ||
+      !formData.program_id ||
+      !formData.year ||
+      !formData.subject_id ||
+      !formData.day ||
+      formData.selectedBlocks.length === 0 ||
+      !formData.classroom ||
+      (needsDivision && !formData.division)
+    ) {
       showToast('Completa todos los campos requeridos', 'error')
       return
     }
@@ -236,7 +232,7 @@ function AdminSchedulesPage() {
       const firstBlock = blocks[formData.selectedBlocks[0]]
       const lastBlock = blocks[formData.selectedBlocks[formData.selectedBlocks.length - 1]]
 
-      const { error } = await supabase.from('schedules').insert({
+      const insertData: any = {
         program_id: formData.program_id,
         subject_id: formData.subject_id,
         professor_id: formData.professor_id,
@@ -244,7 +240,13 @@ function AdminSchedulesPage() {
         start_time: firstBlock.start,
         end_time: lastBlock.end,
         classroom: formData.classroom,
-      })
+      }
+
+      if (needsDivision) {
+        insertData.division = formData.division
+      }
+
+      const { error } = await supabase.from('schedules').insert(insertData)
 
       if (error) throw error
 
@@ -254,6 +256,7 @@ function AdminSchedulesPage() {
         program_id: '',
         year: '',
         subject_id: '',
+        division: '',
         day: '',
         shift: '',
         selectedBlocks: [],
@@ -271,10 +274,7 @@ function AdminSchedulesPage() {
     if (!confirm('¿Eliminar este horario?')) return
 
     try {
-      const { error } = await supabase
-        .from('schedules')
-        .delete()
-        .eq('id', id)
+      const { error } = await supabase.from('schedules').delete().eq('id', id)
 
       if (error) throw error
 
@@ -325,8 +325,7 @@ function AdminSchedulesPage() {
     }
 
     newSelected.sort((a, b) => a - b)
-    
-    // Validar que sean consecutivos
+
     const isConsecutive = newSelected.every((val, i) => i === 0 || val === newSelected[i - 1] + 1)
     if (!isConsecutive && newSelected.length > 1) {
       showToast('Los bloques deben ser consecutivos', 'error')
@@ -335,6 +334,9 @@ function AdminSchedulesPage() {
 
     setFormData({ ...formData, selectedBlocks: newSelected })
   }
+
+  const selectedProgram = programs.find(p => p.id === formData.program_id)
+  const showDivision = selectedProgram && shouldShowDivision(selectedProgram.name)
 
   if (loading) {
     return <p className="text-slate-600">Cargando...</p>
@@ -347,13 +349,12 @@ function AdminSchedulesPage() {
           <Clock size={28} />
           Gestión de Horarios
         </h1>
-        <p className="text-slate-600 text-sm mt-1">Carga horarios por profesor, materia y carrera. Permite hasta 3 bloques consecutivos por día.</p>
+        <p className="text-slate-600 text-sm mt-1">
+          Carga horarios por profesor, materia y carrera. Permite hasta 3 bloques consecutivos por día.
+        </p>
       </div>
 
-      <button
-        onClick={() => setShowForm(!showForm)}
-        className="btn-primary flex items-center gap-2"
-      >
+      <button onClick={() => setShowForm(!showForm)} className="btn-primary flex items-center gap-2">
         <Plus size={18} />
         Agregar horario
       </button>
@@ -364,12 +365,13 @@ function AdminSchedulesPage() {
           <form onSubmit={handleAddSchedule} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="professor-select" className="form-label">Profesor *</label>
+                <label htmlFor="professor-select" className="form-label">
+                  Profesor *
+                </label>
                 <select
                   id="professor-select"
-                  name="professor"
                   value={formData.professor_id}
-                  onChange={(e) => setFormData({ ...formData, professor_id: e.target.value })}
+                  onChange={e => setFormData({ ...formData, professor_id: e.target.value })}
                   className="form-input"
                 >
                   <option value="">-- Selecciona profesor --</option>
@@ -382,13 +384,22 @@ function AdminSchedulesPage() {
               </div>
 
               <div>
-                <label htmlFor="program-select" className="form-label">Carrera *</label>
+                <label htmlFor="program-select" className="form-label">
+                  Carrera *
+                </label>
                 <select
                   id="program-select"
-                  name="program"
                   value={formData.program_id}
-                  onChange={(e) => {
-                    setFormData({ ...formData, program_id: e.target.value, year: '', subject_id: '', shift: '', selectedBlocks: [] })
+                  onChange={e => {
+                    setFormData({
+                      ...formData,
+                      program_id: e.target.value,
+                      year: '',
+                      subject_id: '',
+                      shift: '',
+                      division: '',
+                      selectedBlocks: [],
+                    })
                     setSubjects([])
                   }}
                   className="form-input"
@@ -404,12 +415,13 @@ function AdminSchedulesPage() {
 
               {formData.program_id && (getAvailableShifts().length > 1 || formData.shift) && (
                 <div>
-                  <label htmlFor="shift-select" className="form-label">Turno {getAvailableShifts().length === 1 ? '(Único)' : ''} *</label>
+                  <label htmlFor="shift-select" className="form-label">
+                    Turno {getAvailableShifts().length === 1 ? '(Único)' : ''} *
+                  </label>
                   <select
                     id="shift-select"
-                    name="shift"
                     value={formData.shift}
-                    onChange={(e) => setFormData({ ...formData, shift: e.target.value, selectedBlocks: [] })}
+                    onChange={e => setFormData({ ...formData, shift: e.target.value, selectedBlocks: [] })}
                     className="form-input"
                   >
                     <option value="">-- Selecciona turno --</option>
@@ -424,12 +436,13 @@ function AdminSchedulesPage() {
 
               {formData.program_id && (
                 <div>
-                  <label htmlFor="year-select" className="form-label">Año *</label>
+                  <label htmlFor="year-select" className="form-label">
+                    Año *
+                  </label>
                   <select
                     id="year-select"
-                    name="year"
                     value={formData.year}
-                    onChange={(e) => setFormData({ ...formData, year: e.target.value, subject_id: '' })}
+                    onChange={e => setFormData({ ...formData, year: e.target.value, subject_id: '' })}
                     className="form-input"
                   >
                     <option value="">-- Selecciona año --</option>
@@ -442,14 +455,36 @@ function AdminSchedulesPage() {
                 </div>
               )}
 
+              {showDivision && (
+                <div>
+                  <label htmlFor="division-select" className="form-label">
+                    División *
+                  </label>
+                  <select
+                    id="division-select"
+                    value={formData.division}
+                    onChange={e => setFormData({ ...formData, division: e.target.value })}
+                    className="form-input"
+                  >
+                    <option value="">-- Selecciona división --</option>
+                    {DIVISIONS.map(d => (
+                      <option key={d} value={d}>
+                        División {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {formData.year && subjects.length > 0 && (
                 <div>
-                  <label htmlFor="subject-select" className="form-label">Materia *</label>
+                  <label htmlFor="subject-select" className="form-label">
+                    Materia *
+                  </label>
                   <select
                     id="subject-select"
-                    name="subject"
                     value={formData.subject_id}
-                    onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
+                    onChange={e => setFormData({ ...formData, subject_id: e.target.value })}
                     className="form-input"
                   >
                     <option value="">-- Selecciona materia --</option>
@@ -471,12 +506,13 @@ function AdminSchedulesPage() {
               )}
 
               <div>
-                <label htmlFor="day-select" className="form-label">Día *</label>
+                <label htmlFor="day-select" className="form-label">
+                  Día *
+                </label>
                 <select
                   id="day-select"
-                  name="day"
                   value={formData.day}
-                  onChange={(e) => setFormData({ ...formData, day: e.target.value })}
+                  onChange={e => setFormData({ ...formData, day: e.target.value })}
                   className="form-input"
                 >
                   <option value="">-- Selecciona día --</option>
@@ -490,7 +526,9 @@ function AdminSchedulesPage() {
 
               {formData.program_id && formData.shift && getScheduleBlocks().length > 0 && (
                 <div className="col-span-2">
-                  <label className="form-label mb-3 block">Bloques de horario * (máximo 3 consecutivos)</label>
+                  <label className="form-label mb-3 block">
+                    Bloques de horario * (máximo 3 consecutivos)
+                  </label>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                     {getScheduleBlocks().map((block, idx) => (
                       <button
@@ -509,20 +547,23 @@ function AdminSchedulesPage() {
                   </div>
                   {formData.selectedBlocks.length > 0 && (
                     <p className="text-xs text-gray-600 mt-2">
-                      {formData.selectedBlocks.length} bloque(s) seleccionado(s): {getScheduleBlocks()[formData.selectedBlocks[0]].start} - {getScheduleBlocks()[formData.selectedBlocks[formData.selectedBlocks.length - 1]].end}
+                      {formData.selectedBlocks.length} bloque(s) seleccionado(s):{' '}
+                      {getScheduleBlocks()[formData.selectedBlocks[0]].start} -{' '}
+                      {getScheduleBlocks()[formData.selectedBlocks[formData.selectedBlocks.length - 1]].end}
                     </p>
                   )}
                 </div>
               )}
 
               <div>
-                <label htmlFor="classroom-input" className="form-label">Aula/Salón *</label>
+                <label htmlFor="classroom-input" className="form-label">
+                  Aula/Salón *
+                </label>
                 <input
                   id="classroom-input"
-                  name="classroom"
                   type="text"
                   value={formData.classroom}
-                  onChange={(e) => setFormData({ ...formData, classroom: e.target.value })}
+                  onChange={e => setFormData({ ...formData, classroom: e.target.value })}
                   placeholder="ej: 101"
                   className="form-input"
                 />
@@ -533,11 +574,7 @@ function AdminSchedulesPage() {
               <button type="submit" className="btn-primary">
                 Guardar horario
               </button>
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="btn-secondary"
-              >
+              <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">
                 Cancelar
               </button>
             </div>
@@ -564,6 +601,7 @@ function AdminSchedulesPage() {
                         <th className="px-4 py-2 text-left font-medium">Código</th>
                         <th className="px-4 py-2 text-left font-medium">Carrera</th>
                         <th className="px-4 py-2 text-left font-medium">Año</th>
+                        <th className="px-4 py-2 text-left font-medium">Div</th>
                         <th className="px-4 py-2 text-left font-medium">Día</th>
                         <th className="px-4 py-2 text-center font-medium">Horario</th>
                         <th className="px-4 py-2 text-left font-medium">Aula</th>
@@ -577,6 +615,7 @@ function AdminSchedulesPage() {
                           <td className="px-4 py-3 text-slate-600">{s.subject_code}</td>
                           <td className="px-4 py-3 text-slate-600">{s.program_name}</td>
                           <td className="px-4 py-3">{s.year}°</td>
+                          <td className="px-4 py-3">{s.division || '-'}</td>
                           <td className="px-4 py-3">{s.day}</td>
                           <td className="px-4 py-3 text-center">
                             {s.start_time} - {s.end_time}
