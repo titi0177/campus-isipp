@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
 import { Trash2, Plus, Clock } from 'lucide-react'
+import { ScheduleViewByProfessor } from '@/components/ScheduleViewByProfessor'
+import { ScheduleViewByDay } from '@/components/ScheduleViewByDay'
+import { ScheduleViewByYear } from '@/components/ScheduleViewByYear'
 
 export const Route = createFileRoute('/admin/schedules')({
   component: AdminSchedulesPage,
@@ -82,6 +85,7 @@ function AdminSchedulesPage() {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [viewMode, setViewMode] = useState<'professor' | 'day' | 'year'>('professor')
 
   const [formData, setFormData] = useState({
     professor_id: '',
@@ -281,13 +285,6 @@ function AdminSchedulesPage() {
       showToast('Error al eliminar', 'error')
     }
   }
-
-  const byProfessor: Record<string, Schedule[]> = {}
-  schedules.forEach(s => {
-    const prof = s.professor_name || 'Sin asignar'
-    if (!byProfessor[prof]) byProfessor[prof] = []
-    byProfessor[prof].push(s)
-  })
 
   const getAvailableShifts = (programId?: string) => {
     const pId = programId || formData.program_id
@@ -578,61 +575,44 @@ function AdminSchedulesPage() {
         </div>
       )}
 
-      {Object.keys(byProfessor).length > 0 ? (
-        <div className="space-y-6">
-          {Object.keys(byProfessor)
-            .sort()
-            .map(professor => (
-              <div key={professor} className="card p-0 overflow-hidden">
-                <div className="siu-band-header">
-                  <h3 className="text-sm font-bold tracking-wide text-white">
-                    {professor} - {byProfessor[professor].length} horarios
-                  </h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 text-xs text-gray-600 border-b">
-                        <th className="px-4 py-2 text-left font-medium">Materia</th>
-                        <th className="px-4 py-2 text-left font-medium">Código</th>
-                        <th className="px-4 py-2 text-left font-medium">Carrera</th>
-                        <th className="px-4 py-2 text-left font-medium">Año</th>
-                        <th className="px-4 py-2 text-left font-medium">Div</th>
-                        <th className="px-4 py-2 text-left font-medium">Día</th>
-                        <th className="px-4 py-2 text-center font-medium">Horario</th>
-                        <th className="px-4 py-2 text-left font-medium">Aula</th>
-                        <th className="px-4 py-2 text-center font-medium">Acción</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {byProfessor[professor].map(s => (
-                        <tr key={s.id} className="border-b hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium">{s.subject_name}</td>
-                          <td className="px-4 py-3 text-slate-600">{s.subject_code}</td>
-                          <td className="px-4 py-3 text-slate-600">{s.program_name}</td>
-                          <td className="px-4 py-3">{s.year}°</td>
-                          <td className="px-4 py-3">{s.division || '-'}</td>
-                          <td className="px-4 py-3">{s.day}</td>
-                          <td className="px-4 py-3 text-center">
-                            {s.start_time} - {s.end_time}
-                          </td>
-                          <td className="px-4 py-3">{s.classroom}</td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => void deleteSchedule(s.id)}
-                              className="text-red-600 hover:text-red-800 font-medium text-sm"
-                              title="Eliminar"
-                            >
-                              <Trash2 size={16} className="inline" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
+      {schedules.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex gap-2 border-b">
+            <button
+              onClick={() => setViewMode('professor')}
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                viewMode === 'professor'
+                  ? 'text-indigo-600 border-b-indigo-600'
+                  : 'text-slate-600 border-b-transparent hover:text-slate-900'
+              }`}
+            >
+              Por Profesor
+            </button>
+            <button
+              onClick={() => setViewMode('day')}
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                viewMode === 'day'
+                  ? 'text-indigo-600 border-b-indigo-600'
+                  : 'text-slate-600 border-b-transparent hover:text-slate-900'
+              }`}
+            >
+              Por Día
+            </button>
+            <button
+              onClick={() => setViewMode('year')}
+              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+                viewMode === 'year'
+                  ? 'text-indigo-600 border-b-indigo-600'
+                  : 'text-slate-600 border-b-transparent hover:text-slate-900'
+              }`}
+            >
+              Por Año
+            </button>
+          </div>
+
+          {viewMode === 'professor' && <ScheduleViewByProfessor schedules={schedules} onDelete={deleteSchedule} />}
+          {viewMode === 'day' && <ScheduleViewByDay schedules={schedules} onDelete={deleteSchedule} />}
+          {viewMode === 'year' && <ScheduleViewByYear schedules={schedules} onDelete={deleteSchedule} />}
         </div>
       ) : (
         <div className="card p-6 text-center">
