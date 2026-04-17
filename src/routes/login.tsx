@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useState } from 'react'
 import React from 'react'
-import { Eye, EyeOff, Lock, Mail, ChevronDown } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from '@tanstack/react-router'
 
@@ -36,11 +36,9 @@ function LoginPage() {
     legajo: '',
     programId: '',
     year: '1',
-    selectedSubjects: [] as string[],
     accessCode: '',
   })
 
-  const [availableSubjects, setAvailableSubjects] = useState<Array<{ id: string; name: string; code: string }>>([])
   const [codeValidated, setCodeValidated] = useState(false)
   const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([])
 
@@ -52,37 +50,6 @@ function LoginPage() {
     }
     loadPrograms()
   }, [])
-
-  // Load subjects when program or year changes
-  React.useEffect(() => {
-    const loadSubjects = async () => {
-      if (!registerData.programId || !registerData.year) {
-        setAvailableSubjects([])
-        setRegisterData(prev => ({ ...prev, selectedSubjects: [] }))
-        return
-      }
-
-      const { data } = await supabase
-        .from('subjects')
-        .select('id, name, code')
-        .eq('program_id', registerData.programId)
-        .eq('year', parseInt(registerData.year))
-        .order('name')
-
-      if (data) {
-        setAvailableSubjects(data)
-        // Pre-seleccionar todas las materias
-        setRegisterData(prev => ({
-          ...prev,
-          selectedSubjects: data.map(s => s.id)
-        }))
-      } else {
-        setAvailableSubjects([])
-        setRegisterData(prev => ({ ...prev, selectedSubjects: [] }))
-      }
-    }
-    loadSubjects()
-  }, [registerData.programId, registerData.year])
 
   // Validate fixed access code
   const handleValidateAccessCode = () => {
@@ -184,11 +151,6 @@ function LoginPage() {
       return
     }
 
-    if (registerData.selectedSubjects.length === 0) {
-      setError('Debes seleccionar al menos una materia.')
-      return
-    }
-
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(registerData.email)) {
@@ -259,23 +221,42 @@ function LoginPage() {
         console.error('❌ Profile creation error:', profileError)
       }
 
-      // Auto-inscribir en las materias seleccionadas
-      if (registerData.selectedSubjects.length > 0) {
-        // Esperar a que el trigger cree el registro en students
-        await new Promise(resolve => setTimeout(resolve, 1000))
+      // Esperar a que el trigger cree el registro en students
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
-        // Obtener el student_id
-        const { data: studentData } = await supabase
-          .from('students')
+      // Obtener el student_id
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', authData.user.id)
+        .single()
+
+      if (studentData) {
+        const selectedYear = parseInt(registerData.year)
+
+        // Obtener materias según el año seleccionado
+        let yearsToEnroll: number[] = []
+
+        if (selectedYear === 1) {
+          yearsToEnroll = [1]
+        } else if (selectedYear === 2) {
+          yearsToEnroll = [1, 2]
+        } else if (selectedYear === 3) {
+          yearsToEnroll = [1, 2, 3]
+        }
+
+        // Obtener todas las materias de los años a inscribirse
+        const { data: subjectsData } = await supabase
+          .from('subjects')
           .select('id')
-          .eq('user_id', authData.user.id)
-          .single()
+          .eq('program_id', registerData.programId)
+          .in('year', yearsToEnroll)
 
-        if (studentData) {
+        if (subjectsData && subjectsData.length > 0) {
           // Crear inscripciones
-          const enrollments = registerData.selectedSubjects.map(subjectId => ({
+          const enrollments = subjectsData.map(subject => ({
             student_id: studentData.id,
-            subject_id: subjectId,
+            subject_id: subject.id,
           }))
 
           const { error: enrollError } = await supabase
@@ -285,7 +266,7 @@ function LoginPage() {
           if (enrollError) {
             console.error('❌ Error en inscripción de materias:', enrollError)
           } else {
-            console.log('✅ Alumno inscrito en', registerData.selectedSubjects.length, 'materia(s)')
+            console.log('✅ Alumno inscrito en', enrollments.length, 'materia(s) de años', yearsToEnroll)
           }
         }
       }
@@ -301,7 +282,6 @@ function LoginPage() {
         legajo: '',
         programId: '',
         year: '1',
-        selectedSubjects: [],
         accessCode: '',
       })
       setCodeValidated(false)
@@ -331,15 +311,6 @@ function LoginPage() {
     }
 
     setLoading(false)
-  }
-
-  const toggleSubject = (subjectId: string) => {
-    setRegisterData(prev => ({
-      ...prev,
-      selectedSubjects: prev.selectedSubjects.includes(subjectId)
-        ? prev.selectedSubjects.filter(id => id !== subjectId)
-        : [...prev.selectedSubjects, subjectId]
-    }))
   }
 
   return (
@@ -385,10 +356,10 @@ function LoginPage() {
           </div>
 
           {/* Right Panel - Form */}
-          <div className="w-full max-w-md mx-auto lg:mx-0 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-md mx-auto lg:mx-0">
             <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden">
               {/* Header */}
-              <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] p-8 text-center sticky top-0">
+              <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] p-8 text-center">
                 <div className="mb-3">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20">
                     <Mail className="w-8 h-8 text-white" />
@@ -602,44 +573,18 @@ function LoginPage() {
                             </select>
                           </div>
 
-                          {registerData.programId && (
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-900 mb-1.5">Año</label>
-                              <select
-                                value={registerData.year}
-                                onChange={e => setRegisterData({ ...registerData, year: e.target.value })}
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--siu-blue)]"
-                              >
-                                <option value="1">1° Año</option>
-                                <option value="2">2° Año</option>
-                                <option value="3">3° Año</option>
-                              </select>
-                            </div>
-                          )}
-
-                          {availableSubjects.length > 0 && (
-                            <div className="border-t pt-4">
-                              <label className="block text-xs font-semibold text-slate-900 mb-3">
-                                Selecciona materias ({registerData.selectedSubjects.length}/{availableSubjects.length})
-                              </label>
-                              <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {availableSubjects.map(subject => (
-                                  <label key={subject.id} className="flex items-center gap-3 p-2 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
-                                    <input
-                                      type="checkbox"
-                                      checked={registerData.selectedSubjects.includes(subject.id)}
-                                      onChange={() => toggleSubject(subject.id)}
-                                      className="w-4 h-4 text-[var(--siu-blue)] rounded border-slate-300 focus:ring-2 focus:ring-[var(--siu-blue)]"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-slate-900 truncate">{subject.name}</p>
-                                      <p className="text-xs text-slate-500">{subject.code}</p>
-                                    </div>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-900 mb-1.5">Año de ingreso</label>
+                            <select
+                              value={registerData.year}
+                              onChange={e => setRegisterData({ ...registerData, year: e.target.value })}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--siu-blue)]"
+                            >
+                              <option value="1">1° Año</option>
+                              <option value="2">2° Año (se inscribe en 1° y 2°)</option>
+                              <option value="3">3° Año (se inscribe en 1°, 2° y 3°)</option>
+                            </select>
+                          </div>
 
                           <div>
                             <label className="block text-xs font-semibold text-slate-900 mb-1.5">Correo electrónico</label>
