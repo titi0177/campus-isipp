@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Eye } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/correlatives')({
   component: CorrelativesPage,
@@ -24,6 +24,7 @@ function CorrelativesPage() {
   const [availableCorrelatives, setAvailableCorrelatives] = useState<SubjectWithCorrelatives[]>([])
   const [selectedCorrelatives, setSelectedCorrelatives] = useState<Set<string>>(new Set())
   const [expandedProgram, setExpandedProgram] = useState<string | null>(null)
+  const [expandedViewProgram, setExpandedViewProgram] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const { showToast } = useToast()
 
@@ -125,6 +126,15 @@ function CorrelativesPage() {
     } catch (err) {
       showToast('Error al guardar correlativas.', 'error')
     }
+  }
+
+  // Helper para obtener el nombre de una materia por ID
+  const getSubjectName = (subjectId: string) => {
+    for (const subjects of Object.values(subjectsByProgram)) {
+      const subject = subjects.find(s => s.id === subjectId)
+      if (subject) return subject.name
+    }
+    return 'Desconocida'
   }
 
   return (
@@ -237,6 +247,74 @@ function CorrelativesPage() {
               <p className="text-gray-500">Selecciona una materia para configurar sus correlativas</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Visualization Section */}
+      <div className="mt-8 pt-8 border-t border-gray-200">
+        <div className="flex items-center gap-2 mb-4">
+          <Eye size={20} className="text-gray-700" />
+          <h2 className="font-bold text-gray-900 text-lg">Control Visual de Correlativas</h2>
+        </div>
+
+        <div className="space-y-3">
+          {programs.map(prog => {
+            const subjects = subjectsByProgram[prog.name] || []
+            const subjectsWithCorrelatives = subjects.filter(s => s.correlatives.length > 0)
+
+            return (
+              <div key={prog.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setExpandedViewProgram(expandedViewProgram === prog.name ? null : prog.name)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors bg-gradient-to-r from-blue-50 to-blue-100"
+                >
+                  <div className="text-left">
+                    <span className="font-semibold text-gray-900">{prog.name}</span>
+                    <span className="text-xs text-gray-600 ml-2">
+                      ({subjectsWithCorrelatives.length} materias con correlativas)
+                    </span>
+                  </div>
+                  <ChevronDown
+                    size={18}
+                    className={`text-gray-500 transition-transform ${expandedViewProgram === prog.name ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {expandedViewProgram === prog.name && (
+                  <div className="bg-white p-4 space-y-3 border-t border-gray-200">
+                    {subjects.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4">No hay materias en esta carrera</p>
+                    ) : subjectsWithCorrelatives.length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-4">
+                        Ninguna materia tiene correlativas configuradas
+                      </p>
+                    ) : (
+                      subjectsWithCorrelatives.map(subject => (
+                        <div key={subject.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="font-semibold text-gray-900 text-sm">{subject.name}</p>
+                              <p className="text-xs text-gray-500">{subject.code}</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {subject.correlatives.map(corrId => (
+                              <span
+                                key={corrId}
+                                className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                              >
+                                {getSubjectName(corrId)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
