@@ -78,16 +78,14 @@ function CorrelativesPage() {
   const handleSelectSubject = async (subjectId: string, programName: string) => {
     setSelectedSubject(subjectId)
 
-    // Obtener materias disponibles como correlativas (todas excepto la seleccionada)
-    const available = Object.values(subjectsByProgram)
-      .flat()
+    // Obtener materias disponibles como correlativas (solo de la carrera seleccionada, excepto la seleccionada)
+    const available = (subjectsByProgram[programName] || [])
       .filter(s => s.id !== subjectId)
 
     setAvailableCorrelatives(available)
 
     // Cargar correlativas actuales de esta materia
-    const subject = Object.values(subjectsByProgram)
-      .flat()
+    const subject = (subjectsByProgram[programName] || [])
       .find(s => s.id === subjectId)
 
     setSelectedCorrelatives(new Set(subject?.correlatives || []))
