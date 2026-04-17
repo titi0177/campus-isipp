@@ -234,39 +234,57 @@ function LoginPage() {
       if (studentData) {
         const selectedYear = parseInt(registerData.year)
 
-        // Obtener materias según el año seleccionado
-        let yearsToEnroll: number[] = []
-
+        // Lógica de inscripción según el año seleccionado
         if (selectedYear === 1) {
-          yearsToEnroll = [1]
+          // Año 1: No inscribir en nada
+          console.log('✅ Alumno de 1° año sin inscripciones automáticas')
         } else if (selectedYear === 2) {
-          yearsToEnroll = [1, 2]
+          // Año 2: Inscribir solo en materias de 1° año
+          const { data: subjectsYear1 } = await supabase
+            .from('subjects')
+            .select('id')
+            .eq('program_id', registerData.programId)
+            .eq('year', 1)
+
+          if (subjectsYear1 && subjectsYear1.length > 0) {
+            const enrollments = subjectsYear1.map(subject => ({
+              student_id: studentData.id,
+              subject_id: subject.id,
+            }))
+
+            const { error: enrollError } = await supabase
+              .from('enrollments')
+              .insert(enrollments)
+
+            if (enrollError) {
+              console.error('❌ Error en inscripción de 1° año:', enrollError)
+            } else {
+              console.log('✅ Alumno inscrito en todas las materias de 1° año')
+            }
+          }
         } else if (selectedYear === 3) {
-          yearsToEnroll = [1, 2, 3]
-        }
+          // Año 3: Inscribir en materias de 1° y 2° año
+          const { data: subjectsYear1And2 } = await supabase
+            .from('subjects')
+            .select('id')
+            .eq('program_id', registerData.programId)
+            .in('year', [1, 2])
 
-        // Obtener todas las materias de los años a inscribirse
-        const { data: subjectsData } = await supabase
-          .from('subjects')
-          .select('id')
-          .eq('program_id', registerData.programId)
-          .in('year', yearsToEnroll)
+          if (subjectsYear1And2 && subjectsYear1And2.length > 0) {
+            const enrollments = subjectsYear1And2.map(subject => ({
+              student_id: studentData.id,
+              subject_id: subject.id,
+            }))
 
-        if (subjectsData && subjectsData.length > 0) {
-          // Crear inscripciones
-          const enrollments = subjectsData.map(subject => ({
-            student_id: studentData.id,
-            subject_id: subject.id,
-          }))
+            const { error: enrollError } = await supabase
+              .from('enrollments')
+              .insert(enrollments)
 
-          const { error: enrollError } = await supabase
-            .from('enrollments')
-            .insert(enrollments)
-
-          if (enrollError) {
-            console.error('❌ Error en inscripción de materias:', enrollError)
-          } else {
-            console.log('✅ Alumno inscrito en', enrollments.length, 'materia(s) de años', yearsToEnroll)
+            if (enrollError) {
+              console.error('❌ Error en inscripción de 1° y 2° año:', enrollError)
+            } else {
+              console.log('✅ Alumno inscrito en todas las materias de 1° y 2° año')
+            }
           }
         }
       }
@@ -581,8 +599,8 @@ function LoginPage() {
                               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--siu-blue)]"
                             >
                               <option value="1">1° Año</option>
-                              <option value="2">2° Año (se inscribe en 1° y 2°)</option>
-                              <option value="3">3° Año (se inscribe en 1°, 2° y 3°)</option>
+                              <option value="2">2° Año (inscribe en 1° y 2°)</option>
+                              <option value="3">3° Año (inscribe en 1°, 2° y 3°)</option>
                             </select>
                           </div>
 
