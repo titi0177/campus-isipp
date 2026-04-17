@@ -1,5 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
+const { createClient } = require('@supabase/supabase-js')
 
 function getServiceSupabase() {
   const url = process.env.SUPABASE_URL
@@ -14,7 +13,7 @@ function getServiceSupabase() {
   })
 }
 
-async function assertStaffFromAccessToken(accessToken: string | undefined) {
+async function assertStaffFromAccessToken(accessToken) {
   if (!accessToken?.trim()) {
     throw new Error('No autenticado.')
   }
@@ -54,7 +53,7 @@ async function assertStaffFromAccessToken(accessToken: string | undefined) {
   }
 }
 
-function passwordFromDni(dni: string): string {
+function passwordFromDni(dni) {
   const digits = dni.replace(/\D/g, '')
   if (digits.length < 6) {
     throw new Error(
@@ -64,7 +63,7 @@ function passwordFromDni(dni: string): string {
   return digits
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT')
@@ -109,12 +108,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     console.log('Paso 1: Validando staff...')
-    // Validar staff
     await assertStaffFromAccessToken(accessToken)
     console.log('Paso 1 OK: Staff validado')
 
     console.log('Paso 2: Generando contraseña...')
-    // Generar contraseña desde DNI
     const password = passwordFromDni(dni)
     console.log('Paso 2 OK: Contraseña generada')
 
@@ -123,7 +120,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Paso 3 OK: Cliente creado')
 
     console.log('Paso 4: Creando usuario en Auth...')
-    // 1. Crear usuario en Supabase Auth
     const { data: authData, error: authError } = await admin.auth.admin.createUser({
       email,
       password,
@@ -137,7 +133,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Paso 4 OK: Usuario creado en Auth:', authData.user.id)
 
     console.log('Paso 5: Creando registro en professors...')
-    // 2. Crear registro en tabla professors con user_id
     const { error: profError } = await admin.from('professors').insert({
       user_id: authData.user.id,
       email,
@@ -147,14 +142,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (profError) {
       console.error('Paso 5 ERROR:', profError)
-      // Limpiar usuario Auth si falla la creación del profesor
       await admin.auth.admin.deleteUser(authData.user.id)
       throw new Error(`Error creando profesor: ${profError.message}`)
     }
     console.log('Paso 5 OK: Profesor creado')
 
     console.log('Paso 6: Creando perfil...')
-    // 3. Crear perfil con rol docente
     const { error: profileError } = await admin.from('profiles').insert({
       id: authData.user.id,
       role: 'profesor',
@@ -163,7 +156,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (profileError) {
       console.error('Paso 6 ERROR:', profileError)
-      // Limpiar si falla
       await admin.auth.admin.deleteUser(authData.user.id)
       await admin.from('professors').delete().eq('user_id', authData.user.id)
       throw new Error(`Error creando perfil: ${profileError.message}`)
