@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Trash2, Plus, Clock } from 'lucide-react'
+import { Trash2, Plus, Clock, ChevronDown } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/schedules')({
   component: AdminSchedulesPage,
@@ -96,8 +96,7 @@ function AdminSchedulesPage() {
     subject_id: '',
     day: '',
     shift: '',
-    start_time: '',
-    end_time: '',
+    selectedBlocks: [] as number[], // Índices de bloques seleccionados
     classroom: '',
   })
 
@@ -122,13 +121,11 @@ function AdminSchedulesPage() {
         if (blocks && blocks.length > 0) {
           setFormData(prev => ({
             ...prev,
-            start_time: blocks[0].start,
-            end_time: blocks[0].end,
+            selectedBlocks: [0],
           }))
         }
       }
     } else if (formData.program_id && !formData.shift) {
-      // Auto-select shift if only one is available
       const shifts = getAvailableShifts(formData.program_id)
       if (shifts.length === 1) {
         const program = programs.find(p => p.id === formData.program_id)
@@ -139,8 +136,7 @@ function AdminSchedulesPage() {
             setFormData(prev => ({
               ...prev,
               shift: shifts[0],
-              start_time: blocks[0].start,
-              end_time: blocks[0].end,
+              selectedBlocks: [0],
             }))
           }
         }
@@ -225,19 +221,28 @@ function AdminSchedulesPage() {
   async function handleAddSchedule(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!formData.professor_id || !formData.program_id || !formData.year || !formData.subject_id || !formData.day || !formData.start_time || !formData.end_time || !formData.classroom) {
+    if (!formData.professor_id || !formData.program_id || !formData.year || !formData.subject_id || !formData.day || formData.selectedBlocks.length === 0 || !formData.classroom) {
       showToast('Completa todos los campos requeridos', 'error')
       return
     }
 
+    if (formData.selectedBlocks.length > 3) {
+      showToast('Máximo 3 bloques por día', 'error')
+      return
+    }
+
     try {
+      const blocks = getScheduleBlocks()
+      const firstBlock = blocks[formData.selectedBlocks[0]]
+      const lastBlock = blocks[formData.selectedBlocks[formData.selectedBlocks.length - 1]]
+
       const { error } = await supabase.from('schedules').insert({
         program_id: formData.program_id,
         subject_id: formData.subject_id,
         professor_id: formData.professor_id,
         day: formData.day,
-        start_time: formData.start_time,
-        end_time: formData.end_time,
+        start_time: firstBlock.start,
+        end_time: lastBlock.end,
         classroom: formData.classroom,
       })
 
@@ -251,8 +256,7 @@ function AdminSchedulesPage() {
         subject_id: '',
         day: '',
         shift: '',
-        start_time: '',
-        end_time: '',
+        selectedBlocks: [],
         classroom: '',
       })
       setShowForm(false)
@@ -306,6 +310,32 @@ function AdminSchedulesPage() {
     return SCHEDULE_BLOCKS[programType][formData.shift] || []
   }
 
+  const handleBlockToggle = (index: number) => {
+    const blocks = getScheduleBlocks()
+    const newSelected = [...formData.selectedBlocks]
+
+    if (newSelected.includes(index)) {
+      newSelected.splice(newSelected.indexOf(index), 1)
+    } else {
+      if (newSelected.length >= 3) {
+        showToast('Máximo 3 bloques por día', 'error')
+        return
+      }
+      newSelected.push(index)
+    }
+
+    newSelected.sort((a, b) => a - b)
+    
+    // Validar que sean consecutivos
+    const isConsecutive = newSelected.every((val, i) => i === 0 || val === newSelected[i - 1] + 1)
+    if (!isConsecutive && newSelected.length > 1) {
+      showToast('Los bloques deben ser consecutivos', 'error')
+      return
+    }
+
+    setFormData({ ...formData, selectedBlocks: newSelected })
+  }
+
   if (loading) {
     return <p className="text-slate-600">Cargando...</p>
   }
@@ -317,7 +347,7 @@ function AdminSchedulesPage() {
           <Clock size={28} />
           Gestión de Horarios
         </h1>
-        <p className="text-slate-600 text-sm mt-1">Carga horarios por profesor, materia y carrera</p>
+        <p className="text-slate-600 text-sm mt-1">Carga horarios por profesor, materia y carrera. Permite hasta 3 bloques consecutivos por día.</p>
       </div>
 
       <button
@@ -358,7 +388,7 @@ function AdminSchedulesPage() {
                   name="program"
                   value={formData.program_id}
                   onChange={(e) => {
-                    setFormData({ ...formData, program_id: e.target.value, year: '', subject_id: '', shift: '', start_time: '', end_time: '' })
+                    setFormData({ ...formData, program_id: e.target.value, year: '', subject_id: '', shift: '', selectedBlocks: [] })
                     setSubjects([])
                   }}
                   className="form-input"
@@ -379,7 +409,7 @@ function AdminSchedulesPage() {
                     id="shift-select"
                     name="shift"
                     value={formData.shift}
-                    onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, shift: e.target.value, selectedBlocks: [] })}
                     className="form-input"
                   >
                     <option value="">-- Selecciona turno --</option>
@@ -459,25 +489,29 @@ function AdminSchedulesPage() {
               </div>
 
               {formData.program_id && formData.shift && getScheduleBlocks().length > 0 && (
-                <div>
-                  <label htmlFor="time-block-select" className="form-label">Bloque de horario *</label>
-                  <select
-                    id="time-block-select"
-                    name="timeBlock"
-                    value={`${formData.start_time}-${formData.end_time}`}
-                    onChange={(e) => {
-                      const [start, end] = e.target.value.split('-')
-                      setFormData({ ...formData, start_time: start, end_time: end })
-                    }}
-                    className="form-input"
-                  >
-                    <option value="">-- Selecciona horario --</option>
+                <div className="col-span-2">
+                  <label className="form-label mb-3 block">Bloques de horario * (máximo 3 consecutivos)</label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                     {getScheduleBlocks().map((block, idx) => (
-                      <option key={idx} value={`${block.start}-${block.end}`}>
-                        {block.start} - {block.end}
-                      </option>
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleBlockToggle(idx)}
+                        className={`p-2 rounded text-sm font-medium border-2 transition-all ${
+                          formData.selectedBlocks.includes(idx)
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'
+                        }`}
+                      >
+                        {block.start}-{block.end.split(':')[0]}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                  {formData.selectedBlocks.length > 0 && (
+                    <p className="text-xs text-gray-600 mt-2">
+                      {formData.selectedBlocks.length} bloque(s) seleccionado(s): {getScheduleBlocks()[formData.selectedBlocks[0]].start} - {getScheduleBlocks()[formData.selectedBlocks[formData.selectedBlocks.length - 1]].end}
+                    </p>
+                  )}
                 </div>
               )}
 
