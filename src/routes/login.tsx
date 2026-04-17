@@ -22,10 +22,8 @@ function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [resetSent, setResetSent] = useState(false)
 
-  // Login state
   const [loginData, setLoginData] = useState({ email: '', password: '' })
 
-  // Register state
   const [registerData, setRegisterData] = useState({
     email: '',
     password: '',
@@ -42,7 +40,6 @@ function LoginPage() {
   const [codeValidated, setCodeValidated] = useState(false)
   const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([])
 
-  // Load programs on component mount
   React.useEffect(() => {
     const loadPrograms = async () => {
       const { data } = await supabase.from('programs').select('id, name').order('name')
@@ -51,7 +48,6 @@ function LoginPage() {
     loadPrograms()
   }, [])
 
-  // Validate fixed access code
   const handleValidateAccessCode = () => {
     if (!registerData.accessCode.trim()) {
       setError('Ingresa el código de acceso.')
@@ -130,7 +126,6 @@ function LoginPage() {
     setError('')
     setSuccess('')
 
-    // Basic validations
     if (!codeValidated) {
       setError('Debes validar tu código de invitación primero.')
       return
@@ -151,7 +146,6 @@ function LoginPage() {
       return
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(registerData.email)) {
       setError('Por favor ingresa un email válido.')
@@ -161,10 +155,9 @@ function LoginPage() {
     setLoading(true)
 
     try {
-      // Small delay to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      // Create user in Auth
+      // Auth signUp con solo nombre y apellido
       const { data: authData, error: authError } = await supabase.auth.signUp(
         {
           email: registerData.email.trim().toLowerCase(),
@@ -173,10 +166,6 @@ function LoginPage() {
             data: {
               first_name: registerData.firstName,
               last_name: registerData.lastName,
-              dni: registerData.dni,
-              legajo: registerData.legajo,
-              program_id: registerData.programId,
-              year: parseInt(registerData.year),
             },
           },
         },
@@ -208,7 +197,6 @@ function LoginPage() {
 
       console.log('✅ Usuario Auth creado:', authData.user.id)
 
-      // Create profile for user
       const profilePayload = {
         id: authData.user.id,
         email: registerData.email.trim().toLowerCase(),
@@ -221,10 +209,8 @@ function LoginPage() {
         console.error('❌ Profile creation error:', profileError)
       }
 
-      // Esperar a que el trigger cree el registro en students
       await new Promise(resolve => setTimeout(resolve, 1000))
 
-      // Obtener el student_id
       const { data: studentData } = await supabase
         .from('students')
         .select('id')
@@ -234,12 +220,9 @@ function LoginPage() {
       if (studentData) {
         const selectedYear = parseInt(registerData.year)
 
-        // Lógica de inscripción según el año seleccionado
         if (selectedYear === 1) {
-          // Año 1: No inscribir en nada
           console.log('✅ Alumno de 1° año sin inscripciones automáticas')
         } else if (selectedYear === 2) {
-          // Año 2: Inscribir solo en materias de 1° año
           const { data: subjectsYear1 } = await supabase
             .from('subjects')
             .select('id')
@@ -263,7 +246,6 @@ function LoginPage() {
             }
           }
         } else if (selectedYear === 3) {
-          // Año 3: Inscribir en materias de 1° y 2° año
           const { data: subjectsYear1And2 } = await supabase
             .from('subjects')
             .select('id')
@@ -339,7 +321,6 @@ function LoginPage() {
 
       <div className="relative w-full max-w-6xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left Panel - Info */}
           <div className="hidden lg:flex flex-col justify-center space-y-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
@@ -373,10 +354,8 @@ function LoginPage() {
             </div>
           </div>
 
-          {/* Right Panel - Form */}
           <div className="w-full max-w-md mx-auto lg:mx-0">
             <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden">
-              {/* Header */}
               <div className="bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--siu-blue)] p-8 text-center">
                 <div className="mb-3">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20">
@@ -387,7 +366,6 @@ function LoginPage() {
                 <p className="text-sm text-white/90">Sistema de Gestión Académica</p>
               </div>
 
-              {/* Tabs */}
               {mode !== 'forgot' && (
                 <div className="flex border-b border-slate-200">
                   <button
@@ -413,7 +391,6 @@ function LoginPage() {
                 </div>
               )}
 
-              {/* Content */}
               <div className="p-8">
                 {error && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
@@ -494,7 +471,6 @@ function LoginPage() {
                     <h3 className="text-lg font-bold text-slate-900 mb-1">Crear cuenta</h3>
                     <p className="text-sm text-slate-600 mb-6">Completa el formulario para registrarte</p>
                     <form onSubmit={handleRegister} className="space-y-4">
-                      {/* Access Code Section */}
                       {!codeValidated && (
                         <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-lg">
                           <label className="block text-sm font-semibold text-slate-900 mb-3">🔐 Código de Acceso</label>
@@ -519,14 +495,12 @@ function LoginPage() {
                         </div>
                       )}
 
-                      {/* Code Validated Success Message */}
                       {codeValidated && (
                         <div className="mb-6 p-3 bg-emerald-50 border border-emerald-300 rounded-lg">
                           <p className="text-sm text-emerald-700 font-semibold">✓ Código validado correctamente</p>
                         </div>
                       )}
 
-                      {/* Registration Form Fields */}
                       {codeValidated && (
                         <>
                           <div className="grid grid-cols-2 gap-3">
