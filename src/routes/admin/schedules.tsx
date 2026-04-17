@@ -158,11 +158,17 @@ function AdminSchedulesPage() {
           classroom
         `,
         )
-        .order('day')
-        .order('start_time')
+        .order('day', { ascending: true })
 
       if (data) {
-        const formatted: Schedule[] = data.map((s: any) => ({
+        const sorted = data.sort((a: any, b: any) => {
+          if (a.day !== b.day) {
+            return DAYS.indexOf(a.day) - DAYS.indexOf(b.day)
+          }
+          return a.start_time.localeCompare(b.start_time)
+        })
+
+        const formatted: Schedule[] = sorted.map((s: any) => ({
           id: s.id,
           subject_id: s.subject_id,
           subject_name: s.subject?.name,
