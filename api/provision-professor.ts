@@ -57,8 +57,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { accessToken, email, dni, name, department } = req.body
 
-    if (!accessToken || !email || !dni || !name || !department) {
-      return res.status(400).json({ error: 'Faltan campos requeridos' })
+    console.log('Datos recibidos:', { accessToken: !!accessToken, email, dni, name, department })
+
+    if (!accessToken?.trim()) {
+      return res.status(400).json({ error: 'accessToken requerido' })
+    }
+    if (!email?.trim()) {
+      return res.status(400).json({ error: 'email requerido' })
+    }
+    if (!dni?.trim()) {
+      return res.status(400).json({ error: 'dni requerido' })
+    }
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'name requerido' })
+    }
+    if (!department?.trim()) {
+      return res.status(400).json({ error: 'department requerido' })
     }
 
     // Validar staff
@@ -113,9 +127,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message: 'Profesor creado exitosamente.',
     })
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error desconocido'
+    console.error('Error en provision-professor:', message)
     return res.status(400).json({
       ok: false,
-      message: error instanceof Error ? error.message : 'Error desconocido',
+      message,
     })
   }
 }

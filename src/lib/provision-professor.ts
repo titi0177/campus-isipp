@@ -15,6 +15,8 @@ export async function provisionProfessorWithAuth(req: {
   data: ProvisionRequest
 }): Promise<ProvisionResponse> {
   try {
+    console.log('Enviando datos:', req.data)
+
     const response = await fetch('/api/provision-professor', {
       method: 'POST',
       headers: {
@@ -34,9 +36,11 @@ export async function provisionProfessorWithAuth(req: {
 
     return data
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Error desconocido'
+    console.error('Error en provision:', message)
     return {
       ok: false,
-      message: error instanceof Error ? error.message : 'Error desconocido',
+      message,
     }
   }
 }
