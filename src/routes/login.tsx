@@ -157,18 +157,16 @@ function LoginPage() {
     try {
       await new Promise(resolve => setTimeout(resolve, 500))
 
-      const { data: authData, error: authError } = await supabase.auth.signUp(
-        {
-          email: registerData.email.trim().toLowerCase(),
-          password: registerData.password,
-          options: {
-            data: {
-              first_name: registerData.firstName,
-              last_name: registerData.lastName,
-            },
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: registerData.email.trim().toLowerCase(),
+        password: registerData.password,
+        options: {
+          data: {
+            first_name: registerData.firstName,
+            last_name: registerData.lastName,
           },
         },
-      )
+      })
 
       if (authError) {
         if (authError.message.includes('already registered')) {
@@ -196,7 +194,7 @@ function LoginPage() {
 
       console.log('✅ Usuario Auth creado:', authData.user.id)
 
-      // Crear perfil en profiles
+      // Crear perfil
       const profilePayload = {
         id: authData.user.id,
         email: registerData.email.trim().toLowerCase(),
@@ -209,8 +207,7 @@ function LoginPage() {
         console.error('❌ Profile creation error:', profileError)
       }
 
-      // CAMBIO IMPORTANTE: Insertar estudiante en lugar de buscar y actualizar
-      // Esto dispara el trigger on_student_created que genera los pagos automáticamente
+      // INSERTAR estudiante (esto es lo que dispara el trigger de pagos)
       const studentPayload = {
         user_id: authData.user.id,
         first_name: registerData.firstName,
@@ -230,22 +227,61 @@ function LoginPage() {
         .single()
 
       if (insertError) {
-        console.error('❌ Student insertion error:', insertError)
-        setError('Error al crear el registro de estudiante: ' + insertError.message)
-        setLoading(false)
-        return
+        // Si el error es de duplicado, esperar y buscar
+        if (insertError.code === '23505') {
+          console.log('⏳ Estudiante ya existe (creado por trigger), esperando y recuperando...')
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          const { data: existingStudent, error: selectError } = await supabase
+            .from('students')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+          
+          if (selectError || !existingStudent) {
+            console.error('❌ No se pudo recuperar estudiante:', selectError)
+            setError('Error al obtener registro de estudiante')
+            setLoading(false)
+            return
+          }
+          
+          // Actualizar con los datos correctos
+          const { error: updateError } = await supabase
+            .from('students')
+            .update({
+              program_id: registerData.programId,
+              dni: registerData.dni,
+              legajo: registerData.legajo,
+              year: parseInt(registerData.year),
+            })
+            .eq('id', existingStudent.id)
+          
+          if (updateError) {
+            console.error('❌ Error updating student:', updateError)
+            setError('Error al actualizar estudiante')
+            setLoading(false)
+            return
+          }
+          
+          insertedStudent.id = existingStudent.id
+        } else {
+          console.error('❌ Student insertion error:', insertError)
+          setError('Error al crear estudiante: ' + insertError.message)
+          setLoading(false)
+          return
+        }
       }
 
-      if (!insertedStudent) {
+      if (!insertedStudent?.id) {
         setError('No se pudo crear el registro de estudiante')
         setLoading(false)
         return
       }
 
-      console.log('✅ Estudiante creado en public.students:', insertedStudent.id)
-      console.log('✅ Trigger de pagos debería haber ejecutado automáticamente')
+      console.log('✅ Estudiante listo:', insertedStudent.id)
+      console.log('✅ Trigger de pagos debería haber ejecutado')
 
-      // Ahora manejar inscripciones automáticas según el año
+      // Inscripciones automáticas según año
       const selectedYear = parseInt(registerData.year)
 
       if (selectedYear === 1) {
