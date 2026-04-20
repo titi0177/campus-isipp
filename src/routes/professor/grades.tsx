@@ -6,6 +6,7 @@ import { FileText, ChevronDown } from 'lucide-react'
 import { ProfessorGradeLoader } from '@/components/ProfessorGradeLoader'
 import { ProfessorRegularGrades } from '@/components/ProfessorRegularGrades'
 import { ProfessorApprovedHistory } from '@/components/ProfessorApprovedHistory'
+import { ProfessorDisapprovedManagement } from '@/components/ProfessorDisapprovedManagement'
 
 export const Route = createFileRoute('/professor/grades')({
   component: ProfessorGradesPage,
@@ -31,7 +32,7 @@ function ProfessorGradesPage() {
   const [selectedSubject, setSelectedSubject] = useState('')
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history'>('load')
+  const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history' | 'disapproved'>('load')
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -171,6 +172,16 @@ function ProfessorGradesPage() {
               Notas Finales (Regulares)
             </button>
             <button
+              onClick={() => setActiveTab('disapproved')}
+              className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
+                activeTab === 'disapproved'
+                  ? 'border-b-red-600 text-red-600'
+                  : 'border-b-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              🔄 Desaprobados
+            </button>
+            <button
               onClick={() => setActiveTab('history')}
               className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
                 activeTab === 'history'
@@ -221,6 +232,16 @@ function ProfessorGradesPage() {
                 </p>
               </div>
               <ProfessorRegularGrades subjectId={selectedSubject} />
+            </>
+          ) : activeTab === 'disapproved' ? (
+            <>
+              <div className="card p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200">
+                <h3 className="font-bold text-red-900 mb-2">🔄 Gestión de Desaprobados</h3>
+                <p className="text-sm text-red-900">
+                  Aquí puedes reinscribir a los alumnos desaprobados como recursantes (2do intento)
+                </p>
+              </div>
+              <ProfessorDisapprovedManagement subjectId={selectedSubject} />
             </>
           ) : (
             <>

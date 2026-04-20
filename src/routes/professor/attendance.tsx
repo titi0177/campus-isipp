@@ -103,13 +103,11 @@ function ProfessorAttendancePage() {
         return
       }
 
-      // Obtener IDs de estudiantes con estado final para excluirlos
+      // Obtener IDs de estudiantes con estado final definido (Desaprobado, Promocionado, Aprobado)
       const { data: finalGradesData } = await supabase
         .from('enrollment_grades')
         .select('enrollment_id, final_status')
-        .eq('final_status', 'aprobado')
-        .or('final_status.eq.promocionado')
-        .or('final_status.eq.desaprobado')
+        .in('final_status', ['aprobado', 'promocionado', 'desaprobado'])
 
       const excludedEnrollmentIds = new Set<string>()
       if (finalGradesData) {
