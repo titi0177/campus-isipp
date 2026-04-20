@@ -29,6 +29,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [numGrades, setNumGrades] = useState(3)
   const [allowsPromotion, setAllowsPromotion] = useState(false)
   const [grades, setGrades] = useState<Record<string, GradeData>>({})
+  const [existingGrades, setExistingGrades] = useState<Record<string, GradeData>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -71,21 +72,36 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         return
       }
 
+      // Obtener calificaciones existentes pero sin status final (en proceso)
       const { data: gradesData } = await supabase
         .from('enrollment_grades')
-        .select('enrollment_id, partial_status')
+        .select('enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status')
         .in('enrollment_id', enrollmentIds)
+        .is('final_status', null)
 
-      const completedEnrollmentIds = new Set<string>()
+      const existingGradesMap: Record<string, GradeData> = {}
+      const enrollmentsInProcess = new Set<string>()
+
       if (gradesData) {
         gradesData.forEach(g => {
-          if (g.partial_status) {
-            completedEnrollmentIds.add(g.enrollment_id)
+          existingGradesMap[g.enrollment_id] = {
+            grade_1: g.grade_1 || undefined,
+            grade_2: g.grade_2 || undefined,
+            grade_3: g.grade_3 || undefined,
+            grade_4: g.grade_4 || undefined,
+            grade_5: g.grade_5 || undefined,
+            grade_6: g.grade_6 || undefined,
+            partial_grade: g.partial_grade || undefined,
+            partial_status: g.partial_status || undefined,
           }
+          enrollmentsInProcess.add(g.enrollment_id)
         })
       }
 
-      const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
+      setExistingGrades(existingGradesMap)
+
+      // Mostrar alumnos sin calificaciones O alumnos en proceso (sin status final)
+      const active = enrollments.filter(e => !gradesData?.some(g => g.enrollment_id === e.id && g.partial_status) || gradesData?.some(g => g.enrollment_id === e.id))
       setActiveEnrollments(active)
     } catch (err) {
       console.error('Error filtering enrollments:', err)
@@ -93,12 +109,17 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     }
   }
 
+  const getDisplayGrade = (enrollmentId: string, gradeNum: number): number | undefined => {
+    const newGrade = grades[enrollmentId]?.[`grade_${gradeNum}` as keyof GradeData]
+    if (newGrade !== undefined && newGrade !== null) return newGrade
+    return existingGrades[enrollmentId]?.[`grade_${gradeNum}` as keyof GradeData]
+  }
+
   const calculatePartialGrade = (enrollmentId: string): number | null => {
-    const enrollmentGrades = grades[enrollmentId] || {}
     const gradeValues: number[] = []
 
     for (let i = 1; i <= numGrades; i++) {
-      const grade = enrollmentGrades[`grade_${i}` as keyof GradeData]
+      const grade = getDisplayGrade(enrollmentId, i)
       if (grade !== undefined && grade !== null) {
         gradeValues.push(grade as number)
       }
@@ -112,7 +133,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     return null
   }
 
-  const getPartialStatus = (partialGrade: number): string => {
+  const getPartialStatus = (partialGrade: number | null): string | null => {
+    if (partialGrade === null) return null
     if (partialGrade >= 8 && allowsPromotion) return 'promocionado'
     if (partialGrade >= 6) return 'regular'
     return 'desaprobado'
@@ -135,27 +157,44 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     setError('')
 
     try {
-      for (const enrollment of activeEnrollments) {
-        const partialGrade = calculatePartialGrade(enrollment.id)
+      let savedCount = 0
 
-        if (partialGrade === null) continue
+      for (const enrollment of activeEnrollments) {
+        // Verificar si hay cambios para este alumno
+        let hasChanges = false
+        for (let i = 1; i <= numGrades; i++) {
+          const newGrade = grades[enrollment.id]?.[`grade_${i}` as keyof GradeData]
+          if (newGrade !== undefined && newGrade !== null) {
+            hasChanges = true
+            break
+          }
+        }
+
+        if (!hasChanges) continue
 
         setSavingStudents(prev => new Set(prev).add(enrollment.id))
 
-        const partialStatus = getPartialStatus(partialGrade)
-
-        const payload = {
+        // Construir el payload con todas las notas
+        const payload: any = {
           enrollment_id: enrollment.id,
-          grade_1: grades[enrollment.id]?.grade_1 || null,
-          grade_2: grades[enrollment.id]?.grade_2 || null,
-          grade_3: grades[enrollment.id]?.grade_3 || null,
-          grade_4: grades[enrollment.id]?.grade_4 || null,
-          grade_5: grades[enrollment.id]?.grade_5 || null,
-          grade_6: grades[enrollment.id]?.grade_6 || null,
-          partial_grade: partialGrade,
-          partial_status: partialStatus,
-          attempt_number: 1,
         }
+
+        // Agregar notas nuevas o mantener existentes
+        for (let i = 1; i <= numGrades; i++) {
+          const gradeKey = `grade_${i}` as keyof GradeData
+          const newGrade = grades[enrollment.id]?.[gradeKey]
+          const existingGrade = existingGrades[enrollment.id]?.[gradeKey]
+          payload[gradeKey] = newGrade !== undefined ? newGrade : existingGrade
+        }
+
+        // Calcular promedio solo si todas las notas están completas
+        const partialGrade = calculatePartialGrade(enrollment.id)
+        if (partialGrade !== null) {
+          payload.partial_grade = partialGrade
+          payload.partial_status = getPartialStatus(partialGrade)
+        }
+        // Si no están todas las notas, guardamos solo las que tenemos sin calcular promedio
+        payload.attempt_number = 1
 
         const { error: upsertError } = await supabase
           .from('enrollment_grades')
@@ -173,6 +212,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           return
         }
 
+        savedCount++
         setSavingStudents(prev => {
           const updated = new Set(prev)
           updated.delete(enrollment.id)
@@ -182,7 +222,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
       setError('')
       setGrades({})
-      alert('Calificaciones guardadas correctamente')
+      alert(`${savedCount} calificación${savedCount !== 1 ? 'es' : ''} guardada${savedCount !== 1 ? 's' : ''} correctamente`)
       await filterActiveEnrollments()
     } catch (err) {
       setError('Error al guardar: ' + String(err))
@@ -250,12 +290,12 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
       {/* Info Box */}
       <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
-        <h3 className="font-bold text-emerald-900 mb-2">💡 Carga Flexible</h3>
+        <h3 className="font-bold text-emerald-900 mb-2">💡 Carga Flexible y Progresiva</h3>
         <ul className="text-sm text-emerald-900 space-y-1">
-          <li>✓ Puedes cargar 1 o más notas a la vez</li>
-          <li>✓ Los alumnos pueden tomar exámenes en diferentes fechas</li>
-          <li>✓ Cada alumno se guarda individualmente cuando completa todas sus notas</li>
-          <li>✓ El botón "Guardar" solo procesa alumnos con todas las notas completas</li>
+          <li>✓ <strong>Lunes:</strong> Carga la Nota 1 (ej: 8) y guarda - quedará registrada</li>
+          <li>✓ <strong>Vuelves en 2 semanas:</strong> Verás la Nota 1: 8 ya cargada, luego añade Nota 2 y 3</li>
+          <li>✓ Cuando completes todas las notas, el promedio se calcula automáticamente</li>
+          <li>✓ Se muestra el estado (Promocionado/Regular/Desaprobado) solo cuando todas están completas</li>
         </ul>
       </div>
 
@@ -270,7 +310,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       {activeEnrollments.length === 0 ? (
         <div className="card p-6 text-center bg-blue-50 border border-blue-200">
           <p className="text-gray-600 font-medium">
-            ✓ Todos los alumnos tienen calificaciones cargadas o no hay alumnos inscriptos
+            ✓ Todos los alumnos tienen calificaciones completas y finalizadas
           </p>
         </div>
       ) : (
@@ -288,35 +328,40 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                     ))}
                     <th className="px-4 py-3 text-center text-sm font-bold">Promedio</th>
                     <th className="px-4 py-3 text-center text-sm font-bold">Estado</th>
-                    <th className="px-4 py-3 text-center text-sm font-bold">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {activeEnrollments.map((enrollment, idx) => {
                     const partialGrade = calculatePartialGrade(enrollment.id)
                     const partialStatus = partialGrade ? getPartialStatus(partialGrade) : null
-                    const isSaving = savingStudents.has(enrollment.id)
-                    const isComplete = partialGrade !== null
 
                     return (
                       <tr key={enrollment.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="px-4 py-3 font-medium text-gray-900">{enrollment.student_name}</td>
-                        {Array.from({ length: numGrades }, (_, i) => (
-                          <td key={i + 1} className="px-4 py-3 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="10"
-                              step="0.1"
-                              value={grades[enrollment.id]?.[`grade_${i + 1}` as keyof GradeData] ?? ''}
-                              onChange={e => handleGradeChange(enrollment.id, i + 1, e.target.value)}
-                              className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm"
-                              placeholder="-"
-                            />
-                          </td>
-                        ))}
+                        {Array.from({ length: numGrades }, (_, i) => {
+                          const gradeValue = getDisplayGrade(enrollment.id, i + 1)
+                          const hasExisting = existingGrades[enrollment.id]?.[`grade_${i + 1}` as keyof GradeData] !== undefined
+                          return (
+                            <td key={i + 1} className="px-4 py-3 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                value={gradeValue ?? ''}
+                                onChange={e => handleGradeChange(enrollment.id, i + 1, e.target.value)}
+                                className={`w-16 px-2 py-1 border rounded text-center text-sm font-medium ${
+                                  hasExisting && !grades[enrollment.id]?.[`grade_${i + 1}` as keyof GradeData]
+                                    ? 'border-green-500 bg-green-50'
+                                    : 'border-gray-300'
+                                }`}
+                                placeholder="-"
+                              />
+                            </td>
+                          )
+                        })}
                         <td className="px-4 py-3 text-center font-bold text-gray-900">
-                          {partialGrade !== null ? partialGrade.toFixed(1) : '-'}
+                          {partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '-'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {partialStatus && (
@@ -339,13 +384,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          {isComplete && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
-                              ✓ Completo
-                            </span>
-                          )}
-                        </td>
                       </tr>
                     )
                   })}
@@ -360,11 +398,11 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <Save size={20} />
-            {saving ? 'Guardando...' : 'Guardar Calificaciones'}
+            {saving ? 'Guardando...' : 'Guardar Notas'}
           </button>
 
           <p className="text-xs text-center text-gray-600 mt-2">
-            {activeEnrollments.filter(e => calculatePartialGrade(e.id) !== null).length} de {activeEnrollments.length} alumnos con calificaciones completas
+            💾 Guarda tus cambios cuando agregues nuevas notas. Las notas se mantienen registradas para futuras ediciones.
           </p>
         </>
       )}

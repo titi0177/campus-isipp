@@ -232,7 +232,7 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
                     <td className="px-4 py-3 font-medium text-gray-900">{student.student_name}</td>
                     <td className="px-4 py-3 text-gray-600">{student.dni}</td>
                     <td className="px-4 py-3 text-center font-bold text-gray-900">
-                      {student.partial_grade.toFixed(1)}
+                      {student.partial_grade && !isNaN(student.partial_grade) ? student.partial_grade.toFixed(1) : '—'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold ${getStatusColor(student.partial_status)}`}>
