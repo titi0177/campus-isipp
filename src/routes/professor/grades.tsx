@@ -2,43 +2,35 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Save, Download, Eye, EyeOff, FileText } from 'lucide-react'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { FileText, ChevronDown } from 'lucide-react'
+import { ProfessorGradeLoader } from '@/components/ProfessorGradeLoader'
+import { ProfessorRegularGrades } from '@/components/ProfessorRegularGrades'
 
 export const Route = createFileRoute('/professor/grades')({
   component: ProfessorGradesPage,
 })
 
-type StudentGrade = {
-  enrollmentId: string
+type Subject = {
+  id: string
+  name: string
+  code: string
+  year: number
   division?: string | null
-  studentName: string
-  partial1?: number
-  partial2?: number
-  partial3?: number
-  practical1?: number
-  practical2?: number
-  practical3?: number
-  finalGradeExam?: number
-  avgPartials?: number
-  avgPracticals?: number
-  partialGrade?: number
-  status?: string
+}
+
+type Enrollment = {
+  id: string
+  student_id: string
+  student_name: string
+  subject_id: string
 }
 
 function ProfessorGradesPage() {
-  const [subjects, setSubjects] = useState<any[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
   const [selectedSubject, setSelectedSubject] = useState('')
-  const [selectedDivision, setSelectedDivision] = useState<string | null>(null)
-  const [students, setStudents] = useState<StudentGrade[]>([])
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(false)
-  const [schemaReady, setSchemaReady] = useState(false)
-  const [showColumns, setShowColumns] = useState({
-    p1: true, p2: true, p3: true,
-    tp1: true, tp2: true, tp3: true,
-    partial: true, final: true
-  })
+  const [activeTab, setActiveTab] = useState<'load' | 'regulars'>('load')
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -54,7 +46,7 @@ function ProfessorGradesPage() {
         .from('professors')
         .select('id')
         .eq('user_id', user.id)
-        .maybeSingle()
+        .single()
 
       if (!prof?.id) {
         setSubjects([])
@@ -75,286 +67,46 @@ function ProfessorGradesPage() {
     }
   }
 
-  function getDivisionLabel(subject: any) {
-    return subject.division ? ` - Div. ${subject.division}` : ''
-  }
-
-  async function loadStudents(subjectId: string, division: string | null) {
+  async function loadEnrollments(subjectId: string) {
     try {
       setLoading(true)
 
-      const baseQuery = supabase
+      const { data } = await supabase
         .from('enrollments')
         .select(`
           id,
-          division,
-          student:students(first_name, last_name),
-          grades(
-            id,
-            partial_1, partial_2, partial_3,
-            practical_1, practical_2, practical_3,
-            partial_grade,
-            final_grade_exam,
-            final_grade,
-            status
-          )
+          student:students(id, first_name, last_name)
         `)
         .eq('subject_id', subjectId)
         .order('student(last_name)')
 
-      const { data: allEnrollmentsData, error } = await baseQuery
-
-      if (error) {
-        console.error('Error loading students:', error)
-        showToast('Error al cargar alumnos', 'error')
-        setStudents([])
-        return
+      if (data) {
+        const formatted: Enrollment[] = data.map((e: any) => ({
+          id: e.id,
+          student_id: e.student.id,
+          student_name: `${e.student.last_name}, ${e.student.first_name}`,
+          subject_id: subjectId,
+        }))
+        setEnrollments(formatted)
       }
 
-      // Filtrar por división en memoria si es necesario
-      const enrollmentsData = division && allEnrollmentsData
-        ? allEnrollmentsData.filter(e => e.division === division)
-        : allEnrollmentsData
-
-      const hasNewSchema = enrollmentsData && enrollmentsData.length > 0 && 
-        enrollmentsData[0].grades && 
-        'partial_1' in (Array.isArray(enrollmentsData[0].grades) ? enrollmentsData[0].grades[0] : enrollmentsData[0].grades)
-      
-      setSchemaReady(hasNewSchema || false)
-
-      if (enrollmentsData) {
-        const studentList: StudentGrade[] = enrollmentsData.map((enrollment: any) => {
-          const grade = Array.isArray(enrollment.grades) ? enrollment.grades[0] : enrollment.grades
-
-          if (hasNewSchema && grade) {
-            const partials = [grade?.partial_1, grade?.partial_2, grade?.partial_3].filter(p => p != null)
-            const practicals = [grade?.practical_1, grade?.practical_2, grade?.practical_3].filter(p => p != null)
-
-            const avgPartials = partials.length > 0 ? Math.round((partials.reduce((a, b) => a + b, 0) / partials.length) * 100) / 100 : undefined
-            const avgPracticals = practicals.length > 0 ? Math.round((practicals.reduce((a, b) => a + b, 0) / practicals.length) * 100) / 100 : undefined
-
-            const allGrades = [...(partials || []), ...(practicals || [])]
-            const partialGrade = allGrades.length > 0 ? Math.round((allGrades.reduce((a, b) => a + b, 0) / allGrades.length) * 100) / 100 : undefined
-
-            let status = 'in_progress'
-            if (grade?.final_grade_exam != null) {
-              if (grade.final_grade_exam >= 8) status = 'promoted'
-              else if (grade.final_grade_exam >= 6) status = 'passed'
-              else status = 'failed'
-            }
-
-            return {
-              enrollmentId: enrollment.id,
-              division: enrollment.division,
-              studentName: `${enrollment.student?.last_name || 'Sin'}, ${enrollment.student?.first_name || 'Nombre'}`,
-              partial1: grade?.partial_1,
-              partial2: grade?.partial_2,
-              partial3: grade?.partial_3,
-              practical1: grade?.practical_1,
-              practical2: grade?.practical_2,
-              practical3: grade?.practical_3,
-              finalGradeExam: grade?.final_grade_exam,
-              avgPartials,
-              avgPracticals,
-              partialGrade,
-              status,
-            }
-          } else {
-            const partialGrade = grade?.partial_grade
-            const finalGrade = grade?.final_grade_exam || grade?.final_grade
-
-            let status = grade?.status || 'in_progress'
-
-            return {
-              enrollmentId: enrollment.id,
-              division: enrollment.division,
-              studentName: `${enrollment.student?.last_name || 'Sin'}, ${enrollment.student?.first_name || 'Nombre'}`,
-              partialGrade,
-              finalGradeExam: finalGrade,
-              status,
-            }
-          }
-        })
-
-        setStudents(studentList)
-      }
+      setLoading(false)
     } catch (err) {
-      console.error('Error loading students:', err)
+      console.error('Error loading enrollments:', err)
       showToast('Error al cargar alumnos', 'error')
-    } finally {
       setLoading(false)
     }
   }
 
-  function updateValue(enrollmentId: string, field: string, value: number | '') {
-    setStudents(prev => prev.map(s => {
-      if (s.enrollmentId === enrollmentId) {
-        const updated = { ...s, [field]: value === '' ? undefined : value }
-
-        if (schemaReady && ['partial1', 'partial2', 'partial3', 'practical1', 'practical2', 'practical3'].includes(field)) {
-          const partials = [updated.partial1, updated.partial2, updated.partial3].filter(p => p != null)
-          const practicals = [updated.practical1, updated.practical2, updated.practical3].filter(p => p != null)
-
-          updated.avgPartials = partials.length > 0 ? Math.round((partials.reduce((a, b) => a + b, 0) / partials.length) * 100) / 100 : undefined
-          updated.avgPracticals = practicals.length > 0 ? Math.round((practicals.reduce((a, b) => a + b, 0) / practicals.length) * 100) / 100 : undefined
-
-          const allGrades = [...(partials || []), ...(practicals || [])]
-          updated.partialGrade = allGrades.length > 0 ? Math.round((allGrades.reduce((a, b) => a + b, 0) / allGrades.length) * 100) / 100 : undefined
-        }
-
-        if (field === 'finalGradeExam') {
-          if (updated.finalGradeExam == null) {
-            updated.status = 'in_progress'
-          } else if (updated.finalGradeExam >= 8) {
-            updated.status = 'promoted'
-          } else if (updated.finalGradeExam >= 6) {
-            updated.status = 'passed'
-          } else {
-            updated.status = 'failed'
-          }
-        }
-
-        return updated
-      }
-      return s
-    }))
-  }
-
-  async function saveGrades() {
-    try {
-      for (const student of students) {
-        const { data: existing } = await supabase
-          .from('grades')
-          .select('id')
-          .eq('enrollment_id', student.enrollmentId)
-          .maybeSingle()
-
-        let gradeData: any = {}
-
-        if (schemaReady) {
-          const partials = [student.partial1, student.partial2, student.partial3].filter(p => p != null)
-          const practicals = [student.practical1, student.practical2, student.practical3].filter(p => p != null)
-          const allGrades = [...partials, ...practicals]
-          const partialGrade = allGrades.length > 0 ? Math.round((allGrades.reduce((a, b) => a + b, 0) / allGrades.length) * 100) / 100 : null
-
-          let status = 'in_progress'
-          if (student.finalGradeExam != null) {
-            if (student.finalGradeExam >= 8) status = 'promoted'
-            else if (student.finalGradeExam >= 6) status = 'passed'
-            else status = 'failed'
-          }
-
-          gradeData = {
-            partial_1: student.partial1 || null,
-            partial_2: student.partial2 || null,
-            partial_3: student.partial3 || null,
-            practical_1: student.practical1 || null,
-            practical_2: student.practical2 || null,
-            practical_3: student.practical3 || null,
-            partial_grade: partialGrade,
-            final_grade_exam: student.finalGradeExam || null,
-            final_grade: student.finalGradeExam || null,
-            status,
-          }
-        } else {
-          gradeData = {
-            partial_grade: student.partialGrade || null,
-            final_grade_exam: student.finalGradeExam || null,
-            final_grade: student.finalGradeExam || null,
-            status: student.status || 'in_progress',
-          }
-        }
-
-        if (existing?.id) {
-          await supabase
-            .from('grades')
-            .update(gradeData)
-            .eq('id', existing.id)
-        } else {
-          await supabase
-            .from('grades')
-            .insert({
-              enrollment_id: student.enrollmentId,
-              ...gradeData,
-            })
-        }
-      }
-
-      showToast('✓ Notas guardadas correctamente', 'success')
-    } catch (err) {
-      console.error('Error saving grades:', err)
-      showToast('Error al guardar notas', 'error')
-    }
-  }
-
-  function generatePDF() {
-    if (students.length === 0) {
-      showToast('No hay alumnos para exportar', 'error')
-      return
-    }
-
-    const subject = subjects.find(s => s.id === selectedSubject)
-    const doc = new jsPDF('l')
-    const now = new Date().toLocaleDateString('es-AR')
-
-    doc.setFontSize(16)
-    doc.text('PLANILLA DE CALIFICACIONES', 148, 15, { align: 'center' })
-    
-    doc.setFontSize(11)
-    doc.text(`Materia: ${subject?.name}`, 14, 25)
-    doc.text(`Profesor: ${subject?.code}`, 14, 31)
-    if (selectedDivision) {
-      doc.text(`División: ${selectedDivision}`, 14, 37)
-      doc.text(`Fecha: ${now}`, 14, 43)
+  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value
+    setSelectedSubject(id)
+    setActiveTab('load')
+    if (id) {
+      void loadEnrollments(id)
     } else {
-      doc.text(`Fecha: ${now}`, 14, 37)
+      setEnrollments([])
     }
-
-    const tableData = students.map(s => {
-      const row: any = [
-        s.studentName,
-        s.division || '-'
-      ]
-      
-      if (schemaReady) {
-        row.push(
-          s.partial1 || '-',
-          s.partial2 || '-',
-          s.partial3 || '-',
-          s.practical1 || '-',
-          s.practical2 || '-',
-          s.practical3 || '-',
-          s.partialGrade || '-'
-        )
-      } else {
-        row.push(s.partialGrade || '-')
-      }
-      
-      row.push(s.finalGradeExam || '-')
-      row.push(s.status || '-')
-      
-      return row
-    })
-
-    const headers = ['Alumno', 'Div.']
-    if (schemaReady) {
-      headers.push('P1', 'P2', 'P3', 'TP1', 'TP2', 'TP3', 'Prom Parcial')
-    } else {
-      headers.push('Nota Parcial')
-    }
-    headers.push('Nota Final', 'Estado')
-
-    autoTable(doc, {
-      head: [headers],
-      body: tableData,
-      startY: selectedDivision ? 50 : 45,
-      margin: 10,
-      headStyles: { fillColor: [88, 44, 49], fontSize: 10 },
-      bodyStyles: { fontSize: 9 },
-      alternateRowStyles: { fillColor: [240, 240, 240] },
-    })
-
-    doc.save(`planilla_calificaciones_${subject?.code}${selectedDivision ? `_div${selectedDivision}` : ''}.pdf`)
   }
 
   return (
@@ -363,318 +115,109 @@ function ProfessorGradesPage() {
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-indigo-100 text-sm font-semibold mb-2">Carga de Calificaciones</p>
-            <h1 className="text-5xl font-black mb-3">Notas de Alumnos</h1>
+            <p className="text-indigo-100 text-sm font-semibold mb-2">Sistema Académico</p>
+            <h1 className="text-5xl font-black mb-3">Carga de Calificaciones</h1>
             <p className="text-indigo-100 text-lg">
-              {schemaReady 
-                ? 'Carga de parciales, trabajos prácticos y nota final' 
-                : 'Sistema con nota parcial y final'}
+              Carga flexible de notas parciales (1-6) y finales con promoción automática
             </p>
           </div>
           <FileText size={80} className="opacity-20" />
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div>
-          <label htmlFor="subject-select" className="form-label">Seleccionar Materia *</label>
-          <select
-            id="subject-select"
-            className="form-input"
-            value={selectedSubject}
-            onChange={(e) => {
-              const v = e.target.value
-              setSelectedSubject(v)
-              setSelectedDivision(null)
-              if (v) void loadStudents(v, null)
-              else setStudents([])
-            }}
-          >
-            <option value="">-- Selecciona materia --</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} - {s.name}{getDivisionLabel(s)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {selectedSubject && subjects.find(s => s.id === selectedSubject)?.year === 1 && (
-          <div>
-            <label htmlFor="division-select" className="form-label">División (Año 1)</label>
-            <select
-              id="division-select"
-              className="form-input"
-              value={selectedDivision || ''}
-              onChange={(e) => {
-                const div = e.target.value || null
-                setSelectedDivision(div)
-                void loadStudents(selectedSubject, div)
-              }}
-            >
-              <option value="">Ver ambas divisiones</option>
-              <option value="A">División A</option>
-              <option value="B">División B</option>
-            </select>
-          </div>
-        )}
-
-        {schemaReady && students.length > 0 && (
-          <div>
-            <label className="form-label">Mostrar/Ocultar Columnas</label>
-            <button
-              onClick={() => setShowColumns(prev => ({
-                ...prev,
-                p1: !prev.p1, p2: !prev.p2, p3: !prev.p3,
-                tp1: !prev.tp1, tp2: !prev.tp2, tp3: !prev.tp3
-              }))}
-              className="btn-secondary w-full flex items-center justify-center gap-2"
-            >
-              {Object.values(showColumns).every(v => v) ? (
-                <>
-                  <EyeOff size={16} />
-                  Ocultar Detalles
-                </>
-              ) : (
-                <>
-                  <Eye size={16} />
-                  Mostrar Detalles
-                </>
-              )}
-            </button>
-          </div>
-        )}
+      {/* Selector de Materia */}
+      <div className="card p-6">
+        <label htmlFor="subject-select" className="block text-sm font-bold text-gray-900 mb-3">
+          📚 Seleccionar Materia *
+        </label>
+        <select
+          id="subject-select"
+          value={selectedSubject}
+          onChange={handleSubjectChange}
+          className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-gray-900 font-semibold focus:outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200"
+        >
+          <option value="">-- Selecciona una materia --</option>
+          {subjects.map(s => (
+            <option key={s.id} value={s.id}>
+              {s.code} - {s.name} {s.division ? `(Div. ${s.division})` : ''}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* Info Box */}
-      {students.length > 0 && (
-        <div className="card p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 space-y-2">
-          <p className="text-sm text-blue-900">
-            <strong>📌 Nota Parcial:</strong> Solo autoriza rendir examen final (mínimo 6/10). <strong>Nota Final:</strong> Determina aprobado/desaprobado.
-          </p>
-          {!selectedDivision && subjects.find(s => s.id === selectedSubject)?.year === 1 && (
-            <p className="text-sm text-blue-900">
-              <strong>🔍 División:</strong> Estás viendo ambas divisiones. Filtra por División A o B para ver solo ese grupo.
-            </p>
-          )}
-          {selectedDivision && (
-            <p className="text-sm text-blue-900">
-              <strong>✓ Filtrado:</strong> Mostrando solo alumnos de División <strong>{selectedDivision}</strong>.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Tabla de Notas */}
-      {students.length > 0 && (
-        <div className="space-y-4">
-          <div className="overflow-x-auto rounded-2xl border-2 border-indigo-200 shadow-lg">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-gradient-to-r from-indigo-700 to-purple-700 text-white">
-                  <th className="px-4 py-3 text-left font-bold sticky left-0 z-10 bg-indigo-700">Alumno</th>
-                  {!selectedDivision && <th className="px-3 py-3 text-center font-bold bg-indigo-800 min-w-12">Div.</th>}
-                  {schemaReady && showColumns.p1 && (
-                    <>
-                      <th colSpan={3} className="px-3 py-3 text-center bg-blue-700 font-bold">Parciales</th>
-                      <th colSpan={3} className="px-3 py-3 text-center bg-purple-700 font-bold">Trabajos Prácticos</th>
-                    </>
-                  )}
-                  {schemaReady && (
-                    <th className="px-3 py-3 text-center bg-amber-700 min-w-20 font-bold">Prom Parc.</th>
-                  )}
-                  {!schemaReady && (
-                    <th className="px-3 py-3 text-center bg-amber-700 min-w-20 font-bold">Nota Parcial</th>
-                  )}
-                  <th className="px-3 py-3 text-center bg-green-700 min-w-20 font-bold">Nota Final</th>
-                  <th className="px-3 py-3 text-center bg-slate-600 min-w-24 font-bold">Estado</th>
-                </tr>
-                {schemaReady && showColumns.p1 && (
-                  <tr className="bg-slate-600 text-white text-xs border-b">
-                    <th className="px-4 py-2 sticky left-0 z-10 bg-slate-600"></th>
-                    {!selectedDivision && <th className="px-3 py-2"></th>}
-                    <th className="px-2 py-2 text-center">P1</th>
-                    <th className="px-2 py-2 text-center">P2</th>
-                    <th className="px-2 py-2 text-center">P3</th>
-                    <th className="px-2 py-2 text-center">TP1</th>
-                    <th className="px-2 py-2 text-center">TP2</th>
-                    <th className="px-2 py-2 text-center">TP3</th>
-                    <th className="px-2 py-2 text-center">Prom</th>
-                    <th className="px-2 py-2 text-center">Examen</th>
-                    <th className="px-2 py-2 text-center"></th>
-                  </tr>
-                )}
-              </thead>
-              <tbody>
-                {students.map((student, idx) => (
-                  <tr key={student.enrollmentId} className={`border-b ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-indigo-100 transition-colors`}>
-                    <td className="px-4 py-3 font-semibold text-gray-900 sticky left-0 z-10 bg-inherit">{student.studentName}</td>
-                    {!selectedDivision && <td className="px-3 py-3 text-center font-bold text-blue-600">{student.division || '-'}</td>}
-                    {schemaReady && showColumns.p1 && (
-                      <>
-                        <td className="px-2 py-3 bg-blue-50">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            className="form-input text-center w-12 text-xs"
-                            value={student.partial1 ?? ''}
-                            onChange={(e) => updateValue(student.enrollmentId, 'partial1', e.target.value === '' ? '' : +e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2 py-3 bg-blue-50">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            className="form-input text-center w-12 text-xs"
-                            value={student.partial2 ?? ''}
-                            onChange={(e) => updateValue(student.enrollmentId, 'partial2', e.target.value === '' ? '' : +e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2 py-3 bg-blue-50">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            className="form-input text-center w-12 text-xs"
-                            value={student.partial3 ?? ''}
-                            onChange={(e) => updateValue(student.enrollmentId, 'partial3', e.target.value === '' ? '' : +e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2 py-3 bg-purple-50">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            className="form-input text-center w-12 text-xs"
-                            value={student.practical1 ?? ''}
-                            onChange={(e) => updateValue(student.enrollmentId, 'practical1', e.target.value === '' ? '' : +e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2 py-3 bg-purple-50">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            className="form-input text-center w-12 text-xs"
-                            value={student.practical2 ?? ''}
-                            onChange={(e) => updateValue(student.enrollmentId, 'practical2', e.target.value === '' ? '' : +e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2 py-3 bg-purple-50">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.5"
-                            className="form-input text-center w-12 text-xs"
-                            value={student.practical3 ?? ''}
-                            onChange={(e) => updateValue(student.enrollmentId, 'practical3', e.target.value === '' ? '' : +e.target.value)}
-                          />
-                        </td>
-                        <td className="px-2 py-3 text-center font-bold bg-amber-100 text-amber-900">
-                          {student.partialGrade ?? '-'}
-                        </td>
-                      </>
-                    )}
-                    {!schemaReady && (
-                      <td className="px-2 py-3 bg-amber-50">
-                        <input
-                          type="number"
-                          min="0"
-                          max="10"
-                          step="0.5"
-                          className="form-input text-center w-14 text-xs"
-                          value={student.partialGrade ?? ''}
-                          onChange={(e) => updateValue(student.enrollmentId, 'partialGrade', e.target.value === '' ? '' : +e.target.value)}
-                        />
-                      </td>
-                    )}
-                    <td className="px-2 py-3 bg-green-50">
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.5"
-                        className="form-input text-center w-14 font-bold text-xs"
-                        value={student.finalGradeExam ?? ''}
-                        onChange={(e) => updateValue(student.enrollmentId, 'finalGradeExam', e.target.value === '' ? '' : +e.target.value)}
-                        title="Nota final después de rendir examen"
-                      />
-                    </td>
-                    <td className="px-2 py-3 text-center text-xs font-bold">
-                      <span className={`px-2 py-1 rounded-full text-xs font-bold block ${
-                        student.status === 'promoted' ? 'bg-green-200 text-green-900' :
-                        student.status === 'passed' ? 'bg-blue-200 text-blue-900' :
-                        student.status === 'failed' ? 'bg-red-200 text-red-900' :
-                        'bg-gray-200 text-gray-900'
-                      }`}>
-                        {student.status === 'promoted' ? '🎓 Prom.' :
-                         student.status === 'passed' ? '✓ Apr.' :
-                         student.status === 'failed' ? '✗ Des.' :
-                         '...'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Botones de Acción */}
-          <div className="flex gap-3 flex-wrap">
+      {selectedSubject && (
+        <>
+          {/* Tabs */}
+          <div className="flex gap-2 border-b border-gray-200">
             <button
-              onClick={() => void saveGrades()}
-              className="btn-primary flex items-center gap-2 flex-1 md:flex-none"
+              onClick={() => setActiveTab('load')}
+              className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
+                activeTab === 'load'
+                  ? 'border-b-indigo-600 text-indigo-600'
+                  : 'border-b-transparent text-gray-600 hover:text-gray-900'
+              }`}
             >
-              <Save size={18} />
-              Guardar Todas las Notas
+              Carga de Notas Parciales
             </button>
             <button
-              onClick={generatePDF}
-              className="btn-secondary flex items-center gap-2 flex-1 md:flex-none"
+              onClick={() => setActiveTab('regulars')}
+              className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
+                activeTab === 'regulars'
+                  ? 'border-b-amber-600 text-amber-600'
+                  : 'border-b-transparent text-gray-600 hover:text-gray-900'
+              }`}
             >
-              <Download size={18} />
-              Descargar PDF
+              Notas Finales (Regulares)
             </button>
           </div>
 
-          {/* Notas Importantes */}
-          {schemaReady && (
-            <div className="card p-4 bg-amber-50 border-2 border-amber-200 space-y-2">
-              <h3 className="font-bold text-amber-900 flex items-center gap-2">📝 Sistema de Calificaciones Detallado</h3>
-              <ul className="text-sm text-amber-900 space-y-1 ml-4">
-                <li>• <strong>Parciales (P1, P2, P3):</strong> Carga hasta 3 parciales. El promedio se calcula automáticamente.</li>
-                <li>• <strong>Trabajos Prácticos (TP1, TP2, TP3):</strong> Carga hasta 3 trabajos. El promedio se calcula automáticamente.</li>
-                <li>• <strong>Prom Parc.:</strong> Promedio de todos los parciales y trabajos juntos.</li>
-                <li>• <strong>Requisito:</strong> Nota parcial ≥6 para autorizar a rendir examen final.</li>
-                <li>• <strong>Nota Final:</strong> Se carga DESPUÉS de que el alumno rinda el examen.</li>
-                <li>• <strong>Estado:</strong> Se determina por la NOTA FINAL: ≥8 Promocionado, 6-7 Aprobado, &lt;6 Desaprobado.</li>
-              </ul>
+          {/* Content */}
+          {loading ? (
+            <div className="card p-12 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-200 border-t-indigo-600 mb-4"></div>
+              <p className="text-slate-600">Cargando alumnos...</p>
             </div>
+          ) : activeTab === 'load' ? (
+            <>
+              {enrollments.length > 0 ? (
+                <>
+                  <div className="card p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
+                    <h3 className="font-bold text-blue-900 mb-2">📋 Información del Sistema</h3>
+                    <ul className="text-sm text-blue-900 space-y-1">
+                      <li>✓ Selecciona cuántas notas usarás (1-6)</li>
+                      <li>✓ El promedio parcial se calcula automáticamente al completar todas las notas</li>
+                      <li>✓ Estados: <strong>Promocionado</strong> (≥8), <strong>Regular</strong> (6-7), <strong>Desaprobado</strong> (&lt;6)</li>
+                      <li>✓ Las notas finales se cargan en la sección "Regulares"</li>
+                    </ul>
+                  </div>
+                  <ProfessorGradeLoader enrollments={enrollments} subjectId={selectedSubject} />
+                </>
+              ) : (
+                <div className="card p-6 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
+                  <p className="text-green-800 font-semibold">
+                    ✓ No hay alumnos inscritos en esta materia o todos tienen calificaciones completas
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="card p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200">
+                <h3 className="font-bold text-amber-900 mb-2">📝 Notas Finales para Regulares</h3>
+                <p className="text-sm text-amber-900">
+                  Aquí puedes cargar las notas finales de los estudiantes en condición Regular (parcial ≥6).
+                </p>
+              </div>
+              <ProfessorRegularGrades subjectId={selectedSubject} />
+            </>
           )}
-        </div>
+        </>
       )}
 
-      {selectedSubject && students.length === 0 && !loading && (
-        <div className="card p-6 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl">
-          <p className="text-green-800 font-semibold">
-            ✓ Todos los alumnos de esta materia tienen calificación registrada o no hay alumnos inscritos.
-          </p>
-        </div>
-      )}
-
-      {loading && (
-        <div className="card p-12 text-center rounded-2xl">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-200 border-t-indigo-600 mb-4"></div>
-          <p className="text-slate-600">Cargando alumnos...</p>
+      {!selectedSubject && (
+        <div className="card p-12 text-center bg-gradient-to-br from-gray-50 to-slate-50 border-2 border-gray-200 rounded-2xl">
+          <ChevronDown size={48} className="mx-auto text-gray-400 mb-4" />
+          <p className="text-gray-600 text-lg font-semibold">Selecciona una materia para comenzar</p>
         </div>
       )}
     </div>
