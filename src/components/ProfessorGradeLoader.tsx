@@ -30,6 +30,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [allowsPromotion, setAllowsPromotion] = useState(false)
   const [grades, setGrades] = useState<Record<string, GradeData>>({})
   const [existingGrades, setExistingGrades] = useState<Record<string, GradeData>>({})
+  const [existingIds, setExistingIds] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -75,11 +76,12 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       // Obtener calificaciones existentes pero sin status final (en proceso)
       const { data: gradesData } = await supabase
         .from('enrollment_grades')
-        .select('enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status')
+        .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status')
         .in('enrollment_id', enrollmentIds)
         .is('final_status', null)
 
       const existingGradesMap: Record<string, GradeData> = {}
+      const existingIdsMap: Record<string, string> = {}
       const enrollmentsInProcess = new Set<string>()
 
       if (gradesData) {
@@ -94,11 +96,13 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             partial_grade: g.partial_grade || undefined,
             partial_status: g.partial_status || undefined,
           }
+          existingIdsMap[g.enrollment_id] = g.id
           enrollmentsInProcess.add(g.enrollment_id)
         })
       }
 
       setExistingGrades(existingGradesMap)
+      setExistingIds(existingIdsMap)
 
       // Mostrar alumnos sin calificaciones O alumnos en proceso (sin status final)
       const active = enrollments.filter(e => !gradesData?.some(g => g.enrollment_id === e.id && g.partial_status) || gradesData?.some(g => g.enrollment_id === e.id))
@@ -196,12 +200,25 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         // Si no están todas las notas, guardamos solo las que tenemos sin calcular promedio
         payload.attempt_number = 1
 
-        const { error: upsertError } = await supabase
-          .from('enrollment_grades')
-          .upsert(payload)
+        // Verificar si el registro ya existe
+        const existingId = existingIds[enrollment.id]
+        let result
 
-        if (upsertError) {
-          console.error('Error saving grade for', enrollment.id, upsertError)
+        if (existingId) {
+          // Si existe, actualizar
+          result = await supabase
+            .from('enrollment_grades')
+            .update(payload)
+            .eq('id', existingId)
+        } else {
+          // Si no existe, insertar
+          result = await supabase
+            .from('enrollment_grades')
+            .insert([payload])
+        }
+
+        if (result.error) {
+          console.error('Error saving grade for', enrollment.id, result.error)
           setError(`Error al guardar nota de ${enrollment.student_name}`)
           setSavingStudents(prev => {
             const updated = new Set(prev)
