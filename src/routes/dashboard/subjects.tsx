@@ -40,9 +40,7 @@ type EnrollmentWithGrades = {
     partial_status?: string
     final_status?: string
   } | null
-  attendance: {
-    percentage: number
-  }[] | null
+  attendance: number | null
 }
 
 function SubjectsPage() {
@@ -76,8 +74,8 @@ function SubjectsPage() {
         return
       }
 
-      // Obtener enrollments con la nueva tabla enrollment_grades
-      const { data, error: queryError } = await supabase
+      // Step 1: Obtener enrollments
+      const { data: enrollmentsData, error: enrollError } = await supabase
         .from('enrollments')
         .select(`
           id,
@@ -94,62 +92,62 @@ function SubjectsPage() {
             credits,
             allows_promotion,
             professor_id
-          ),
-          enrollment_grades(
-            id,
-            grade_1,
-            grade_2,
-            grade_3,
-            grade_4,
-            grade_5,
-            grade_6,
-            partial_grade,
-            final_grade,
-            partial_status,
-            final_status
-          ),
-          attendance(id, percentage)
+          )
         `)
         .eq('student_id', student.id)
 
-      if (queryError) {
-        console.error('Query error:', queryError)
-        setError(`Error: ${queryError.message}`)
+      if (enrollError) {
+        console.error('Error fetching enrollments:', enrollError)
+        setError(`Error: ${enrollError.message}`)
         setLoading(false)
         return
       }
 
-      const enrollmentsWithProfs: EnrollmentWithGrades[] = []
-
-      if (data && data.length > 0) {
-        const profIds = [...new Set(data.map(e => e.subject?.professor_id).filter(Boolean))]
-
-        let professors: any[] = []
-        if (profIds.length > 0) {
-          const { data: profsData } = await supabase
-            .from('professors')
-            .select('id, name')
-            .in('id', profIds)
-          professors = profsData || []
-        }
-
-        for (const enrollment of data) {
-          const profId = enrollment.subject?.professor_id
-          const prof = professors.find(p => p.id === profId)
-          
-          // Obtener el primer grade si existe
-          const gradeArray = enrollment.enrollment_grades as any[]
-          const grades = Array.isArray(gradeArray) && gradeArray.length > 0 ? gradeArray[0] : null
-
-          enrollmentsWithProfs.push({
-            ...enrollment,
-            professor: prof || undefined,
-            grades: grades,
-          })
-        }
+      if (!enrollmentsData || enrollmentsData.length === 0) {
+        setEnrollments([])
+        setLoading(false)
+        return
       }
 
-      setEnrollments(enrollmentsWithProfs)
+      // Step 2: Para cada enrollment, obtener grades y attendance
+      const enrichedEnrollments: EnrollmentWithGrades[] = []
+
+      for (const enr of enrollmentsData) {
+        // Obtener grades
+        const { data: gradesData } = await supabase
+          .from('enrollment_grades')
+          .select('id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, final_grade, partial_status, final_status')
+          .eq('enrollment_id', enr.id)
+          .single()
+
+        // Obtener attendance
+        const { data: attData } = await supabase
+          .from('attendance')
+          .select('percentage')
+          .eq('enrollment_id', enr.id)
+          .single()
+
+        // Obtener profesor
+        let professor: any = undefined
+        if ((enr.subject as any)?.professor_id) {
+          const { data: profData } = await supabase
+            .from('professors')
+            .select('id, name')
+            .eq('id', (enr.subject as any).professor_id)
+            .single()
+          professor = profData || undefined
+        }
+
+        enrichedEnrollments.push({
+          ...enr,
+          professor,
+          grades: gradesData,
+          attendance: attData?.percentage || null,
+        })
+      }
+
+      console.log('Enrollments loaded:', enrichedEnrollments)
+      setEnrollments(enrichedEnrollments)
     } catch (err) {
       console.error('Error loading subjects:', err)
       setError('Error al cargar materias')
@@ -165,7 +163,7 @@ function SubjectsPage() {
   const stats = {
     approved: enrollments.filter(e => e.grades?.final_status === 'aprobado').length,
     promoted: enrollments.filter(e => e.grades?.final_status === 'promocionado').length,
-    current: enrollments.filter(e => !e.grades?.final_status || e.grades?.final_status === null).length,
+    current: enrollments.filter(e => !e.grades?.final_status).length,
   }
 
   if (loading) {
@@ -194,7 +192,6 @@ function SubjectsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header Hero */}
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -206,7 +203,6 @@ function SubjectsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       {enrollments.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="card p-6 border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-teal-50">
@@ -248,19 +244,16 @@ function SubjectsPage() {
             const subject = enr.subject
             const professor = enr.professor
             const grades = enr.grades
-            const att = enr.attendance?.[0]
+            const attendance = enr.attendance
 
             const isExpanded = expandedId === enr.id
 
-            // Recolectar notas cargadas
             const partialGrades = [grades?.grade_1, grades?.grade_2, grades?.grade_3, grades?.grade_4, grades?.grade_5, grades?.grade_6].filter(g => g != null)
             const partialGrade = grades?.partial_grade
             const finalGrade = grades?.final_grade
             const partialStatus = grades?.partial_status
             const finalStatus = grades?.final_status
-            const attendance = att?.percentage
 
-            // Determinar estado para mostrar
             let displayStatus = 'en_curso'
             if (finalGrade) {
               if (finalGrade >= 8 && subject.allows_promotion) {
@@ -294,7 +287,6 @@ function SubjectsPage() {
                   isExpanded ? 'ring-2 ring-indigo-400' : ''
                 }`}
               >
-                {/* Header */}
                 <button
                   onClick={() => toggleExpanded(enr.id)}
                   className="w-full p-6 text-left hover:bg-black/5 transition-colors"
@@ -329,9 +321,7 @@ function SubjectsPage() {
                     )}
                   </div>
 
-                  {/* Quick Stats */}
                   <div className="grid grid-cols-3 gap-3">
-                    {/* Parcial */}
                     <div className="p-4 rounded-2xl bg-white/60 border-2 border-blue-200 hover:border-blue-400 transition-colors">
                       <p className="text-xs text-blue-600 font-black mb-2 uppercase tracking-wide">PARCIAL</p>
                       <div className="flex items-center justify-between">
@@ -342,7 +332,6 @@ function SubjectsPage() {
                       </div>
                     </div>
 
-                    {/* Final */}
                     <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
                       finalGrade && finalGrade >= 8 ? 'border-purple-400 hover:border-purple-600' :
                       finalGrade && finalGrade >= 6 ? 'border-emerald-400 hover:border-emerald-600' :
@@ -363,7 +352,6 @@ function SubjectsPage() {
                       }`}>{finalGrade ? finalGrade.toFixed(1) : '—'}</p>
                     </div>
 
-                    {/* Asistencia */}
                     <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
                       attendance && attendance >= 60 ? 'border-green-400 hover:border-green-600' :
                       'border-orange-400 hover:border-orange-600'
@@ -380,10 +368,8 @@ function SubjectsPage() {
                   </div>
                 </button>
 
-                {/* Expanded Details */}
                 {isExpanded && (
                   <div className="border-t-2 border-gray-200 p-6 space-y-6 bg-white/50 backdrop-blur-sm">
-                    {/* Profesor */}
                     <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/60 border-2 border-gray-100">
                       <div className="p-3 rounded-xl bg-gradient-to-br from-orange-100 to-yellow-100">
                         <User size={20} className="text-orange-600" />
@@ -394,7 +380,6 @@ function SubjectsPage() {
                       </div>
                     </div>
 
-                    {/* Notas Cargadas */}
                     {partialGrades.length > 0 && (
                       <div>
                         <h4 className="text-sm font-black text-gray-900 mb-3 flex items-center gap-2">
@@ -412,7 +397,6 @@ function SubjectsPage() {
                       </div>
                     )}
 
-                    {/* Info General */}
                     <div className="border-t-2 border-gray-200 pt-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
@@ -428,7 +412,6 @@ function SubjectsPage() {
                       </div>
                     </div>
 
-                    {/* Estado */}
                     <div className={`rounded-2xl p-6 border-2 ${
                       finalGrade && finalGrade >= 8 && subject.allows_promotion 
                         ? 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-400' :
@@ -501,7 +484,6 @@ function SubjectsPage() {
         </div>
       )}
 
-      {/* Footer Info */}
       {enrollments.length > 0 && (
         <div className="bg-gradient-to-r from-indigo-100 via-purple-100 to-pink-100 rounded-3xl p-8 border-2 border-indigo-300">
           <h3 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
