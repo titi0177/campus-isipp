@@ -1,15 +1,53 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { StatusBadge } from '@/components/StatusBadge'
 import { ChevronDown, ChevronUp, Book, User, BarChart3, CheckCircle2, AlertCircle, Zap, Award } from 'lucide-react'
 
 export const Route = createFileRoute('/dashboard/subjects')({
   component: SubjectsPage,
 })
 
+type EnrollmentWithGrades = {
+  id: string
+  student_id: string
+  subject_id: string
+  division?: string
+  academic_year: number
+  status: string
+  subject: {
+    id: string
+    name: string
+    code: string
+    year: number
+    division?: string
+    credits: number
+    allows_promotion: boolean
+    professor_id: string
+  }
+  professor?: {
+    id: string
+    name: string
+  }
+  grades: {
+    id: string
+    grade_1?: number
+    grade_2?: number
+    grade_3?: number
+    grade_4?: number
+    grade_5?: number
+    grade_6?: number
+    partial_grade?: number
+    final_grade?: number
+    partial_status?: string
+    final_status?: string
+  } | null
+  attendance: {
+    percentage: number
+  }[] | null
+}
+
 function SubjectsPage() {
-  const [enrollments, setEnrollments] = useState<any[]>([])
+  const [enrollments, setEnrollments] = useState<EnrollmentWithGrades[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -39,6 +77,7 @@ function SubjectsPage() {
         return
       }
 
+      // Obtener enrollments con la nueva tabla enrollment_grades
       const { data, error: queryError } = await supabase
         .from('enrollments')
         .select(`
@@ -47,7 +86,6 @@ function SubjectsPage() {
           subject_id,
           division,
           academic_year,
-          attempt,
           status,
           subject:subjects(
             id,
@@ -59,17 +97,20 @@ function SubjectsPage() {
             allows_promotion,
             professor_id
           ),
-          grades(
-            id, 
-            enrollment_id, 
-            partial_1, partial_2, partial_3,
-            practical_1, practical_2, practical_3,
+          enrollment_grades(
+            id,
+            grade_1,
+            grade_2,
+            grade_3,
+            grade_4,
+            grade_5,
+            grade_6,
             partial_grade,
-            final_grade_exam, 
-            final_grade, 
-            status
+            final_grade,
+            partial_status,
+            final_status
           ),
-          attendance(id, enrollment_id, percentage)
+          attendance(id, percentage)
         `)
         .eq('student_id', student.id)
         .order('academic_year', { ascending: false })
@@ -81,11 +122,11 @@ function SubjectsPage() {
         return
       }
 
-      const enrollmentsWithProfs: any[] = []
-      
+      const enrollmentsWithProfs: EnrollmentWithGrades[] = []
+
       if (data && data.length > 0) {
         const profIds = [...new Set(data.map(e => e.subject?.professor_id).filter(Boolean))]
-        
+
         let professors: any[] = []
         if (profIds.length > 0) {
           const { data: profsData } = await supabase
@@ -98,24 +139,20 @@ function SubjectsPage() {
         for (const enrollment of data) {
           const profId = enrollment.subject?.professor_id
           const prof = professors.find(p => p.id === profId)
+          
+          // Obtener el primer grade si existe
+          const gradeArray = enrollment.enrollment_grades as any[]
+          const grades = Array.isArray(gradeArray) && gradeArray.length > 0 ? gradeArray[0] : null
+
           enrollmentsWithProfs.push({
             ...enrollment,
-            professor: prof || null
+            professor: prof || undefined,
+            grades: grades,
           })
         }
       }
 
-      const filteredEnrollments = enrollmentsWithProfs.filter(enr => {
-        const subject = enr.subject
-        
-        if (subject?.year === 1 && subject?.division) {
-          return enr.division === enr.division
-        }
-        
-        return true
-      })
-      
-      setEnrollments(filteredEnrollments)
+      setEnrollments(enrollmentsWithProfs)
     } catch (err) {
       console.error('Error loading subjects:', err)
       setError('Error al cargar materias')
@@ -129,18 +166,9 @@ function SubjectsPage() {
   }
 
   const stats = {
-    approved: enrollments.filter(e => {
-      const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
-      return grade && grade.status === 'passed'
-    }).length,
-    promoted: enrollments.filter(e => {
-      const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
-      return grade && grade.status === 'promoted'
-    }).length,
-    current: enrollments.filter(e => {
-      const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
-      return !grade || grade.status === 'in_progress'
-    }).length,
+    approved: enrollments.filter(e => e.grades?.final_status === 'aprobado').length,
+    promoted: enrollments.filter(e => e.grades?.final_status === 'promocionado').length,
+    current: enrollments.filter(e => !e.grades?.final_status || e.grades?.final_status === null).length,
   }
 
   if (loading) {
@@ -222,30 +250,35 @@ function SubjectsPage() {
           {enrollments.map(enr => {
             const subject = enr.subject
             const professor = enr.professor
-            const grade = Array.isArray(enr.grades) ? enr.grades[0] : enr.grades
-            const att = Array.isArray(enr.attendance) ? enr.attendance[0] : enr.attendance
-
-            let displayStatus = grade?.status || 'in_progress'
-            if (grade?.status === 'promoted' && !subject?.allows_promotion) {
-              displayStatus = 'passed'
-            }
+            const grades = enr.grades
+            const att = enr.attendance?.[0]
 
             const isExpanded = expandedId === enr.id
 
-            const partials = [grade?.partial_1, grade?.partial_2, grade?.partial_3].filter(p => p != null)
-            const practicals = [grade?.practical_1, grade?.practical_2, grade?.practical_3].filter(p => p != null)
-            const allGrades = [...partials, ...practicals]
-            const calculatedPartial = allGrades.length > 0 
-              ? (allGrades.reduce((a, b) => a + b, 0) / allGrades.length).toFixed(2)
-              : null
-            const partialToShow = grade?.partial_grade || calculatedPartial
-
-            const finalGrade = grade?.final_grade_exam
+            // Recolectar notas cargadas
+            const partialGrades = [grades?.grade_1, grades?.grade_2, grades?.grade_3, grades?.grade_4, grades?.grade_5, grades?.grade_6].filter(g => g != null)
+            const partialGrade = grades?.partial_grade
+            const finalGrade = grades?.final_grade
+            const partialStatus = grades?.partial_status
+            const finalStatus = grades?.final_status
             const attendance = att?.percentage
 
-            // Determine card color scheme based on status
+            // Determinar estado para mostrar
+            let displayStatus = 'en_curso'
+            if (finalGrade) {
+              if (finalGrade >= 8 && subject.allows_promotion) {
+                displayStatus = 'promocionado'
+              } else if (finalGrade >= 6) {
+                displayStatus = 'aprobado'
+              } else {
+                displayStatus = 'desaprobado'
+              }
+            } else if (partialStatus) {
+              displayStatus = partialStatus
+            }
+
             const getCardStyle = () => {
-              if (finalGrade && finalGrade >= 8 && subject?.allows_promotion) {
+              if (finalGrade && finalGrade >= 8 && subject.allows_promotion) {
                 return 'border-purple-600 bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50'
               }
               if (finalGrade && finalGrade >= 6) {
@@ -276,13 +309,13 @@ function SubjectsPage() {
                           <Book size={24} className="text-indigo-600" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="text-lg font-black text-gray-900">{subject?.name}</h3>
+                          <h3 className="text-lg font-black text-gray-900">{subject.name}</h3>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            <p className="text-sm font-bold text-indigo-600 font-mono">{subject?.code}</p>
+                            <p className="text-sm font-bold text-indigo-600 font-mono">{subject.code}</p>
                             <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
                               {enr.academic_year}° año
                             </span>
-                            {subject?.division && (
+                            {subject.division && (
                               <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">
                                 Div. {subject.division}
                               </span>
@@ -305,8 +338,8 @@ function SubjectsPage() {
                     <div className="p-4 rounded-2xl bg-white/60 border-2 border-blue-200 hover:border-blue-400 transition-colors">
                       <p className="text-xs text-blue-600 font-black mb-2 uppercase tracking-wide">PARCIAL</p>
                       <div className="flex items-center justify-between">
-                        <p className="text-3xl font-black text-blue-900">{partialToShow ?? '—'}</p>
-                        {partialToShow && parseFloat(partialToShow as string) >= 6 && (
+                        <p className="text-3xl font-black text-blue-900">{partialGrade ? partialGrade.toFixed(1) : '—'}</p>
+                        {partialGrade && partialGrade >= 6 && (
                           <CheckCircle2 size={24} className="text-emerald-600" />
                         )}
                       </div>
@@ -330,7 +363,7 @@ function SubjectsPage() {
                         finalGrade && finalGrade >= 6 ? 'text-emerald-900' :
                         finalGrade ? 'text-red-900' :
                         'text-gray-600'
-                      }`}>{finalGrade ?? '—'}</p>
+                      }`}>{finalGrade ? finalGrade.toFixed(1) : '—'}</p>
                     </div>
 
                     {/* Asistencia */}
@@ -345,7 +378,7 @@ function SubjectsPage() {
                       <p className={`text-3xl font-black ${
                         attendance && attendance >= 60 ? 'text-green-900' :
                         'text-orange-900'
-                      }`}>{attendance ?? '—'}%</p>
+                      }`}>{attendance ? `${Math.round(attendance)}%` : '—'}</p>
                     </div>
                   </div>
                 </button>
@@ -364,32 +397,20 @@ function SubjectsPage() {
                       </div>
                     </div>
 
-                    {/* Parciales y TPs */}
-                    {(partials.length > 0 || practicals.length > 0) && (
+                    {/* Notas Cargadas */}
+                    {partialGrades.length > 0 && (
                       <div>
                         <h4 className="text-sm font-black text-gray-900 mb-3 flex items-center gap-2">
                           <BarChart3 size={18} className="text-indigo-600" />
-                          DESGLOSE DE CALIFICACIONES
+                          NOTAS PARCIALES CARGADAS
                         </h4>
                         <div className="grid grid-cols-3 gap-2">
-                          {[1, 2, 3].map(i => {
-                            const pValue = grade?.[`partial_${i}`]
-                            return (
-                              <div key={`p${i}`} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center hover:border-blue-400 transition-colors">
-                                <p className="text-xs text-blue-600 font-black mb-1 uppercase">P{i}</p>
-                                <p className="text-2xl font-black text-blue-900">{pValue ?? '—'}</p>
-                              </div>
-                            )
-                          })}
-                          {[1, 2, 3].map(i => {
-                            const tpValue = grade?.[`practical_${i}`]
-                            return (
-                              <div key={`tp${i}`} className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 border-2 border-purple-200 text-center hover:border-purple-400 transition-colors">
-                                <p className="text-xs text-purple-600 font-black mb-1 uppercase">TP{i}</p>
-                                <p className="text-2xl font-black text-purple-900">{tpValue ?? '—'}</p>
-                              </div>
-                            )
-                          })}
+                          {partialGrades.map((grade, idx) => (
+                            <div key={idx} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center">
+                              <p className="text-xs text-blue-600 font-black mb-1 uppercase">Nota {idx + 1}</p>
+                              <p className="text-2xl font-black text-blue-900">{grade.toFixed(1)}</p>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -399,56 +420,77 @@ function SubjectsPage() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
                           <p className="text-xs text-gray-600 font-bold uppercase">Créditos</p>
-                          <p className="text-2xl font-black text-gray-900">{subject?.credits || '—'}</p>
+                          <p className="text-2xl font-black text-gray-900">{subject.credits || '—'}</p>
                         </div>
                         <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
-                          <p className="text-xs text-gray-600 font-bold uppercase">Intento</p>
-                          <p className="text-2xl font-black text-gray-900">{enr.attempt || 1}</p>
+                          <p className="text-xs text-gray-600 font-bold uppercase">Promoción</p>
+                          <p className="text-lg font-black text-gray-900">
+                            {subject.allows_promotion ? '✓ Sí' : '✗ No'}
+                          </p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Estado Final */}
+                    {/* Estado */}
                     <div className={`rounded-2xl p-6 border-2 ${
-                      finalGrade && finalGrade >= 8 && subject?.allows_promotion 
+                      finalGrade && finalGrade >= 8 && subject.allows_promotion 
                         ? 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-400' :
                       finalGrade && finalGrade >= 6
                         ? 'bg-gradient-to-r from-emerald-100 to-teal-100 border-emerald-400' :
                       finalGrade
                         ? 'bg-gradient-to-r from-red-100 to-rose-100 border-red-400' :
+                      partialStatus === 'regular'
+                        ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-yellow-400' :
+                      partialStatus === 'promocionado'
+                        ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-green-400' :
+                      partialStatus === 'desaprobado'
+                        ? 'bg-gradient-to-r from-red-100 to-rose-100 border-red-400' :
                         'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-400'
                     }`}>
                       <p className={`text-xs font-black mb-3 uppercase tracking-wide ${
-                        finalGrade && finalGrade >= 8 && subject?.allows_promotion 
+                        finalGrade && finalGrade >= 8 && subject.allows_promotion 
                           ? 'text-purple-700' :
                         finalGrade && finalGrade >= 6
                           ? 'text-emerald-700' :
                         finalGrade
                           ? 'text-red-700' :
+                        partialStatus === 'regular'
+                          ? 'text-yellow-700' :
+                        partialStatus === 'promocionado'
+                          ? 'text-green-700' :
+                        partialStatus === 'desaprobado'
+                          ? 'text-red-700' :
                           'text-blue-700'
-                      }`}>ESTADO FINAL</p>
+                      }`}>ESTADO ACTUAL</p>
                       <div className="flex items-center justify-between">
-                        <StatusBadge status={displayStatus} />
+                        <div>
+                          <p className="font-black text-gray-900">
+                            {displayStatus === 'promocionado' ? 'PROMOCIONADO' :
+                             displayStatus === 'aprobado' ? 'APROBADO' :
+                             displayStatus === 'desaprobado' ? 'DESAPROBADO' :
+                             displayStatus === 'regular' ? 'REGULAR' :
+                             'EN CURSO'}
+                          </p>
+                          {partialGrade && !finalGrade && (
+                            <p className="text-xs text-gray-600 mt-1">Parcial: {partialGrade.toFixed(1)} - Pendiente final</p>
+                          )}
+                        </div>
                         <div className="text-right">
-                          {finalGrade && finalGrade >= 8 && subject?.allows_promotion ? (
+                          {finalGrade && finalGrade >= 8 && subject.allows_promotion ? (
                             <div className="flex items-center gap-1 text-purple-700">
                               <Award size={28} />
-                              <span className="text-xs font-black">PROMOCIONADO</span>
                             </div>
                           ) : finalGrade && finalGrade >= 6 ? (
                             <div className="flex items-center gap-1 text-emerald-700">
                               <CheckCircle2 size={28} />
-                              <span className="text-xs font-black">APROBADO</span>
                             </div>
                           ) : finalGrade ? (
                             <div className="flex items-center gap-1 text-red-700">
                               <AlertCircle size={28} />
-                              <span className="text-xs font-black">DESAPROBADO</span>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1 text-blue-700">
                               <Zap size={28} />
-                              <span className="text-xs font-black">PENDIENTE</span>
                             </div>
                           )}
                         </div>
@@ -472,7 +514,7 @@ function SubjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white/70 rounded-xl p-4">
               <p className="font-black text-blue-900 mb-2">📚 Nota Parcial</p>
-              <p className="text-sm text-gray-700">Promedio de parciales y trabajos prácticos. Mínimo <strong>6 puntos</strong> para examen final.</p>
+              <p className="text-sm text-gray-700">Promedio de todas las notas cargadas. Mínimo <strong>6 puntos</strong> para examen final.</p>
             </div>
             <div className="bg-white/70 rounded-xl p-4">
               <p className="font-black text-indigo-900 mb-2">📊 Nota Final</p>
