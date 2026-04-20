@@ -43,7 +43,6 @@ import { Route as DashboardEnrollSubjectsRouteImport } from './routes/dashboard/
 import { Route as DashboardCertificatesRouteImport } from './routes/dashboard/certificates'
 import { Route as DashboardAttendanceRouteImport } from './routes/dashboard/attendance'
 import { Route as DashboardRecursiveReinscriptionRouteImport } from './routes/dashboard/recursive-reinscription'
-import { Route as DashboardRecursiveReinscriptionRouteImport } from './routes/dashboard/recursive-reinscription'
 import { Route as DashboardAnnouncementsRouteImport } from './routes/dashboard/announcements'
 import { Route as AdminSubjectsRouteImport } from './routes/admin/subjects'
 import { Route as AdminStudentsRouteImport } from './routes/admin/students'
@@ -1136,6 +1135,8 @@ declare module '@tanstack/react-start' {
     router: Awaited<ReturnType<typeof getRouter>>
   }
 }
+
+
 
 
 
