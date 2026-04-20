@@ -27,25 +27,35 @@ type Props = {
 
 export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [numGrades, setNumGrades] = useState(3)
-  const [allowsPromotion, setAllowsPromotion] = useState(true)
+  const [allowsPromotion, setAllowsPromotion] = useState(false)
   const [grades, setGrades] = useState<Record<string, GradeData>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    loadGradeSettings()
+    loadSubjectSettings()
   }, [subjectId])
 
-  const loadGradeSettings = async () => {
-    const { data } = await supabase
-      .from('grade_settings')
-      .select('num_grades, allows_promotion')
-      .eq('subject_id', subjectId)
-      .single()
+  const loadSubjectSettings = async () => {
+    try {
+      const { data, error: err } = await supabase
+        .from('subjects')
+        .select('num_grades, allows_promotion')
+        .eq('id', subjectId)
+        .single()
 
-    if (data) {
-      setNumGrades(data.num_grades)
-      setAllowsPromotion(data.allows_promotion)
+      if (err) {
+        console.error('Error loading subject settings:', err)
+        return
+      }
+
+      if (data) {
+        setNumGrades(data.num_grades || 3)
+        setAllowsPromotion(data.allows_promotion || false)
+      }
+    } catch (err) {
+      console.error('Error:', err)
     }
   }
 
@@ -87,7 +97,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   }
 
   const handleSaveGrades = async () => {
-    setLoading(true)
+    setSaving(true)
     setError('')
 
     try {
@@ -98,37 +108,38 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
         const partialStatus = getPartialStatus(partialGrade)
 
+        const payload = {
+          enrollment_id: enrollment.id,
+          grade_1: grades[enrollment.id]?.grade_1 || null,
+          grade_2: grades[enrollment.id]?.grade_2 || null,
+          grade_3: grades[enrollment.id]?.grade_3 || null,
+          grade_4: grades[enrollment.id]?.grade_4 || null,
+          grade_5: grades[enrollment.id]?.grade_5 || null,
+          grade_6: grades[enrollment.id]?.grade_6 || null,
+          partial_grade: partialGrade,
+          partial_status: partialStatus,
+          attempt_number: 1,
+        }
+
         const { error: upsertError } = await supabase
           .from('enrollment_grades')
-          .upsert(
-            {
-              enrollment_id: enrollment.id,
-              grade_1: grades[enrollment.id]?.grade_1,
-              grade_2: grades[enrollment.id]?.grade_2,
-              grade_3: grades[enrollment.id]?.grade_3,
-              grade_4: grades[enrollment.id]?.grade_4,
-              grade_5: grades[enrollment.id]?.grade_5,
-              grade_6: grades[enrollment.id]?.grade_6,
-              partial_grade: partialGrade,
-              partial_status: partialStatus,
-              attempt_number: 1,
-            },
-            { onConflict: 'enrollment_id' }
-          )
+          .upsert(payload)
 
         if (upsertError) {
-          console.error('Error saving grades:', upsertError)
-          setError('Error al guardar calificaciones')
+          console.error('Error saving grade for', enrollment.id, upsertError)
+          setError(`Error al guardar nota de ${enrollment.student_name}`)
+          setSaving(false)
           return
         }
       }
 
       setError('')
+      setGrades({})
       alert('Calificaciones guardadas correctamente')
     } catch (err) {
       setError('Error al guardar: ' + String(err))
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
@@ -146,6 +157,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
               value={numGrades}
               onChange={e => setNumGrades(parseInt(e.target.value))}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              disabled
             >
               {[1, 2, 3, 4, 5, 6].map(n => (
                 <option key={n} value={n}>
@@ -153,19 +165,25 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-600 mt-1">Configurado en la materia</p>
           </div>
           <div>
-            <label className="flex items-center gap-2 mt-6 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={allowsPromotion}
-                onChange={e => setAllowsPromotion(e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm font-semibold text-gray-700">
-                Permite promocional (≥8)
-              </span>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Promoción
             </label>
+            <div className="flex items-center gap-2 mt-4">
+              {allowsPromotion ? (
+                <>
+                  <Check size={20} className="text-green-600" />
+                  <span className="text-sm font-bold text-green-700">Permite Promocional (≥8)</span>
+                </>
+              ) : (
+                <>
+                  <X size={20} className="text-red-600" />
+                  <span className="text-sm font-bold text-red-700">Sin Promocional</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -231,7 +249,11 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                         >
                           {partialStatus === 'promocionado' && <Check size={14} />}
                           {partialStatus === 'desaprobado' && <X size={14} />}
-                          {partialStatus.charAt(0).toUpperCase() + partialStatus.slice(1)}
+                          {partialStatus === 'promocionado'
+                            ? 'Prom.'
+                            : partialStatus === 'regular'
+                              ? 'Regular'
+                              : 'Desapr.'}
                         </span>
                       )}
                     </td>
@@ -245,10 +267,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
       <button
         onClick={handleSaveGrades}
-        disabled={loading}
+        disabled={saving}
         className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50"
       >
-        {loading ? 'Guardando...' : 'Guardar Calificaciones'}
+        {saving ? 'Guardando...' : 'Guardar Calificaciones'}
       </button>
     </div>
   )

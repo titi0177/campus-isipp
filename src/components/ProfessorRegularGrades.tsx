@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { AlertCircle, Check } from 'lucide-react'
+import { AlertCircle, Check, X } from 'lucide-react'
 
 type RegularEnrollment = {
   enrollment_id: string
@@ -18,7 +18,7 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [allowsPromotion, setAllowsPromotion] = useState(true)
+  const [allowsPromotion, setAllowsPromotion] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -28,49 +28,46 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
     try {
       // Obtener configuración
       const { data: settings } = await supabase
-        .from('grade_settings')
+        .from('subjects')
         .select('allows_promotion')
-        .eq('subject_id', subjectId)
+        .eq('id', subjectId)
         .single()
 
       if (settings) {
-        setAllowsPromotion(settings.allows_promotion)
+        setAllowsPromotion(settings.allows_promotion || false)
       }
 
       // Obtener regulares
-      const { data: regularData } = await supabase
+      const { data: regularData, error: err } = await supabase
         .from('enrollment_grades')
         .select(`
+          id,
           enrollment_id,
           partial_grade,
           final_grade,
-          enrollments:enrollment_id (
-            student:student_id (
-              first_name,
-              last_name
-            )
+          enrollments!inner(
+            student:students(first_name, last_name),
+            subject_id
           )
         `)
+        .eq('enrollments.subject_id', subjectId)
         .eq('partial_status', 'regular')
         .is('final_grade', null)
+
+      if (err) {
+        console.error('Error loading regulars:', err)
+        setError('Error al cargar regulares')
+        setLoading(false)
+        return
+      }
 
       if (regularData) {
         const formatted = regularData.map((r: any) => ({
           enrollment_id: r.enrollment_id,
-          student_name: `${r.enrollments.student.first_name} ${r.enrollments.student.last_name}`,
+          student_name: `${r.enrollments.student.last_name}, ${r.enrollments.student.first_name}`,
           partial_grade: r.partial_grade,
-          final_grade: r.final_grade,
         }))
         setRegulars(formatted)
-
-        // Pre-cargar notas finales existentes
-        const grades: Record<string, number> = {}
-        formatted.forEach((r: any) => {
-          if (r.final_grade) {
-            grades[r.enrollment_id] = r.final_grade
-          }
-        })
-        setFinalGrades(grades)
       }
 
       setLoading(false)
@@ -207,10 +204,16 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
                                 : 'bg-red-100 text-red-700'
                           }`}
                         >
-                          {(finalStatus === 'promocionado' || finalStatus === 'aprobado') && (
+                          {finalStatus === 'promocionado' || finalStatus === 'aprobado' ? (
                             <Check size={14} />
+                          ) : (
+                            <X size={14} />
                           )}
-                          {finalStatus.charAt(0).toUpperCase() + finalStatus.slice(1)}
+                          {finalStatus === 'promocionado'
+                            ? 'Prom.'
+                            : finalStatus === 'aprobado'
+                              ? 'Aprob.'
+                              : 'Desapr.'}
                         </span>
                       )}
                     </td>
