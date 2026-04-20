@@ -195,7 +195,14 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         const partialGrade = calculatePartialGrade(enrollment.id)
         if (partialGrade !== null) {
           payload.partial_grade = partialGrade
-          payload.partial_status = getPartialStatus(partialGrade)
+          const partialStatus = getPartialStatus(partialGrade)
+          payload.partial_status = partialStatus
+
+          // Si es Desaprobado o Promocionado, pasar automáticamente como nota final
+          if (partialStatus === 'desaprobado' || partialStatus === 'promocionado') {
+            payload.final_grade = partialGrade
+            payload.final_status = partialStatus
+          }
         }
         // Si no están todas las notas, guardamos solo las que tenemos sin calcular promedio
         payload.attempt_number = 1
@@ -311,8 +318,9 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         <ul className="text-sm text-emerald-900 space-y-1">
           <li>✓ <strong>Lunes:</strong> Carga la Nota 1 (ej: 8) y guarda - quedará registrada</li>
           <li>✓ <strong>Vuelves en 2 semanas:</strong> Verás la Nota 1: 8 ya cargada, luego añade Nota 2 y 3</li>
-          <li>✓ Cuando completes todas las notas, el promedio se calcula automáticamente</li>
-          <li>✓ Se muestra el estado (Promocionado/Regular/Desaprobado) solo cuando todas están completas</li>
+          <li>✓ <strong>Promedio ≥8 (Promocionado):</strong> Se guarda automáticamente como nota final ✅</li>
+          <li>✓ <strong>Promedio &lt;6 (Desaprobado):</strong> Se guarda automáticamente como nota final ✅</li>
+          <li>✓ <strong>Promedio 6-7 (Regular):</strong> Va a la sección "Notas Finales" para examen</li>
         </ul>
       </div>
 
@@ -394,10 +402,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                               {partialStatus === 'promocionado' && <Check size={14} />}
                               {partialStatus === 'desaprobado' && <X size={14} />}
                               {partialStatus === 'promocionado'
-                                ? 'Prom.'
+                                ? 'Prom. ✅'
                                 : partialStatus === 'regular'
                                   ? 'Regular'
-                                  : 'Desapr.'}
+                                  : 'Desapr. ✅'}
                             </span>
                           )}
                         </td>

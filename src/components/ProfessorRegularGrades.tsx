@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { AlertCircle, Check, X } from 'lucide-react'
 
 type RegularEnrollment = {
+  id: string
   enrollment_id: string
   student_name: string
   partial_grade: number
@@ -64,6 +65,7 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
 
       if (regularData) {
         const formatted = regularData.map((r: any) => ({
+          id: r.id,
           enrollment_id: r.enrollment_id,
           student_name: `${r.enrollments.student.last_name}, ${r.enrollments.student.first_name}`,
           partial_grade: r.partial_grade,
@@ -94,13 +96,17 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
         const finalGrade = finalGrades[enrollmentId]
         const finalStatus = getFinalStatus(finalGrade)
 
+        // Buscar el student para obtener el id correcto
+        const student = regulars.find(s => s.enrollment_id === enrollmentId)
+        if (!student) continue
+
         const { error: updateError } = await supabase
           .from('enrollment_grades')
           .update({
             final_grade: finalGrade,
             final_status: finalStatus,
           })
-          .eq('enrollment_id', enrollmentId)
+          .eq('id', student.id)
 
         if (updateError) {
           throw updateError
