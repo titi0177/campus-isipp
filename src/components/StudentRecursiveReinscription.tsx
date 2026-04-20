@@ -43,18 +43,23 @@ export function StudentRecursiveReinscription() {
 
       if (!student) return
 
-      // Obtener todas las materias en las que desaprobó
+      // Obtener todas las materias en las que desaprobó (final_status = 'desaprobado')
       const { data: failedData, error: err } = await supabase
         .from('enrollment_grades')
         .select(`
           final_grade,
           final_status,
+          partial_status,
+          partial_grade,
           created_at,
+          enrollment_id,
           enrollments!inner(
             id,
             student_id,
             subject_id,
             academic_year,
+            attempt_number,
+            is_recursive,
             subject:subjects(id, name, code, year, dictation_type, semester)
           )
         `)
@@ -92,9 +97,9 @@ export function StudentRecursiveReinscription() {
       for (const record of failedData) {
         const subjectId = record.enrollments.subject_id
         const failedYear = new Date(record.created_at).getFullYear()
+        const subject = record.enrollments.subject
 
         if (!subjectMap.has(subjectId)) {
-          const subject = record.enrollments.subject
           const failureYear = failedYear
 
           // Determinar si puede reinscribirse
@@ -133,9 +138,9 @@ export function StudentRecursiveReinscription() {
             name: subject.name,
             code: subject.code,
             year: subject.year,
-            dictation_type: subject.dictation_type,
-            semester: subject.semester,
-            final_grade: record.final_grade,
+            dictation_type: subject.dictation_type || 'anual',
+            semester: subject.semester || 1,
+            final_grade: record.final_grade || 0,
             final_status: record.final_status,
             failed_year: failureYear,
             can_reinscribe: canReinscribe,
@@ -165,13 +170,31 @@ export function StudentRecursiveReinscription() {
   const handleReinscribe = async (subject: FailedSubject) => {
     setReinscribing(subject.id)
     try {
-      const { data, error: err } = await supabase.rpc('student_reinscribe_as_recursive', {
-        p_student_id: (await supabase.auth.getUser()).data.user?.id,
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: student } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!student) return
+
+      const result = await supabase.rpc('student_reinscribe_as_recursive', {
+        p_student_id: student.id,
         p_subject_id: subject.id,
       })
 
-      if (err) {
-        setError(`Error: ${err.message}`)
+      if (result.error) {
+        setError(`Error: ${result.error.message}`)
+        setReinscribing(null)
+        return
+      }
+
+      const response = result.data as any
+      if (!response.success) {
+        setError(`Error: ${response.message}`)
         setReinscribing(null)
         return
       }
@@ -257,7 +280,7 @@ export function StudentRecursiveReinscription() {
                     )}
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
-                    <span>📊 Nota: {subject.final_grade.toFixed(1)}</span>
+                    <span>📊 Nota: {subject.final_grade ? subject.final_grade.toFixed(1) : 'N/A'}</span>
                     <span>📅 Desaprobado: {subject.failed_year}</span>
                   </div>
                 </div>

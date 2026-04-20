@@ -296,6 +296,12 @@ function DashboardPage() {
                 + Inscribirse
               </Link>
               <Link
+                to="/dashboard/recursive-reinscription"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-5 sm:px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-95"
+              >
+                🔄 Reinscripción
+              </Link>
+              <Link
                 to="/dashboard/roadmap"
                 className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-5 sm:px-6 py-2.5 rounded-lg font-semibold text-sm transition-all active:scale-95"
               >
