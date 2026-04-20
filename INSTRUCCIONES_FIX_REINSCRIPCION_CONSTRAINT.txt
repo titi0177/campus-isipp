@@ -1,0 +1,48 @@
+SOLUCIÓN: ERROR DE CONSTRAINT EN REINSCRIPCIÓN
+
+PROBLEMA:
+"Error: duplicate key value violates unique constraint 
+enrollments_student_id_subject_id_academic_year_attempt_key"
+
+CAUSA:
+La tabla `enrollments` tiene un constraint UNIQUE que previene:
+- Duplicados por (student_id, subject_id, academic_year)
+- SIN considerar attempt_number
+
+Esto significa que un estudiante NO puede inscribirse 2 veces en la misma materia 
+en el mismo año, incluso si es como recursante (attempt_number = 2).
+
+SOLUCIÓN EN SUPABASE:
+
+1. Abre SQL Editor en Supabase: https://app.supabase.com → tu proyecto → SQL
+
+2. Ejecuta EXACTAMENTE este código:
+
+================================================================================
+
+-- Eliminar el constraint problemático
+ALTER TABLE public.enrollments 
+DROP CONSTRAINT IF EXISTS enrollments_student_id_subject_id_academic_year_attempt_key;
+
+-- Crear un nuevo constraint que PERMITA múltiples intentos
+ALTER TABLE public.enrollments
+ADD CONSTRAINT enrollments_unique_attempt 
+UNIQUE (student_id, subject_id, academic_year, attempt_number);
+
+================================================================================
+
+3. Verifica que no haya errores (debería decir "Query executed successfully")
+
+4. Recarga la app en el navegador (Ctrl+F5)
+
+5. Intenta reinscribirse nuevamente - debería funcionar ahora
+
+EXPLICACIÓN TÉCNICA:
+- ANTES: Constraint impedía 2 registros con mismo (student, subject, year)
+- DESPUÉS: Permite múltiples registros si tienen diferente attempt_number
+  * attempt_number = 1 → primer intento
+  * attempt_number = 2 → recursante (2do intento)
+  * etc.
+
+Esto es correcto porque un alumno debería poder reinscribirse como recursante 
+en el mismo año académico de una materia diferente (o en años diferentes).
