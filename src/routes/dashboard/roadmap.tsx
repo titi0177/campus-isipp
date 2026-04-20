@@ -80,17 +80,12 @@ function RoadmapPage() {
     }
     setSubjectsMap(sMap)
 
-    // Obtener enrollments con la nueva tabla enrollment_grades
+    // Obtener enrollments
+    const studentId = (student as any).id
     const { data: enrollments } = await supabase
       .from('enrollments')
-      .select(`
-        id,
-        subject_id,
-        division,
-        status,
-        attempt_number
-      `)
-      .eq('student_id', (student as any).id)
+      .select('id, subject_id, division, status, attempt_number')
+      .eq('student_id', studentId)
 
     const enrolledIds = new Set<string>()
     const passedIds = new Set<string>()
