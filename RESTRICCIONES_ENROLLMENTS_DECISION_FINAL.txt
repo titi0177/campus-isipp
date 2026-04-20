@@ -1,0 +1,69 @@
+RESTRICCIONES EN ENROLLMENTS - DECISIÓN FINAL
+
+SITUACION ANTERIOR:
+- Sacamos TODOS los constraints para permitir reinscripciones
+- Causó error "duplicate key" al intentar reinscribirse
+
+PROBLEMA CON "SIN CONSTRAINTS":
+Sin constraintsal nivel de BD, cualquier bug de código podría permitir:
+- 2 inscripciones idénticas (mismo alumno, materia, año, intento)
+- Datos inconsistentes
+- Problemas de integridad
+
+SOLUCIÓN CORRECTA:
+Restaurar UN constraint específico que:
+✓ Previene duplicados a nivel de BD
+✓ Permite múltiples intentos (1, 2, 3)
+✓ Funciona con la lógica de reinscripción
+
+CONSTRAINT CORRECTO:
+```sql
+ALTER TABLE public.enrollments
+ADD CONSTRAINT enrollments_unique_attempt 
+UNIQUE (student_id, subject_id, academic_year, attempt_number);
+```
+
+QUE PERMITE:
+- ✓ (student=1, subject=MATH, year=2024, attempt=1) 
+- ✓ (student=1, subject=MATH, year=2024, attempt=2)  ← Recursante
+- ✓ (student=1, subject=MATH, year=2025, attempt=2)  ← Mismo año diferente
+- ✓ (student=1, subject=MATH, year=2025, attempt=3)  ← Tercer intento
+
+QUE PREVIENE:
+- ✗ (student=1, subject=MATH, year=2024, attempt=1) × 2  ← Duplicate
+- ✗ (student=1, subject=MATH, year=2024, attempt=2) × 2  ← Duplicate
+
+INSTRUCCIONES EN SUPABASE:
+
+1. Abre SQL Editor: https://app.supabase.com → tu proyecto → SQL Editor
+
+2. Ejecuta exactamente este código:
+
+================================================================================
+
+ALTER TABLE public.enrollments 
+DROP CONSTRAINT IF EXISTS enrollments_unique_attempt;
+
+ALTER TABLE public.enrollments 
+DROP CONSTRAINT IF EXISTS enrollments_student_id_subject_id_academic_year_attempt_key;
+
+ALTER TABLE public.enrollments 
+DROP CONSTRAINT IF EXISTS enrollments_student_id_subject_id_key;
+
+ALTER TABLE public.enrollments
+ADD CONSTRAINT enrollments_unique_attempt 
+UNIQUE (student_id, subject_id, academic_year, attempt_number);
+
+CREATE INDEX IF NOT EXISTS idx_enrollments_student_subject_year_attempt 
+ON public.enrollments(student_id, subject_id, academic_year, attempt_number);
+
+================================================================================
+
+3. Debería completarse sin errores
+
+4. Ahora puedes reinscribir sin problemas AND con protección de BD
+
+CONCLUSION:
+✓ El constraint es NECESARIO para reinscripción
+✓ Protege integridad de datos
+✓ Funciona correctamente con la lógica actual
