@@ -15,6 +15,7 @@ type FailedSubject = {
   can_reinscribe: boolean
   reason: string
   is_already_reinscribed: boolean
+  next_available_year?: number
 }
 
 type Props = {
@@ -87,11 +88,10 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
         .from('enrollments')
         .select('subject_id, academic_year')
         .eq('student_id', student.id)
-        .eq('academic_year', currentYear)
         .eq('is_recursive', true)
 
       const currentRecursiveIds = new Set(
-        currentEnrollments?.map(e => e.subject_id) || []
+        currentEnrollments?.map(e => `${e.subject_id}_${e.academic_year}`) || []
       )
 
       const subjectMap = new Map<string, FailedSubject>()
@@ -104,33 +104,47 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
         if (!subjectMap.has(subjectId)) {
           let canReinscribe = false
           let reason = ''
+          let nextAvailableYear = null
 
           if (subject.dictation_type === 'anual') {
+            // Anual: solo puede reinscribirse el año SIGUIENTE
             if (currentYear > failedYear) {
               canReinscribe = true
               reason = `Anual: puede reinscribirse en ${currentYear}`
             } else {
               canReinscribe = false
-              reason = 'Anual: solo el próximo año'
+              nextAvailableYear = failedYear + 1
+              reason = `Anual: solo disponible a partir de ${failedYear + 1}`
             }
           } else if (subject.dictation_type === 'cuatrimestral') {
-            if (subject.semester === 1 && currentMonth <= 6) {
-              canReinscribe = true
-              reason = '1er cuatrimestre: disponible hasta junio'
-            } else if (subject.semester === 2 && currentMonth >= 7) {
-              canReinscribe = true
-              reason = '2do cuatrimestre: disponible desde julio'
-            } else if (subject.semester === 1) {
-              canReinscribe = false
-              reason = '1er cuatrimestre: próximo disponible en enero'
+            // Cuatrimestral: solo en el cuatrimestre correspondiente
+            if (subject.semester === 1) {
+              // 1er cuatrimestre: enero a junio
+              if (currentMonth <= 6) {
+                canReinscribe = true
+                reason = '1er cuatrimestre: disponible hasta junio'
+              } else {
+                canReinscribe = false
+                nextAvailableYear = currentYear + 1
+                reason = `1er cuatrimestre: próximo disponible en enero ${currentYear + 1}`
+              }
             } else {
-              canReinscribe = false
-              reason = '2do cuatrimestre: próximo disponible en julio'
+              // 2do cuatrimestre: julio a diciembre
+              if (currentMonth >= 7) {
+                canReinscribe = true
+                reason = '2do cuatrimestre: disponible desde julio'
+              } else {
+                canReinscribe = false
+                nextAvailableYear = currentYear
+                reason = `2do cuatrimestre: próximo disponible en julio ${currentYear}`
+              }
             }
           } else {
             canReinscribe = true
             reason = 'Disponible para reinscribirse'
           }
+
+          const isAlreadyReinscribed = currentRecursiveIds.has(`${subjectId}_${currentYear}`)
 
           subjectMap.set(subjectId, {
             id: subjectId,
@@ -142,9 +156,10 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
             final_grade: record.final_grade || 0,
             final_status: record.final_status,
             failed_year: failedYear,
-            can_reinscribe: canReinscribe,
-            reason: reason,
-            is_already_reinscribed: currentRecursiveIds.has(subjectId),
+            can_reinscribe: canReinscribe && !isAlreadyReinscribed,
+            reason: isAlreadyReinscribed ? 'Ya reinscripto este año' : reason,
+            is_already_reinscribed: isAlreadyReinscribed,
+            next_available_year: nextAvailableYear,
           })
         }
       }
@@ -253,17 +268,20 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
             </div>
           ) : (
             <>
-              {failedSubjects.filter(s => s.can_reinscribe && !s.is_already_reinscribed).length > 0 && (
+              {failedSubjects.filter(s => s.can_reinscribe).length > 0 && (
                 <div>
                   <h3 className="font-bold text-lg text-indigo-900 mb-3">🔄 Disponibles para Reinscribirse</h3>
                   <div className="space-y-2">
                     {failedSubjects
-                      .filter(s => s.can_reinscribe && !s.is_already_reinscribed)
+                      .filter(s => s.can_reinscribe)
                       .map((subject) => (
-                        <div key={subject.id} className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                        <div key={subject.id} className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
                           <div className="flex-1">
                             <p className="font-semibold text-gray-900">{subject.code} - {subject.name}</p>
-                            <p className="text-xs text-gray-600 mt-1">Nota: {Number(subject.final_grade).toFixed(1)} | Desaprobado: {subject.failed_year}</p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Nota: {Number(subject.final_grade).toFixed(1)} | Desaprobado: {subject.failed_year}
+                            </p>
+                            <p className="text-xs text-green-700 font-semibold mt-1">✓ {subject.reason}</p>
                           </div>
                           <button
                             onClick={() => handleReinscribe(subject)}
@@ -288,25 +306,37 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
                 </div>
               )}
 
-              {failedSubjects.filter(s => !s.can_reinscribe || s.is_already_reinscribed).length > 0 && (
+              {failedSubjects.filter(s => !s.can_reinscribe).length > 0 && (
                 <div>
                   <h3 className="font-bold text-lg text-gray-900 mb-3">⏳ No disponibles actualmente</h3>
                   <div className="space-y-2">
                     {failedSubjects
-                      .filter(s => !s.can_reinscribe || s.is_already_reinscribed)
+                      .filter(s => !s.can_reinscribe)
                       .map((subject) => (
-                        <div key={subject.id} className="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold text-gray-900">{subject.code} - {subject.name}</p>
-                            <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
-                              <Lock size={12} />
-                              {subject.reason}
-                            </p>
+                        <div key={subject.id} className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1">
+                              <p className="font-semibold text-gray-900">{subject.code} - {subject.name}</p>
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs text-gray-600">
+                                  Nota: {Number(subject.final_grade).toFixed(1)} | Desaprobado: {subject.failed_year}
+                                </p>
+                                <p className="text-xs text-gray-600 flex items-center gap-1">
+                                  <Lock size={12} />
+                                  {subject.reason}
+                                </p>
+                                {subject.next_available_year && (
+                                  <p className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded mt-2 inline-block">
+                                    Disponible a partir de {subject.next_available_year}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <button disabled className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-gray-300 text-gray-600 text-sm rounded cursor-not-allowed">
+                              <Lock size={14} />
+                              No disponible
+                            </button>
                           </div>
-                          <button disabled className="ml-3 flex items-center gap-2 px-3 py-2 bg-gray-300 text-gray-600 text-sm rounded cursor-not-allowed">
-                            <Lock size={14} />
-                            No disponible
-                          </button>
                         </div>
                       ))}
                   </div>
@@ -316,11 +346,12 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
           )}
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
-            <p className="font-bold mb-2">ℹ️ Cómo funciona</p>
+            <p className="font-bold mb-2">ℹ️ Cómo funciona la reinscripción</p>
             <ul className="text-xs space-y-1">
-              <li>• <strong>Anuales:</strong> Solo el año siguiente al desaprobado</li>
-              <li>• <strong>Cuatrimestrales:</strong> Solo en el período correspondiente</li>
-              <li>• Se registrará como 2do intento en el sistema</li>
+              <li>• <strong>Anuales:</strong> Solo el año siguiente al desaprobado (ej: desaprobado 2024 → reinscribirse 2025)</li>
+              <li>• <strong>Cuatrimestrales:</strong> Solo en el período correspondiente (1er C: enero-junio | 2do C: julio-diciembre)</li>
+              <li>• Se registrará como recursante (2do intento) en el sistema</li>
+              <li>• No se pierden tus calificaciones del primer intento</li>
             </ul>
           </div>
         </div>
