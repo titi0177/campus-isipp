@@ -172,7 +172,7 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
                   <tr key={regular.enrollment_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-4 py-3 font-medium text-gray-900">{regular.student_name}</td>
                     <td className="px-4 py-3 text-center font-bold text-gray-700">
-                      {regular.partial_grade.toFixed(1)}
+                      {regular.partial_grade !== undefined && regular.partial_grade !== null ? Number(regular.partial_grade).toFixed(1) : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <input

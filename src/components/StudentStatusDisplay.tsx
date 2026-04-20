@@ -16,6 +16,7 @@ type StudentStatus = {
 export function StudentStatusDisplay() {
   const [statuses, setStatuses] = useState<StudentStatus[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     loadStatuses()
@@ -23,6 +24,7 @@ export function StudentStatusDisplay() {
 
   const loadStatuses = async () => {
     try {
+      setError('')
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -34,7 +36,7 @@ export function StudentStatusDisplay() {
 
       if (!student) return
 
-      const { data } = await supabase
+      const { data, error: dataError } = await supabase
         .from('enrollments')
         .select(`
           id,
@@ -49,6 +51,13 @@ export function StudentStatusDisplay() {
         `)
         .eq('student_id', student.id)
 
+      if (dataError) {
+        console.error('Error loading statuses:', dataError)
+        setError(`Error al cargar estados: ${dataError.message}`)
+        setLoading(false)
+        return
+      }
+
       if (data) {
         const formatted = data.map((e: any) => {
           const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
@@ -56,11 +65,11 @@ export function StudentStatusDisplay() {
             enrollment_id: e.id,
             student_name: '',
             subject_name: e.subject?.name || 'Materia desconocida',
-            partial_grade: grade?.partial_grade,
-            final_grade: grade?.final_grade,
+            partial_grade: grade?.partial_grade ?? undefined,
+            final_grade: grade?.final_grade ?? undefined,
             partial_status: grade?.partial_status,
             final_status: grade?.final_status,
-            status: e.status,
+            status: e.status || 'en_curso',
           }
         })
         setStatuses(formatted)
@@ -69,6 +78,7 @@ export function StudentStatusDisplay() {
       setLoading(false)
     } catch (err) {
       console.error('Error loading statuses:', err)
+      setError('Error inesperado: ' + String(err))
       setLoading(false)
     }
   }
@@ -120,6 +130,15 @@ export function StudentStatusDisplay() {
     return <div className="text-center py-4">Cargando estados...</div>
   }
 
+  if (error) {
+    return (
+      <div className="card p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+        <p className="font-semibold">Error al cargar estados</p>
+        <p className="text-xs mt-1">{error}</p>
+      </div>
+    )
+  }
+
   if (statuses.length === 0) {
     return (
       <div className="card p-6 text-center bg-blue-50 border border-blue-200">
@@ -133,7 +152,7 @@ export function StudentStatusDisplay() {
       <div className="card p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border-2 border-indigo-200">
         <h3 className="font-bold text-indigo-900 mb-2">Estado de Tus Materias</h3>
         <p className="text-sm text-indigo-800">
-          Aquí se muestra tu progreso en cada materia según las calificaciones cargadas
+          Aqui se muestra tu progreso en cada materia segun las calificaciones cargadas
         </p>
       </div>
 
@@ -146,12 +165,12 @@ export function StudentStatusDisplay() {
             <div>
               <p className="font-bold text-gray-900">{status.subject_name}</p>
               <div className="mt-1 space-y-1 text-sm text-gray-600">
-                {status.partial_grade && (
-                  <p>Promedio Parcial: <span className="font-bold text-gray-900">{status.partial_grade.toFixed(1)}</span></p>
-                )}
-                {status.final_grade && (
-                  <p>Nota Final: <span className="font-bold text-gray-900">{status.final_grade.toFixed(1)}</span></p>
-                )}
+                {status.partial_grade !== undefined && status.partial_grade !== null ? (
+                  <p>Promedio Parcial: <span className="font-bold text-gray-900">{Number(status.partial_grade).toFixed(1)}</span></p>
+                ) : null}
+                {status.final_grade !== undefined && status.final_grade !== null ? (
+                  <p>Nota Final: <span className="font-bold text-gray-900">{Number(status.final_grade).toFixed(1)}</span></p>
+                ) : null}
               </div>
             </div>
             <div>
