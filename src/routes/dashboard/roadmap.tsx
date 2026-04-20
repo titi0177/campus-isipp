@@ -87,7 +87,6 @@ function RoadmapPage() {
         id,
         subject_id,
         division,
-        academic_year,
         status,
         attempt_number
       `)
