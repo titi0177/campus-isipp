@@ -250,7 +250,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
       setError('')
       setGrades({})
-      alert(`${savedCount} calificación${savedCount !== 1 ? 'es' : ''} guardada${savedCount !== 1 ? 's' : ''} correctamente`)
+      alert(`${savedCount} calificacion${savedCount !== 1 ? 'es' : ''} guardada${savedCount !== 1 ? 's' : ''} correctamente`)
       await filterActiveEnrollments()
     } catch (err) {
       setError('Error al guardar: ' + String(err))
@@ -284,8 +284,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             <select
               value={numGrades}
               onChange={e => setNumGrades(parseInt(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
               {[1, 2, 3, 4, 5, 6].map(n => (
                 <option key={n} value={n}>
@@ -293,17 +292,17 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-600 mt-1">Configurado en la materia</p>
+            <p className="text-xs text-gray-600 mt-1">Selecciona cuantas notas usaras esta clase</p>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Promoción
+              Promocion
             </label>
             <div className="flex items-center gap-2 mt-4">
               {allowsPromotion ? (
                 <>
                   <Check size={20} className="text-green-600" />
-                  <span className="text-sm font-bold text-green-700">Permite Promocional (≥8)</span>
+                  <span className="text-sm font-bold text-green-700">Permite Promocional (8 o mas)</span>
                 </>
               ) : (
                 <>
@@ -318,13 +317,13 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
       {/* Info Box */}
       <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
-        <h3 className="font-bold text-emerald-900 mb-2">💡 Carga Flexible y Progresiva</h3>
+        <h3 className="font-bold text-emerald-900 mb-2">Carga Flexible y Progresiva</h3>
         <ul className="text-sm text-emerald-900 space-y-1">
-          <li>✓ <strong>Lunes:</strong> Carga la Nota 1 (ej: 8) y guarda - quedará registrada</li>
-          <li>✓ <strong>Vuelves en 2 semanas:</strong> Verás la Nota 1: 8 ya cargada, luego añade Nota 2 y 3</li>
-          <li>✓ <strong>Promedio ≥8 (Promocionado):</strong> Se guarda automáticamente como nota final ✅</li>
-          <li>✓ <strong>Promedio &lt;6 (Desaprobado):</strong> Se guarda automáticamente como nota final ✅</li>
-          <li>✓ <strong>Promedio 6-7 (Regular):</strong> Va a la sección "Notas Finales" para examen</li>
+          <li>Lunes: Carga la Nota 1 (ej: 8) y guarda - quedara registrada</li>
+          <li>Vuelves en 2 semanas: Veras la Nota 1: 8 ya cargada, luego anade Nota 2 y 3</li>
+          <li>Promedio 8 o mas (Promocionado): Se guarda automaticamente como nota final</li>
+          <li>Promedio menor a 6 (Desaprobado): Se guarda automaticamente como nota final</li>
+          <li>Promedio 6-7 (Regular): Va a la seccion Notas Finales para examen</li>
         </ul>
       </div>
 
@@ -339,7 +338,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       {activeEnrollments.length === 0 ? (
         <div className="card p-6 text-center bg-blue-50 border border-blue-200">
           <p className="text-gray-600 font-medium">
-            ✓ Todos los alumnos tienen calificaciones completas y finalizadas
+            Todos los alumnos tienen calificaciones completas y finalizadas
           </p>
         </div>
       ) : (
@@ -406,10 +405,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                               {partialStatus === 'promocionado' && <Check size={14} />}
                               {partialStatus === 'desaprobado' && <X size={14} />}
                               {partialStatus === 'promocionado'
-                                ? 'Prom. ✅'
+                                ? 'Prom.'
                                 : partialStatus === 'regular'
                                   ? 'Regular'
-                                  : 'Desapr. ✅'}
+                                  : 'Desapr.'}
                             </span>
                           )}
                         </td>
@@ -431,7 +430,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           </button>
 
           <p className="text-xs text-center text-gray-600 mt-2">
-            💾 Guarda tus cambios cuando agregues nuevas notas. Las notas se mantienen registradas para futuras ediciones.
+            Guarda tus cambios cuando agregues nuevas notas. Las notas se mantienen registradas para futuras ediciones.
           </p>
         </>
       )}
