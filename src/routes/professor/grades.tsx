@@ -5,6 +5,7 @@ import { useToast } from '@/components/Toast'
 import { FileText, ChevronDown } from 'lucide-react'
 import { ProfessorGradeLoader } from '@/components/ProfessorGradeLoader'
 import { ProfessorRegularGrades } from '@/components/ProfessorRegularGrades'
+import { ProfessorApprovedHistory } from '@/components/ProfessorApprovedHistory'
 
 export const Route = createFileRoute('/professor/grades')({
   component: ProfessorGradesPage,
@@ -30,7 +31,7 @@ function ProfessorGradesPage() {
   const [selectedSubject, setSelectedSubject] = useState('')
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'load' | 'regulars'>('load')
+  const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history'>('load')
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -148,7 +149,7 @@ function ProfessorGradesPage() {
       {selectedSubject && (
         <>
           {/* Tabs */}
-          <div className="flex gap-2 border-b border-gray-200">
+          <div className="flex gap-2 border-b border-gray-200 flex-wrap">
             <button
               onClick={() => setActiveTab('load')}
               className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
@@ -169,6 +170,16 @@ function ProfessorGradesPage() {
             >
               Notas Finales (Regulares)
             </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
+                activeTab === 'history'
+                  ? 'border-b-emerald-600 text-emerald-600'
+                  : 'border-b-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📋 Historial de Aprobados
+            </button>
           </div>
 
           {/* Content */}
@@ -188,6 +199,7 @@ function ProfessorGradesPage() {
                       <li>✓ El promedio parcial se calcula automáticamente al completar todas las notas</li>
                       <li>✓ Estados: <strong>Promocionado</strong> (≥8), <strong>Regular</strong> (6-7), <strong>Desaprobado</strong> (&lt;6)</li>
                       <li>✓ Las notas finales se cargan en la sección "Regulares"</li>
+                      <li>✓ Puedes cargar 1 o más notas a la vez - el sistema permite carga parcial</li>
                     </ul>
                   </div>
                   <ProfessorGradeLoader enrollments={enrollments} subjectId={selectedSubject} />
@@ -200,7 +212,7 @@ function ProfessorGradesPage() {
                 </div>
               )}
             </>
-          ) : (
+          ) : activeTab === 'regulars' ? (
             <>
               <div className="card p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200">
                 <h3 className="font-bold text-amber-900 mb-2">📝 Notas Finales para Regulares</h3>
@@ -209,6 +221,16 @@ function ProfessorGradesPage() {
                 </p>
               </div>
               <ProfessorRegularGrades subjectId={selectedSubject} />
+            </>
+          ) : (
+            <>
+              <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
+                <h3 className="font-bold text-emerald-900 mb-2">📋 Historial de Calificaciones</h3>
+                <p className="text-sm text-emerald-900">
+                  Visualiza el registro completo de todos los alumnos con sus notas parciales y finales, estados y condiciones académicas.
+                </p>
+              </div>
+              <ProfessorApprovedHistory subjectId={selectedSubject} subjectName={subjects.find(s => s.id === selectedSubject)?.name || ''} />
             </>
           )}
         </>

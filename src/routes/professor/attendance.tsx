@@ -103,10 +103,30 @@ function ProfessorAttendancePage() {
         return
       }
 
+      // Obtener IDs de estudiantes con estado final para excluirlos
+      const { data: finalGradesData } = await supabase
+        .from('enrollment_grades')
+        .select('enrollment_id, final_status')
+        .eq('final_status', 'aprobado')
+        .or('final_status.eq.promocionado')
+        .or('final_status.eq.desaprobado')
+
+      const excludedEnrollmentIds = new Set<string>()
+      if (finalGradesData) {
+        finalGradesData.forEach(g => {
+          excludedEnrollmentIds.add(g.enrollment_id)
+        })
+      }
+
       // Filtrar por división en memoria si es necesario
-      const enrollmentsData = division && allEnrollmentsData
+      let enrollmentsData = division && allEnrollmentsData
         ? allEnrollmentsData.filter(e => e.division === division)
         : allEnrollmentsData
+      
+      // Excluir estudiantes con estado final
+      enrollmentsData = enrollmentsData
+        ? enrollmentsData.filter(e => !excludedEnrollmentIds.has(e.id))
+        : []
 
       if (enrollmentsData && enrollmentsData.length > 0) {
         const enrollmentIds = enrollmentsData.map(e => e.id)
@@ -451,6 +471,9 @@ function ProfessorAttendancePage() {
           <p className="text-sm text-cyan-900">
             <strong>⚠️ Requisito:</strong> Mínimo 60% acumulado para rendir examen final (Abril - Diciembre)
           </p>
+          <p className="text-sm text-cyan-900">
+            <strong>📌 Nota:</strong> Los alumnos con estado final definido (aprobado/desaprobado) se ocultan automáticamente de esta sección
+          </p>
           {selectedDivision && (
             <p className="text-sm text-cyan-900">
               <strong>🔍 Filtrado:</strong> Mostrando solo División <strong>{selectedDivision}</strong>
@@ -627,13 +650,15 @@ function ProfessorAttendancePage() {
 
       {selectedSubject && students.length === 0 && (
         <div className="card p-8 text-center bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 rounded-2xl">
-          <p className="text-slate-600 font-semibold">No hay alumnos inscriptos en esta materia.</p>
+          <p className="text-slate-600 font-semibold">No hay alumnos para registrar asistencia</p>
+          <p className="text-slate-500 text-sm mt-2">(Los alumnos con estado final definido se ocultan automáticamente)</p>
         </div>
       )}
 
       {!selectedSubject && (
         <div className="card p-8 text-center bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-2xl">
           <p className="text-blue-700 font-semibold">👉 Selecciona una materia para comenzar a registrar asistencia.</p>
+          <p className="text-blue-600 text-sm mt-2">Se mostrarán solo alumnos sin estado final definido</p>
         </div>
       )}
     </div>

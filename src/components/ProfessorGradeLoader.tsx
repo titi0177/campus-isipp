@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { AlertCircle, Check, X } from 'lucide-react'
+import { AlertCircle, Check, X, Save } from 'lucide-react'
 
 type Enrollment = {
   id: string
@@ -32,7 +32,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  // Filtrar: solo mostrar alumnos sin calificaciones finales (en curso)
+  const [savingStudents, setSavingStudents] = useState<Set<string>>(new Set())
   const [activeEnrollments, setActiveEnrollments] = useState<Enrollment[]>([])
 
   useEffect(() => {
@@ -64,7 +64,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
   const filterActiveEnrollments = async () => {
     try {
-      // Obtener todos los enrollments con sus calificaciones
       const enrollmentIds = enrollments.map(e => e.id)
       
       if (enrollmentIds.length === 0) {
@@ -77,18 +76,15 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         .select('enrollment_id, partial_status')
         .in('enrollment_id', enrollmentIds)
 
-      // Crear set de enrollments que tienen calificaciones finales
       const completedEnrollmentIds = new Set<string>()
       if (gradesData) {
         gradesData.forEach(g => {
-          // Si tiene partial_status (tiene notas), lo consideramos "procesado"
           if (g.partial_status) {
             completedEnrollmentIds.add(g.enrollment_id)
           }
         })
       }
 
-      // Filtrar: mostrar solo los que NO tienen calificaciones
       const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
       setActiveEnrollments(active)
     } catch (err) {
@@ -144,6 +140,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
         if (partialGrade === null) continue
 
+        setSavingStudents(prev => new Set(prev).add(enrollment.id))
+
         const partialStatus = getPartialStatus(partialGrade)
 
         const payload = {
@@ -166,15 +164,25 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         if (upsertError) {
           console.error('Error saving grade for', enrollment.id, upsertError)
           setError(`Error al guardar nota de ${enrollment.student_name}`)
+          setSavingStudents(prev => {
+            const updated = new Set(prev)
+            updated.delete(enrollment.id)
+            return updated
+          })
           setSaving(false)
           return
         }
+
+        setSavingStudents(prev => {
+          const updated = new Set(prev)
+          updated.delete(enrollment.id)
+          return updated
+        })
       }
 
       setError('')
       setGrades({})
       alert('Calificaciones guardadas correctamente')
-      // Recargar la lista de alumnos activos
       await filterActiveEnrollments()
     } catch (err) {
       setError('Error al guardar: ' + String(err))
@@ -182,6 +190,18 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       setSaving(false)
     }
   }
+
+  const hasAnyGrade = activeEnrollments.some(enrollment => {
+    const enrollmentData = grades[enrollment.id]
+    if (!enrollmentData) return false
+    for (let i = 1; i <= numGrades; i++) {
+      if (enrollmentData[`grade_${i}` as keyof GradeData] !== undefined && 
+          enrollmentData[`grade_${i}` as keyof GradeData] !== null) {
+        return true
+      }
+    }
+    return false
+  })
 
   return (
     <div className="space-y-6">
@@ -228,6 +248,17 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       </div>
 
+      {/* Info Box */}
+      <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
+        <h3 className="font-bold text-emerald-900 mb-2">💡 Carga Flexible</h3>
+        <ul className="text-sm text-emerald-900 space-y-1">
+          <li>✓ Puedes cargar 1 o más notas a la vez</li>
+          <li>✓ Los alumnos pueden tomar exámenes en diferentes fechas</li>
+          <li>✓ Cada alumno se guarda individualmente cuando completa todas sus notas</li>
+          <li>✓ El botón "Guardar" solo procesa alumnos con todas las notas completas</li>
+        </ul>
+      </div>
+
       {/* Tabla de carga */}
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex gap-2">
@@ -257,12 +288,15 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                     ))}
                     <th className="px-4 py-3 text-center text-sm font-bold">Promedio</th>
                     <th className="px-4 py-3 text-center text-sm font-bold">Estado</th>
+                    <th className="px-4 py-3 text-center text-sm font-bold">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {activeEnrollments.map((enrollment, idx) => {
                     const partialGrade = calculatePartialGrade(enrollment.id)
                     const partialStatus = partialGrade ? getPartialStatus(partialGrade) : null
+                    const isSaving = savingStudents.has(enrollment.id)
+                    const isComplete = partialGrade !== null
 
                     return (
                       <tr key={enrollment.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -305,6 +339,13 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                             </span>
                           )}
                         </td>
+                        <td className="px-4 py-3 text-center">
+                          {isComplete && (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                              ✓ Completo
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     )
                   })}
@@ -315,11 +356,16 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
           <button
             onClick={handleSaveGrades}
-            disabled={saving}
-            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50"
+            disabled={saving || !hasAnyGrade}
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
+            <Save size={20} />
             {saving ? 'Guardando...' : 'Guardar Calificaciones'}
           </button>
+
+          <p className="text-xs text-center text-gray-600 mt-2">
+            {activeEnrollments.filter(e => calculatePartialGrade(e.id) !== null).length} de {activeEnrollments.length} alumnos con calificaciones completas
+          </p>
         </>
       )}
     </div>
