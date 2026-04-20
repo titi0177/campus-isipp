@@ -60,7 +60,6 @@ const StatCardMemo = memo(function StatCardComp({
           <Icon className="w-6 h-6 sm:w-7 sm:h-7 opacity-60" />
         </div>
       </div>
-      <ReinscriptionModal isOpen={showReinscriptionModal} onClose={() => setShowReinscriptionModal(false)} />
     </div>
   )
 })
@@ -443,6 +442,7 @@ function DashboardPage() {
           )}
         </div>
       </div>
+      <ReinscriptionModal isOpen={showReinscriptionModal} onClose={() => setShowReinscriptionModal(false)} />
     </div>
   )
 }
