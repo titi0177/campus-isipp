@@ -42,6 +42,7 @@ import { Route as DashboardExamsRouteImport } from './routes/dashboard/exams'
 import { Route as DashboardEnrollSubjectsRouteImport } from './routes/dashboard/enroll-subjects'
 import { Route as DashboardCertificatesRouteImport } from './routes/dashboard/certificates'
 import { Route as DashboardAttendanceRouteImport } from './routes/dashboard/attendance'
+import { Route as DashboardRecursiveReinscriptionRouteImport } from './routes/dashboard/recursive-reinscription'
 import { Route as DashboardAnnouncementsRouteImport } from './routes/dashboard/announcements'
 import { Route as AdminSubjectsRouteImport } from './routes/admin/subjects'
 import { Route as AdminStudentsRouteImport } from './routes/admin/students'
@@ -223,6 +224,11 @@ const DashboardCertificatesRoute = DashboardCertificatesRouteImport.update({
 const DashboardAttendanceRoute = DashboardAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardRecursiveReinscriptionRoute = DashboardRecursiveReinscriptionRouteImport.update({
+  id: '/recursive-reinscription',
+  path: '/recursive-reinscription',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardAnnouncementsRoute = DashboardAnnouncementsRouteImport.update({
