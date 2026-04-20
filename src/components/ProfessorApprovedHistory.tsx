@@ -134,9 +134,9 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
     const tableData = filteredStudents.map(s => [
       s.legajo,
       s.student_name,
-      s.partial_grade.toFixed(1),
+      s.partial_grade !== null && s.partial_grade !== undefined ? Number(s.partial_grade).toFixed(1) : '-',
       s.partial_status || '-',
-      s.final_grade ? s.final_grade.toFixed(1) : '-',
+      s.final_grade !== null && s.final_grade !== undefined ? Number(s.final_grade).toFixed(1) : '-',
       s.final_status ? getStatusLabel(s.final_status) : (s.partial_status ? getStatusLabel(s.partial_status) : '-'),
     ])
 
@@ -232,7 +232,7 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
                     <td className="px-4 py-3 font-medium text-gray-900">{student.student_name}</td>
                     <td className="px-4 py-3 text-gray-600">{student.dni}</td>
                     <td className="px-4 py-3 text-center font-bold text-gray-900">
-                      {student.partial_grade && !isNaN(student.partial_grade) ? student.partial_grade.toFixed(1) : '—'}
+                      {student.partial_grade !== null && student.partial_grade !== undefined && !isNaN(student.partial_grade) ? Number(student.partial_grade).toFixed(1) : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex px-2 py-1 rounded-full text-xs font-bold ${getStatusColor(student.partial_status)}`}>
@@ -240,7 +240,7 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center font-bold text-gray-900">
-                      {student.final_grade ? student.final_grade.toFixed(1) : '—'}
+                      {student.final_grade !== null && student.final_grade !== undefined ? Number(student.final_grade).toFixed(1) : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {finalStatus && (

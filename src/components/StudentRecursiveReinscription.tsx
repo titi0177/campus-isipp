@@ -280,7 +280,7 @@ export function StudentRecursiveReinscription() {
                     )}
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-600">
-                    <span>📊 Nota: {subject.final_grade ? subject.final_grade.toFixed(1) : 'N/A'}</span>
+                    <span>📊 Nota: {subject.final_grade !== null && subject.final_grade !== undefined ? Number(subject.final_grade).toFixed(1) : 'N/A'}</span>
                     <span>📅 Desaprobado: {subject.failed_year}</span>
                   </div>
                 </div>

@@ -185,10 +185,10 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-gray-900">
-                    {student.partial_grade.toFixed(1)}
+                    {student.partial_grade !== null && student.partial_grade !== undefined ? Number(student.partial_grade).toFixed(1) : '-'}
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-red-700">
-                    {student.final_grade.toFixed(1)}
+                    {student.final_grade !== null && student.final_grade !== undefined ? Number(student.final_grade).toFixed(1) : '-'}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
