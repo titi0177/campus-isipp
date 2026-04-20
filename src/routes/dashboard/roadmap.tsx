@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Lock, CheckCircle2, BookOpen, AlertCircle, RefreshCw, Zap, Award, TrendingUp } from 'lucide-react'
-
+ 
 type SubjectRow = {
   id: string
   name: string
@@ -14,7 +14,7 @@ type SubjectRow = {
   correlatives_ok: boolean
   state: 'done' | 'current' | 'locked' | 'available' | 'recursant'
   isRecursant: boolean
-  attempt_number: number
+  attempt: number
   blockedByCorrelatives: Array<{ id: string; name: string; code: string }>
   finalGrade?: number
   partialGrade?: number
@@ -39,165 +39,173 @@ function RoadmapPage() {
   }, [])
 
   async function load() {
-    setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      setLoading(false)
-      return
-    }
+    try {
+      setLoading(true)
 
-    const { data: student } = await supabase
-      .from('students')
-      .select('id, year, program_id, program:programs(name)')
-      .eq('user_id', user.id)
-      .single()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return setLoading(false)
 
-    if (!student) {
-      setLoading(false)
-      return
-    }
+      const { data: student } = await supabase
+        .from('students')
+        .select('id, year, program_id, program:programs(name)')
+        .eq('user_id', user.id)
+        .single()
 
-    setStudentId((student as any).id)
-    setProgramName((student as any).program?.name ?? '')
+      if (!student) return setLoading(false)
 
-    const programId = (student as any).program_id as string | undefined
-    const studentYear = (student as any).year as number
+      setStudentId(student.id)
+      setProgramName(student.program?.name ?? '')
 
-    let catalog: any[] = []
-    if (programId) {
-      const { data: subs } = await supabase
-        .from('subjects')
-        .select('id, name, code, year, division, dictation_type, semester, allows_promotion')
-        .eq('program_id', programId)
-        .order('year')
-        .order('code')
-      catalog = subs ?? []
-    }
+      const studentYear = student.year
+      const programId = student.program_id
 
-    const sMap = new Map()
-    for (const s of catalog) {
-      sMap.set(s.id, s)
-    }
-    setSubjectsMap(sMap)
+      const [
+        { data: catalog },
+        { data: enrollments },
+        { data: corrs }
+      ] = await Promise.all([
+        supabase
+          .from('subjects')
+          .select('id, name, code, year, division, dictation_type, semester, allows_promotion')
+          .eq('program_id', programId)
+          .order('year')
+          .order('code'),
 
-    // Obtener enrollments
-    const studentId = (student as any).id
-    const { data: enrollments } = await supabase
-      .from('enrollments')
-      .select('id, subject_id, division, status, attempt_number')
-      .eq('student_id', studentId)
+        supabase
+          .from('enrollments')
+          .select('id, subject_id, division, status, attempt')
+          .eq('student_id', student.id),
 
-    const enrolledIds = new Set<string>()
-    const passedIds = new Set<string>()
-    const recursantIds = new Set<string>()
-    const gradesMap = new Map<string, any>()
-    const enrollmentMap = new Map<string, any>()
-    let enrolledDivision: string | null = null
+        supabase
+          .from('subject_correlatives')
+          .select('subject_id, requires_subject_id')
+      ])
 
-    if (enrollments && enrollments.length > 0) {
-      for (const enr of enrollments) {
-        enrollmentMap.set(enr.subject_id, enr)
+      const sMap = new Map()
+      for (const s of catalog || []) {
+        sMap.set(s.id, s)
+      }
+      setSubjectsMap(sMap)
 
-        // Obtener calificaciones de la tabla enrollment_grades
-        const { data: grades } = await supabase
+      const enrollmentMap = new Map()
+      const enrolledIds = new Set<string>()
+
+      for (const e of enrollments || []) {
+        enrollmentMap.set(e.subject_id, e)
+        enrolledIds.add(e.subject_id)
+      }
+
+      const enrollmentIds = (enrollments || []).map(e => e.id)
+
+      let gradesMap = new Map()
+
+      if (enrollmentIds.length > 0) {
+        const { data: gradesData } = await supabase
           .from('enrollment_grades')
-          .select('final_status, partial_status, final_grade, partial_grade')
-          .eq('enrollment_id', enr.id)
-          .single()
+          .select('enrollment_id, final_status, partial_status, final_grade, partial_grade')
+          .in('enrollment_id', enrollmentIds)
 
-        if (grades) {
-          gradesMap.set(enr.subject_id, grades)
+        for (const g of gradesData || []) {
+          gradesMap.set(g.enrollment_id, g)
         }
+      }
 
-        // Determinar si pasó (tiene final_status que no es desaprobado)
-        if (grades && grades.final_status && grades.final_status !== 'desaprobado') {
-          passedIds.add(enr.subject_id)
-        } else if (gradesMap.has(enr.subject_id)) {
-          // Si tiene calificaciones pero no aprobó, es recursante
-          recursantIds.add(enr.subject_id)
-        }
+      const requiresMap = new Map<string, string[]>()
+      for (const c of corrs || []) {
+        const arr = requiresMap.get(c.subject_id) ?? []
+        arr.push(c.requires_subject_id)
+        requiresMap.set(c.subject_id, arr)
+      }
 
-        enrolledIds.add(enr.subject_id)
+      const passedIds = new Set<string>()
+      const recursantIds = new Set<string>()
+      let enrolledDivision: string | null = null
+
+      for (const enr of enrollments || []) {
+  const grades = gradesMap.get(enr.id)
+
+  if (
+    grades?.final_status === 'aprobado' ||
+    grades?.final_status === 'promocionado'
+  ) {
+    passedIds.add(enr.subject_id)
+  } else if (
+    grades?.final_status === 'desaprobado'
+  ) {
+    recursantIds.add(enr.subject_id)
+  }
 
         const subj = sMap.get(enr.subject_id)
         if (subj?.year === 1 && enr.division) {
           enrolledDivision = enr.division
         }
       }
+
+      const computed: SubjectRow[] = (catalog || [])
+        .filter(s => {
+          if (s.year === 1 && s.division && enrolledDivision && enrolledDivision !== s.division) {
+            return false
+          }
+          return true
+        })
+        .map((s) => {
+          const reqs = requiresMap.get(s.id) ?? []
+
+          const correlatives_ok =
+            reqs.length === 0 || reqs.every((rid) => passedIds.has(rid))
+
+          const blockedByCorrelatives = reqs
+            .filter((rid) => !passedIds.has(rid))
+            .map((rid) => sMap.get(rid))
+            .filter(Boolean)
+
+          const enrollment = enrollmentMap.get(s.id)
+          const grades = enrollment ? gradesMap.get(enrollment.id) : null
+
+          const isRecursant = recursantIds.has(s.id)
+          const attempt = enrollment?.attempt || 1
+
+          let state: SubjectRow['state'] = 'locked'
+
+          if (passedIds.has(s.id)) state = 'done'
+          else if (isRecursant) state = 'recursant'
+          else if (enrolledIds.has(s.id)) state = 'current'
+          else if (correlatives_ok && s.year <= studentYear + 1) state = 'available'
+
+          return {
+            id: s.id,
+            name: s.name,
+            code: s.code,
+            year: s.year,
+            division: s.division,
+            dictation_type: s.dictation_type || 'anual',
+            semester: s.semester || 1,
+            correlatives_ok,
+            state,
+            isRecursant,
+            attempt,
+            blockedByCorrelatives,
+            finalGrade: grades?.final_grade,
+            partialGrade: grades?.partial_grade,
+            partialStatus: grades?.partial_status,
+            finalStatus: grades?.final_status,
+            allowsPromotion: s.allows_promotion,
+          }
+        })
+
+      setSubjects(computed)
+
+    } catch (err) {
+      console.error('❌ Error cargando roadmap:', err)
+    } finally {
+      setLoading(false)
     }
-
-    const { data: corrs } = await supabase
-      .from('subject_correlatives')
-      .select('subject_id, requires_subject_id')
-
-    const requiresMap = new Map<string, string[]>()
-    for (const c of corrs ?? []) {
-      const arr = requiresMap.get(c.subject_id) ?? []
-      arr.push(c.requires_subject_id)
-      requiresMap.set(c.subject_id, arr)
-    }
-
-    const computed: SubjectRow[] = (catalog as any[])
-      .filter(s => {
-        if (s.year === 1 && s.division && enrolledDivision && enrolledDivision !== s.division) {
-          return false
-        }
-        return true
-      })
-      .map((s) => {
-        const reqs = requiresMap.get(s.id) ?? []
-        const correlatives_ok =
-          reqs.length === 0 || reqs.every((rid) => passedIds.has(rid))
-
-        const blockedByCorrelatives = reqs
-          .filter((rid) => !passedIds.has(rid))
-          .map((rid) => sMap.get(rid))
-          .filter((s) => s)
-
-        const isRecursant = recursantIds.has(s.id)
-        const enrollment = enrollmentMap.get(s.id)
-        const attempt_number = enrollment?.attempt_number || 1
-
-        let state: SubjectRow['state'] = 'locked'
-
-        if (passedIds.has(s.id)) {
-          state = 'done'
-        } else if (isRecursant) {
-          state = 'recursant'
-        } else if (enrolledIds.has(s.id)) {
-          state = 'current'
-        } else if (correlatives_ok && s.year <= studentYear + 1) {
-          state = 'available'
-        } else {
-          state = 'locked'
-        }
-
-        const grades = gradesMap.get(s.id)
-
-        return {
-          id: s.id,
-          name: s.name,
-          code: s.code,
-          year: s.year,
-          division: s.division,
-          dictation_type: s.dictation_type || 'anual',
-          semester: s.semester || 1,
-          correlatives_ok,
-          state,
-          isRecursant,
-          attempt_number,
-          blockedByCorrelatives,
-          finalGrade: grades?.final_grade,
-          partialGrade: grades?.partial_grade,
-          partialStatus: grades?.partial_status,
-          finalStatus: grades?.final_status,
-          allowsPromotion: s.allows_promotion,
-        }
-      })
-
-    setSubjects(computed)
-    setLoading(false)
   }
+
+  // 🔽 TODO LO DEMÁS (TU UI ORIGINAL) SE MANTIENE IGUAL 🔽
+
+  // 🔽 TODO LO DEMÁS (TU UI ORIGINAL) SE MANTIENE IGUAL 🔽
+  
 
   const getDictationLabel = (subject: SubjectRow) => {
     if (subject.dictation_type === 'cuatrimestral') {
@@ -424,9 +432,9 @@ function RoadmapPage() {
                               {s.state === 'locked' && <Lock className="h-6 w-6 text-gray-500" />}
                               <span className="font-mono text-lg font-black text-gray-900">{s.code}</span>
                             </div>
-                            {s.attempt_number > 1 && (
+                            {s.attempt > 1 && (
                               <span className="text-xs font-bold px-2 py-1 rounded-full bg-orange-200 text-orange-700">
-                                Intento {s.attempt_number}
+                                Intento {s.attempt}
                               </span>
                             )}
                           </div>

@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS public.enrollment_grades (
   partial_status TEXT CHECK (partial_status IN ('en_curso', 'regular', 'promocionado', 'desaprobado')),
   final_status TEXT CHECK (final_status IN ('aprobado', 'promocionado', 'desaprobado')),
   -- Intentos
-  attempt_number INTEGER DEFAULT 1,
+  attempt INTEGER DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ,
-  UNIQUE(enrollment_id, attempt_number)
+  UNIQUE(enrollment_id, attempt)
 );
 
 -- Crear índices si no existen
