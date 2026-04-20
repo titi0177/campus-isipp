@@ -12,7 +12,6 @@ type EnrollmentWithGrades = {
   student_id: string
   subject_id: string
   division?: string
-  academic_year: number
   status: string
   subject: {
     id: string
@@ -85,7 +84,6 @@ function SubjectsPage() {
           student_id,
           subject_id,
           division,
-          academic_year,
           status,
           subject:subjects(
             id,
@@ -113,7 +111,6 @@ function SubjectsPage() {
           attendance(id, percentage)
         `)
         .eq('student_id', student.id)
-        .order('academic_year', { ascending: false })
 
       if (queryError) {
         console.error('Query error:', queryError)
@@ -313,7 +310,7 @@ function SubjectsPage() {
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <p className="text-sm font-bold text-indigo-600 font-mono">{subject.code}</p>
                             <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
-                              {enr.academic_year}° año
+                              {subject.year}° año
                             </span>
                             {subject.division && (
                               <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">
