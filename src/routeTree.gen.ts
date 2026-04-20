@@ -42,7 +42,6 @@ import { Route as DashboardExamsRouteImport } from './routes/dashboard/exams'
 import { Route as DashboardEnrollSubjectsRouteImport } from './routes/dashboard/enroll-subjects'
 import { Route as DashboardCertificatesRouteImport } from './routes/dashboard/certificates'
 import { Route as DashboardAttendanceRouteImport } from './routes/dashboard/attendance'
-import { Route as DashboardRecursiveReinscriptionRouteImport } from './routes/dashboard/recursive-reinscription'
 import { Route as DashboardAnnouncementsRouteImport } from './routes/dashboard/announcements'
 import { Route as AdminSubjectsRouteImport } from './routes/admin/subjects'
 import { Route as AdminStudentsRouteImport } from './routes/admin/students'
@@ -337,7 +336,6 @@ export interface FileRoutesByFullPath {
   '/admin/subjects': typeof AdminSubjectsRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
-  '/dashboard/recursive-reinscription': typeof DashboardRecursiveReinscriptionRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
   '/dashboard/enroll-subjects': typeof DashboardEnrollSubjectsRoute
   '/dashboard/exams': typeof DashboardExamsRoute
@@ -386,7 +384,6 @@ export interface FileRoutesByTo {
   '/admin/subjects': typeof AdminSubjectsRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
-  '/dashboard/recursive-reinscription': typeof DashboardRecursiveReinscriptionRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
   '/dashboard/enroll-subjects': typeof DashboardEnrollSubjectsRoute
   '/dashboard/exams': typeof DashboardExamsRoute
@@ -440,7 +437,6 @@ export interface FileRoutesById {
   '/admin/subjects': typeof AdminSubjectsRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
-  '/dashboard/recursive-reinscription': typeof DashboardRecursiveReinscriptionRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
   '/dashboard/enroll-subjects': typeof DashboardEnrollSubjectsRoute
   '/dashboard/exams': typeof DashboardExamsRoute
@@ -1033,7 +1029,6 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 interface DashboardRouteChildren {
   DashboardAnnouncementsRoute: typeof DashboardAnnouncementsRoute
   DashboardAttendanceRoute: typeof DashboardAttendanceRoute
-  DashboardRecursiveReinscriptionRoute: typeof DashboardRecursiveReinscriptionRoute
   DashboardCertificatesRoute: typeof DashboardCertificatesRoute
   DashboardEnrollSubjectsRoute: typeof DashboardEnrollSubjectsRoute
   DashboardExamsRoute: typeof DashboardExamsRoute
@@ -1051,7 +1046,6 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAnnouncementsRoute: DashboardAnnouncementsRoute,
   DashboardAttendanceRoute: DashboardAttendanceRoute,
-  DashboardRecursiveReinscriptionRoute: DashboardRecursiveReinscriptionRoute,
   DashboardCertificatesRoute: DashboardCertificatesRoute,
   DashboardEnrollSubjectsRoute: DashboardEnrollSubjectsRoute,
   DashboardExamsRoute: DashboardExamsRoute,
@@ -1135,10 +1129,3 @@ declare module '@tanstack/react-start' {
     router: Awaited<ReturnType<typeof getRouter>>
   }
 }
-
-
-
-
-
-
-
