@@ -212,7 +212,7 @@ function ExamsPage() {
 
         if (debtWithinDeadline.length > 0) {
           const debtAmount = debtWithinDeadline.reduce((sum: number, p: any) => sum + p.amount, 0)
-          reasons.push(`Tienes deuda de $${debtAmount.toFixed(2)} con vencimiento antes de este examen`)
+          reasons.push(`Tienes deuda de $${debtAmount !== null && debtAmount !== undefined ? debtAmount.toFixed(2) : '0.00'} con vencimiento antes de este examen`)
           eligible = false
         }
       }

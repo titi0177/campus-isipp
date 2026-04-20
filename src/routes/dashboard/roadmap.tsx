@@ -484,7 +484,7 @@ function RoadmapPage() {
                               {s.partialGrade !== undefined && (
                                 <div className="bg-white rounded-xl p-3 text-center border-2 border-blue-200 shadow-sm">
                                   <p className="text-xs text-blue-600 font-bold mb-1">Parcial</p>
-                                  <p className="text-2xl font-black text-blue-900">{s.partialGrade.toFixed(1)}</p>
+                                  <p className="text-2xl font-black text-blue-900">{s.partialGrade !== null && s.partialGrade !== undefined ? s.partialGrade.toFixed(1) : '-'}</p>
                                 </div>
                               )}
                               {s.finalGrade !== undefined && (
@@ -505,7 +505,7 @@ function RoadmapPage() {
                                     s.finalGrade >= 6 ? 'text-emerald-900' :
                                     'text-red-900'
                                   }`}>
-                                    {s.finalGrade.toFixed(1)}
+                                    {s.finalGrade !== null && s.finalGrade !== undefined ? s.finalGrade.toFixed(1) : '-'}
                                   </p>
                                 </div>
                               )}

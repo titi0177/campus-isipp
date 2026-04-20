@@ -83,7 +83,7 @@ function TreasurerIndex() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-green-600 uppercase tracking-wide">Pagado</p>
-              <p className="text-3xl font-bold text-green-900 mt-2">${stats.totalPaid.toFixed(0)}</p>
+              <p className="text-3xl font-bold text-green-900 mt-2">${stats.totalPaid !== null && stats.totalPaid !== undefined ? stats.totalPaid.toFixed(0) : '0'}</p>
             </div>
             <TrendingUp size={32} className="text-green-200" />
           </div>
@@ -93,7 +93,7 @@ function TreasurerIndex() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-red-600 uppercase tracking-wide">Adeudado</p>
-              <p className="text-3xl font-bold text-red-900 mt-2">${stats.totalOwed.toFixed(0)}</p>
+              <p className="text-3xl font-bold text-red-900 mt-2">${stats.totalOwed !== null && stats.totalOwed !== undefined ? stats.totalOwed.toFixed(0) : '0'}</p>
             </div>
             <DollarSign size={32} className="text-red-200" />
           </div>
@@ -164,8 +164,8 @@ function TreasurerIndex() {
           <h3 className="font-semibold text-slate-900 mb-3">📊 Estadísticas Rápidas</h3>
           <ul className="space-y-2 text-sm text-slate-700">
             <li>✓ Total de movimientos: <strong>{stats.totalPayments}</strong></li>
-            <li>✓ Monto recaudado: <strong>${stats.totalPaid.toFixed(2)}</strong></li>
-            <li>✓ Deuda pendiente: <strong>${stats.totalOwed.toFixed(2)}</strong></li>
+            <li>✓ Monto recaudado: <strong>${stats.totalPaid !== null && stats.totalPaid !== undefined ? stats.totalPaid.toFixed(2) : '0.00'}</strong></li>
+            <li>✓ Deuda pendiente: <strong>${stats.totalOwed !== null && stats.totalOwed !== undefined ? stats.totalOwed.toFixed(2) : '0.00'}</strong></li>
             <li>✓ Tasa de cobranza: <strong>
               {stats.totalPaid + stats.totalOwed > 0
                 ? ((stats.totalPaid / (stats.totalPaid + stats.totalOwed)) * 100).toFixed(1)

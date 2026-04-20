@@ -128,7 +128,7 @@ function AdminDashboard() {
         <StatCard title="Carreras" value={stats.programs} icon={<GraduationCap size={24} />} color="green" />
         <StatCard title="Profesores" value={stats.professors} icon={<UserCheck size={24} />} color="orange" />
         <StatCard title="Inscripciones" value={stats.enrollments} icon={<TrendingUp size={24} />} color="purple" />
-        <StatCard title="Promedio" value={stats.avg.toFixed(2)} icon={<Award size={24} />} color="bordeaux" />
+        <StatCard title="Promedio" value={stats.avg !== null && stats.avg !== undefined ? stats.avg.toFixed(2) : '0.00'} icon={<Award size={24} />} color="bordeaux" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

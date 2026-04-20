@@ -43,7 +43,7 @@ function ReportsPage() {
       const subjectNames = Object.keys(subjectGrades).slice(0, 10)
       const avgs = subjectNames.map(n => {
         const vals = subjectGrades[n]
-        return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2)
+        return vals.length > 0 ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '0.00'
       })
       setGradesBySubject({
         labels: subjectNames,
