@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { AlertCircle, Check, Plus, RotateCcw } from 'lucide-react'
+import { AlertCircle, Check } from 'lucide-react'
 
 type DisapprovedStudent = {
   id: string
@@ -26,7 +26,6 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
   const [disapprovedStudents, setDisapprovedStudents] = useState<DisapprovedStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [creatingRecursive, setCreatingRecursive] = useState<string | null>(null)
 
   useEffect(() => {
     loadDisapprovedStudents()
@@ -34,7 +33,6 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
 
   const loadDisapprovedStudents = async () => {
     try {
-      // Primero intenta con la relación completa
       let { data, error: err } = await supabase
         .from('enrollment_grades')
         .select(`
@@ -89,38 +87,6 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
     }
   }
 
-  const handleCreateRecursiveEnrollment = async (student: DisapprovedStudent) => {
-    setCreatingRecursive(student.enrollment_id)
-    try {
-      // Llamar a la función de Supabase para crear nueva inscripción recursante
-      const { data, error: err } = await supabase.rpc('create_recursive_enrollment', {
-        p_original_enrollment_id: student.enrollment_id,
-        p_reason: 'desaprobado',
-      })
-
-      if (err) {
-        console.error('Error creating recursive enrollment:', err)
-        setError(`Error al crear reinscripción: ${err.message}`)
-        return
-      }
-
-      alert(
-        `✅ Reinscripción creada exitosamente\n\n` +
-        `Alumno: ${student.student_name}\n` +
-        `Materia: ${student.subject_code} - ${student.subject_name}\n` +
-        `Intento: ${student.attempt_number} → ${student.attempt_number + 1}\n` +
-        `Estado: Recursante`
-      )
-
-      await loadDisapprovedStudents()
-    } catch (err) {
-      console.error('Error:', err)
-      setError('Error al crear reinscripción: ' + String(err))
-    } finally {
-      setCreatingRecursive(null)
-    }
-  }
-
   if (loading) {
     return (
       <div className="card p-6 text-center">
@@ -133,7 +99,7 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
   if (disapprovedStudents.length === 0) {
     return (
       <div className="card p-6 text-center bg-green-50 border border-green-200">
-        <p className="text-green-700 font-medium">✓ No hay alumnos desaprobados en esta materia</p>
+        <p className="text-green-700 font-medium">No hay alumnos desaprobados en esta materia</p>
       </div>
     )
   }
@@ -148,9 +114,17 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
       )}
 
       <div className="card p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200">
-        <h3 className="font-bold text-red-900 mb-2">🔄 Gestión de Desaprobados</h3>
+        <h3 className="font-bold text-red-900 mb-2">Alumnos Desaprobados</h3>
         <p className="text-sm text-red-900">
-          <strong>{disapprovedStudents.length}</strong> estudiante{disapprovedStudents.length !== 1 ? 's' : ''} desaprobado{disapprovedStudents.length !== 1 ? 's' : ''} listos para reinscribirse como recursante
+          <strong>{disapprovedStudents.length}</strong> estudiante{disapprovedStudents.length !== 1 ? 's' : ''} desaprobado{disapprovedStudents.length !== 1 ? 's' : ''} en esta materia
+        </p>
+      </div>
+
+      <div className="card p-4 bg-blue-50 border-2 border-blue-200">
+        <h3 className="font-bold text-blue-900 mb-2">Reinscripcion - Accion del Alumno</h3>
+        <p className="text-sm text-blue-900">
+          Los alumnos desaprobados pueden reinscribirse como recursantes desde su Dashboard. 
+          Ve a: <strong>Dashboard → Reinscripcion</strong> para completar el proceso.
         </p>
       </div>
 
@@ -166,7 +140,6 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                 <th className="px-4 py-3 text-center font-bold">Promedio</th>
                 <th className="px-4 py-3 text-center font-bold">Nota Final</th>
                 <th className="px-4 py-3 text-center font-bold">Estado</th>
-                <th className="px-4 py-3 text-center font-bold">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -181,7 +154,7 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-gray-900">
                     <span className="inline-block bg-yellow-100 text-yellow-900 px-2 py-1 rounded-full text-xs font-bold">
-                      {student.attempt_number}°
+                      {student.attempt_number}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center font-bold text-gray-900">
@@ -192,27 +165,8 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                      ✗ Desapr.
+                      Desaprobado
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleCreateRecursiveEnrollment(student)}
-                      disabled={creatingRecursive === student.enrollment_id}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors disabled:opacity-50"
-                    >
-                      {creatingRecursive === student.enrollment_id ? (
-                        <>
-                          <div className="inline-block animate-spin rounded-full h-3 w-3 border-2 border-indigo-700 border-t-transparent"></div>
-                          Creando...
-                        </>
-                      ) : (
-                        <>
-                          <RotateCcw size={14} />
-                          Reinscribir
-                        </>
-                      )}
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -222,12 +176,12 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
       </div>
 
       <div className="card p-4 bg-blue-50 border-2 border-blue-200">
-        <h3 className="font-bold text-blue-900 mb-2">ℹ️ Cómo funciona:</h3>
+        <h3 className="font-bold text-blue-900 mb-2">Informacion:</h3>
         <ul className="text-sm text-blue-900 space-y-1">
-          <li>✓ El alumno aparece aquí cuando obtiene promedio &lt;6 (Desaprobado)</li>
-          <li>✓ Al presionar "Reinscribir", se crea una nueva inscripción como recursante (2do intento)</li>
-          <li>✓ El alumno conserva su historial del primer intento</li>
-          <li>✓ Puede cargar notas nuevamente en el siguiente ciclo</li>
+          <li>Los alumnos desaprobados aparecen aqui con promedio menor a 6</li>
+          <li>Pueden reinscribirse accediendo a su Dashboard → Reinscripcion</li>
+          <li>Se crean como recursantes (2do intento) automaticamente</li>
+          <li>Conservan su historial del primer intento</li>
         </ul>
       </div>
     </div>
