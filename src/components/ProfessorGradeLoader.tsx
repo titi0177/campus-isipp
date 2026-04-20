@@ -73,17 +73,15 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         return
       }
 
-      // Obtener calificaciones existentes pero sin status final O solo Regular (no Desaprobado/Promocionado)
+      // Obtener TODAS las calificaciones (incluso sin final_status) para cada inscripción
       const { data: gradesData } = await supabase
         .from('enrollment_grades')
-        .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status')
+        .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status, final_status')
         .in('enrollment_id', enrollmentIds)
-        .or('final_status.is.null,final_status.eq.regular')
-        .not('final_status', 'in', '("desaprobado","promocionado")')
 
       const existingGradesMap: Record<string, GradeData> = {}
       const existingIdsMap: Record<string, string> = {}
-      const enrollmentsInProcess = new Set<string>()
+      const completedEnrollmentIds = new Set<string>()
 
       if (gradesData) {
         gradesData.forEach(g => {
@@ -98,20 +96,20 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             partial_status: g.partial_status || undefined,
           }
           existingIdsMap[g.enrollment_id] = g.id
-          enrollmentsInProcess.add(g.enrollment_id)
+          
+          // Marcar como completado si tiene final_status de desaprobado o promocionado
+          if (g.final_status && ['desaprobado', 'promocionado'].includes(g.final_status)) {
+            completedEnrollmentIds.add(g.enrollment_id)
+          }
         })
       }
 
       setExistingGrades(existingGradesMap)
       setExistingIds(existingIdsMap)
 
-      // Mostrar alumnos sin calificaciones O alumnos en proceso (sin status final)
-      // NO mostrar desaprobados ni promocionados
-      const active = enrollments.filter(e => {
-        const hasGrade = gradesData?.some(g => g.enrollment_id === e.id)
-        const isCompleted = gradesData?.some(g => g.enrollment_id === e.id && g.partial_status && ['desaprobado', 'promocionado'].includes(g.partial_status))
-        return hasGrade && !isCompleted
-      })
+      // Mostrar TODOS los alumnos EXCEPTO los que ya tienen final_status = desaprobado o promocionado
+      // Esto incluye: alumnos sin calificaciones + alumnos en proceso (sin final_status) + alumnos con regular
+      const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
       setActiveEnrollments(active)
     } catch (err) {
       console.error('Error filtering enrollments:', err)

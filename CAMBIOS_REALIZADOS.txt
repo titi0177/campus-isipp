@@ -1,0 +1,101 @@
+## CAMBIOS REALIZADOS - DIAGNOSIS Y FIXES
+
+### PROBLEMAS IDENTIFICADOS:
+
+1. **Reinscripción muestra 404 NOT FOUND**
+   - Causa: Faltaba RPC `student_reinscribe_as_recursive` en Supabase
+   - Tabla `enrollment_grades` no estaba unificada
+
+2. **Alumnos NO aparecen en carga de calificaciones (profesor)**
+   - Causa: `filterActiveEnrollments()` filtraba incorrectamente
+   - Lógica con `.or()` y `.not()` excluía alumnos sin calificaciones
+   - Alumnos nuevos nunca aparecían
+
+3. **Estructura de BD inconsistente**
+   - Código usa `enrollment_grades` pero schema tenía solo `grades`
+   - Faltaban columnas en `enrollments`: `academic_year`, `is_recursive`, `status`, `division`
+   - `professors` no tenía `user_id` para vincularse con usuarios de Auth
+
+### SOLUCIONES IMPLEMENTADAS:
+
+#### 1. SQL - Tabla unified enrollment_grades (20260421000000_unified_enrollment_grades_table.sql)
+- Tabla `enrollment_grades` con estructura correcta:
+  - Columnas: `grade_1` a `grade_6` (6 parciales)
+  - `partial_grade` y `partial_status`
+  - `final_grade` y `final_status`
+  - Índices para optimizar búsquedas
+  - RLS con políticas para estudiantes, profesores y admin
+
+- **RPC `student_reinscribe_as_recursive()`**:
+  - Verifica que alumno no esté reinscripto ya como recursante
+  - Crea inscripción con `is_recursive = true`
+  - Crea registro inicial en `enrollment_grades` con `attempt_number = 2`
+  - Retorna JSON con success/message
+
+- **RPC `get_enrolled_students_for_subject()`**:
+  - Retorna alumnos inscritos en materia
+  - Incluye si tienen calificaciones y estado final
+  - Filtro opcional por año académico
+
+#### 2. SQL - Columnas faltantes (20260421000001_add_missing_enrollments_columns.sql)
+- `enrollments` ahora tiene:
+  - `academic_year` (INTEGER)
+  - `is_recursive` (BOOLEAN)
+  - `status` (active/inactive/completed/dropped)
+  - `attempt_number` (INTEGER)
+  - `division` (TEXT para divisiones A/B)
+
+#### 3. SQL - user_id en professors (20260421000002_add_user_id_to_professors.sql)
+- `professors.user_id` -> referencia a `users(id)`
+- Permite vincular profesor con su usuario Auth
+- Esencial para RLS de profesor sobre sus calificaciones
+
+#### 4. Componente ProfessorGradeLoader.tsx - FIX crítico
+ANTES (INCORRECTO):
+```
+.or('final_status.is.null,final_status.eq.regular')
+.not('final_status', 'in', '("desaprobado","promocionado")')
+active = enrollments.filter(e => {
+  const hasGrade = gradesData?.some(...)
+  const isCompleted = ... includes('desaprobado','promocionado')
+  return hasGrade && !isCompleted  // ← Solo mostraba si tiene registro + no está completo
+})
+```
+PROBLEMA: Alumnos sin calificaciones = no tenían registro = NO aparecían
+
+DESPUÉS (CORRECTO):
+```
+// Obtener TODAS las calificaciones (incluso sin final_status)
+const completedEnrollmentIds = new Set<string>()
+if (g.final_status && ['desaprobado', 'promocionado'].includes(g.final_status)) {
+  completedEnrollmentIds.add(g.enrollment_id)
+}
+// Mostrar TODOS EXCEPTO los completados
+const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
+```
+RESULTADO: Ahora aparecen alumnos nuevos + en progreso + regular
+
+#### 5. Componente StudentRecursiveReinscription.tsx - Mejorado
+- Mejor manejo de errores (verificar user y student)
+- Log de errores de RPC para debugging
+- Validación de response.data
+- Mensajes más descriptivos
+
+### ESTADO DE DEPLOYMENT:
+
+✓ Build completo sin errores
+✓ Todos los cambios compilados en `dist/`
+✓ Listo para Vercel
+
+### TESTING RECOMENDADO:
+
+1. **Reinscripción**: Alumno con desaprobado → intenta reinscribirse
+2. **Carga de notas**: Profesor selecciona materia → verifica que aparecen TODOS los alumnos
+3. **Tabla enrollment_grades**: Consulta SELECT * para verificar estructura
+
+### PRÓXIMOS PASOS:
+
+- Ejecutar migraciones SQL en Supabase
+- Desplegar a Vercel
+- Verificar RPC en Supabase SQL Editor
+- Test end-to-end de reinscripción y carga de notas
