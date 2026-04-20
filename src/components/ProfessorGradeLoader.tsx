@@ -32,10 +32,13 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  // Filtrar: solo mostrar alumnos sin calificaciones finales (en curso)
+  const [activeEnrollments, setActiveEnrollments] = useState<Enrollment[]>([])
 
   useEffect(() => {
     loadSubjectSettings()
-  }, [subjectId])
+    filterActiveEnrollments()
+  }, [subjectId, enrollments])
 
   const loadSubjectSettings = async () => {
     try {
@@ -56,6 +59,41 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       }
     } catch (err) {
       console.error('Error:', err)
+    }
+  }
+
+  const filterActiveEnrollments = async () => {
+    try {
+      // Obtener todos los enrollments con sus calificaciones
+      const enrollmentIds = enrollments.map(e => e.id)
+      
+      if (enrollmentIds.length === 0) {
+        setActiveEnrollments([])
+        return
+      }
+
+      const { data: gradesData } = await supabase
+        .from('enrollment_grades')
+        .select('enrollment_id, partial_status')
+        .in('enrollment_id', enrollmentIds)
+
+      // Crear set de enrollments que tienen calificaciones finales
+      const completedEnrollmentIds = new Set<string>()
+      if (gradesData) {
+        gradesData.forEach(g => {
+          // Si tiene partial_status (tiene notas), lo consideramos "procesado"
+          if (g.partial_status) {
+            completedEnrollmentIds.add(g.enrollment_id)
+          }
+        })
+      }
+
+      // Filtrar: mostrar solo los que NO tienen calificaciones
+      const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
+      setActiveEnrollments(active)
+    } catch (err) {
+      console.error('Error filtering enrollments:', err)
+      setActiveEnrollments(enrollments)
     }
   }
 
@@ -101,7 +139,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     setError('')
 
     try {
-      for (const enrollment of enrollments) {
+      for (const enrollment of activeEnrollments) {
         const partialGrade = calculatePartialGrade(enrollment.id)
 
         if (partialGrade === null) continue
@@ -136,6 +174,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       setError('')
       setGrades({})
       alert('Calificaciones guardadas correctamente')
+      // Recargar la lista de alumnos activos
+      await filterActiveEnrollments()
     } catch (err) {
       setError('Error al guardar: ' + String(err))
     } finally {
@@ -196,82 +236,92 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       )}
 
-      <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-                <th className="px-4 py-3 text-left text-sm font-bold">Estudiante</th>
-                {Array.from({ length: numGrades }, (_, i) => (
-                  <th key={i + 1} className="px-4 py-3 text-center text-sm font-bold">
-                    Nota {i + 1}
-                  </th>
-                ))}
-                <th className="px-4 py-3 text-center text-sm font-bold">Promedio</th>
-                <th className="px-4 py-3 text-center text-sm font-bold">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {enrollments.map((enrollment, idx) => {
-                const partialGrade = calculatePartialGrade(enrollment.id)
-                const partialStatus = partialGrade ? getPartialStatus(partialGrade) : null
-
-                return (
-                  <tr key={enrollment.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3 font-medium text-gray-900">{enrollment.student_name}</td>
-                    {Array.from({ length: numGrades }, (_, i) => (
-                      <td key={i + 1} className="px-4 py-3 text-center">
-                        <input
-                          type="number"
-                          min="0"
-                          max="10"
-                          step="0.1"
-                          value={grades[enrollment.id]?.[`grade_${i + 1}` as keyof GradeData] ?? ''}
-                          onChange={e => handleGradeChange(enrollment.id, i + 1, e.target.value)}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm"
-                          placeholder="-"
-                        />
-                      </td>
-                    ))}
-                    <td className="px-4 py-3 text-center font-bold text-gray-900">
-                      {partialGrade !== null ? partialGrade.toFixed(1) : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {partialStatus && (
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
-                            partialStatus === 'promocionado'
-                              ? 'bg-green-100 text-green-700'
-                              : partialStatus === 'regular'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {partialStatus === 'promocionado' && <Check size={14} />}
-                          {partialStatus === 'desaprobado' && <X size={14} />}
-                          {partialStatus === 'promocionado'
-                            ? 'Prom.'
-                            : partialStatus === 'regular'
-                              ? 'Regular'
-                              : 'Desapr.'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {activeEnrollments.length === 0 ? (
+        <div className="card p-6 text-center bg-blue-50 border border-blue-200">
+          <p className="text-gray-600 font-medium">
+            ✓ Todos los alumnos tienen calificaciones cargadas o no hay alumnos inscriptos
+          </p>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="card p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                    <th className="px-4 py-3 text-left text-sm font-bold">Estudiante</th>
+                    {Array.from({ length: numGrades }, (_, i) => (
+                      <th key={i + 1} className="px-4 py-3 text-center text-sm font-bold">
+                        Nota {i + 1}
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-center text-sm font-bold">Promedio</th>
+                    <th className="px-4 py-3 text-center text-sm font-bold">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {activeEnrollments.map((enrollment, idx) => {
+                    const partialGrade = calculatePartialGrade(enrollment.id)
+                    const partialStatus = partialGrade ? getPartialStatus(partialGrade) : null
 
-      <button
-        onClick={handleSaveGrades}
-        disabled={saving}
-        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50"
-      >
-        {saving ? 'Guardando...' : 'Guardar Calificaciones'}
-      </button>
+                    return (
+                      <tr key={enrollment.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-4 py-3 font-medium text-gray-900">{enrollment.student_name}</td>
+                        {Array.from({ length: numGrades }, (_, i) => (
+                          <td key={i + 1} className="px-4 py-3 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.1"
+                              value={grades[enrollment.id]?.[`grade_${i + 1}` as keyof GradeData] ?? ''}
+                              onChange={e => handleGradeChange(enrollment.id, i + 1, e.target.value)}
+                              className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm"
+                              placeholder="-"
+                            />
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-center font-bold text-gray-900">
+                          {partialGrade !== null ? partialGrade.toFixed(1) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {partialStatus && (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
+                                partialStatus === 'promocionado'
+                                  ? 'bg-green-100 text-green-700'
+                                  : partialStatus === 'regular'
+                                    ? 'bg-yellow-100 text-yellow-700'
+                                    : 'bg-red-100 text-red-700'
+                              }`}
+                            >
+                              {partialStatus === 'promocionado' && <Check size={14} />}
+                              {partialStatus === 'desaprobado' && <X size={14} />}
+                              {partialStatus === 'promocionado'
+                                ? 'Prom.'
+                                : partialStatus === 'regular'
+                                  ? 'Regular'
+                                  : 'Desapr.'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSaveGrades}
+            disabled={saving}
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50"
+          >
+            {saving ? 'Guardando...' : 'Guardar Calificaciones'}
+          </button>
+        </>
+      )}
     </div>
   )
 }

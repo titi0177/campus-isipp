@@ -14,10 +14,12 @@ type SubjectRow = {
   correlatives_ok: boolean
   state: 'done' | 'current' | 'locked' | 'available' | 'recursant'
   isRecursant: boolean
+  attempt_number: number
   blockedByCorrelatives: Array<{ id: string; name: string; code: string }>
   finalGrade?: number
   partialGrade?: number
-  gradeStatus?: string
+  partialStatus?: string
+  finalStatus?: string
   allowsPromotion?: boolean
 }
 
@@ -78,22 +80,34 @@ function RoadmapPage() {
     }
     setSubjectsMap(sMap)
 
+    // Obtener enrollments con la nueva tabla enrollment_grades
     const { data: enrollments } = await supabase
       .from('enrollments')
-      .select('id, subject_id, division, academic_year, status')
+      .select(`
+        id,
+        subject_id,
+        division,
+        academic_year,
+        status,
+        attempt_number
+      `)
       .eq('student_id', (student as any).id)
 
     const enrolledIds = new Set<string>()
     const passedIds = new Set<string>()
     const recursantIds = new Set<string>()
     const gradesMap = new Map<string, any>()
+    const enrollmentMap = new Map<string, any>()
     let enrolledDivision: string | null = null
 
     if (enrollments && enrollments.length > 0) {
       for (const enr of enrollments) {
+        enrollmentMap.set(enr.subject_id, enr)
+
+        // Obtener calificaciones de la tabla enrollment_grades
         const { data: grades } = await supabase
-          .from('grades')
-          .select('status, final_grade_exam, partial_grade')
+          .from('enrollment_grades')
+          .select('final_status, partial_status, final_grade, partial_grade')
           .eq('enrollment_id', enr.id)
           .single()
 
@@ -101,16 +115,19 @@ function RoadmapPage() {
           gradesMap.set(enr.subject_id, grades)
         }
 
-        if (grades && ['promoted', 'passed', 'regular'].includes(grades.status)) {
+        // Determinar si pasó (tiene final_status que no es desaprobado)
+        if (grades && grades.final_status && grades.final_status !== 'desaprobado') {
           passedIds.add(enr.subject_id)
-        } else {
+        } else if (gradesMap.has(enr.subject_id)) {
+          // Si tiene calificaciones pero no aprobó, es recursante
           recursantIds.add(enr.subject_id)
-          enrolledIds.add(enr.subject_id)
         }
-        
+
+        enrolledIds.add(enr.subject_id)
+
         const subj = sMap.get(enr.subject_id)
-        if (subj?.year === 1 && (enr as any).division) {
-          enrolledDivision = (enr as any).division
+        if (subj?.year === 1 && enr.division) {
+          enrolledDivision = enr.division
         }
       }
     }
@@ -134,50 +151,55 @@ function RoadmapPage() {
         return true
       })
       .map((s) => {
-      const reqs = requiresMap.get(s.id) ?? []
-      const correlatives_ok =
-        reqs.length === 0 || reqs.every((rid) => passedIds.has(rid))
+        const reqs = requiresMap.get(s.id) ?? []
+        const correlatives_ok =
+          reqs.length === 0 || reqs.every((rid) => passedIds.has(rid))
 
-      const blockedByCorrelatives = reqs
-        .filter((rid) => !passedIds.has(rid))
-        .map((rid) => sMap.get(rid))
-        .filter((s) => s)
+        const blockedByCorrelatives = reqs
+          .filter((rid) => !passedIds.has(rid))
+          .map((rid) => sMap.get(rid))
+          .filter((s) => s)
 
-      let state: SubjectRow['state'] = 'locked'
-      const isRecursant = recursantIds.has(s.id)
-      
-      if (passedIds.has(s.id)) {
-        state = 'done'
-      } else if (isRecursant) {
-        state = 'recursant'
-      } else if (enrolledIds.has(s.id)) {
-        state = 'current'
-      } else if (correlatives_ok && s.year <= studentYear + 1) {
-        state = 'available'
-      } else {
-        state = 'locked'
-      }
+        const isRecursant = recursantIds.has(s.id)
+        const enrollment = enrollmentMap.get(s.id)
+        const attempt_number = enrollment?.attempt_number || 1
 
-      const grades = gradesMap.get(s.id)
+        let state: SubjectRow['state'] = 'locked'
 
-      return {
-        id: s.id,
-        name: s.name,
-        code: s.code,
-        year: s.year,
-        division: s.division,
-        dictation_type: s.dictation_type || 'anual',
-        semester: s.semester || 1,
-        correlatives_ok,
-        state,
-        isRecursant,
-        blockedByCorrelatives,
-        finalGrade: grades?.final_grade_exam,
-        partialGrade: grades?.partial_grade,
-        gradeStatus: grades?.status,
-        allowsPromotion: s.allows_promotion,
-      }
-    })
+        if (passedIds.has(s.id)) {
+          state = 'done'
+        } else if (isRecursant) {
+          state = 'recursant'
+        } else if (enrolledIds.has(s.id)) {
+          state = 'current'
+        } else if (correlatives_ok && s.year <= studentYear + 1) {
+          state = 'available'
+        } else {
+          state = 'locked'
+        }
+
+        const grades = gradesMap.get(s.id)
+
+        return {
+          id: s.id,
+          name: s.name,
+          code: s.code,
+          year: s.year,
+          division: s.division,
+          dictation_type: s.dictation_type || 'anual',
+          semester: s.semester || 1,
+          correlatives_ok,
+          state,
+          isRecursant,
+          attempt_number,
+          blockedByCorrelatives,
+          finalGrade: grades?.final_grade,
+          partialGrade: grades?.partial_grade,
+          partialStatus: grades?.partial_status,
+          finalStatus: grades?.final_status,
+          allowsPromotion: s.allows_promotion,
+        }
+      })
 
     setSubjects(computed)
     setLoading(false)
@@ -190,14 +212,6 @@ function RoadmapPage() {
     return 'Anual'
   }
 
-  function getGradeColor(finalGrade?: number, allowsPromotion?: boolean) {
-    if (!finalGrade) return 'from-gray-100 to-gray-200'
-    if (allowsPromotion && finalGrade >= 8) return 'from-purple-100 to-pink-100'
-    if (finalGrade >= 7) return 'from-emerald-100 to-teal-100'
-    if (finalGrade >= 4) return 'from-emerald-100 to-teal-100'
-    return 'from-red-100 to-rose-100'
-  }
-
   function getStatusLabel(finalGrade?: number, allowsPromotion?: boolean) {
     if (!finalGrade) return null
     if (allowsPromotion && finalGrade >= 8) return 'Promocionado'
@@ -208,7 +222,6 @@ function RoadmapPage() {
   function getStatusColor(finalGrade?: number, allowsPromotion?: boolean) {
     if (!finalGrade) return 'text-gray-600'
     if (allowsPromotion && finalGrade >= 8) return 'text-purple-700'
-    if (finalGrade >= 8) return 'text-emerald-700'
     if (finalGrade >= 6) return 'text-emerald-700'
     return 'text-red-700'
   }
@@ -227,8 +240,9 @@ function RoadmapPage() {
     const approved = subjects.filter(s => s.state === 'done').length
     const promoted = subjects.filter(s => s.state === 'done' && s.finalGrade && s.finalGrade >= 8 && s.allowsPromotion).length
     const current = subjects.filter(s => s.state === 'current').length
+    const recursant = subjects.filter(s => s.state === 'recursant').length
     const available = subjects.filter(s => s.state === 'available').length
-    return { approved, promoted, current, available, total: subjects.length }
+    return { approved, promoted, current, recursant, available, total: subjects.length }
   }, [subjects])
 
   if (loading) {
@@ -286,13 +300,13 @@ function RoadmapPage() {
           <p className="text-3xl font-black text-blue-700">{stats.current}</p>
           <p className="text-xs text-blue-600 mt-1">Inscripto</p>
         </div>
-        
-        <div className="card p-4 border-l-4 border-l-amber-500 bg-gradient-to-br from-amber-50 to-yellow-50 hover:shadow-lg transition-all cursor-pointer">
-          <p className="text-xs text-amber-600 font-bold mb-2">DISPONIBLES</p>
-          <p className="text-3xl font-black text-amber-700">{stats.available}</p>
-          <p className="text-xs text-amber-600 mt-1">Podés inscribir</p>
-        </div>
 
+        <div className="card p-4 border-l-4 border-l-orange-600 bg-gradient-to-br from-orange-50 to-yellow-50 hover:shadow-lg transition-all cursor-pointer">
+          <p className="text-xs text-orange-600 font-bold mb-2">RECURSANTES</p>
+          <p className="text-3xl font-black text-orange-700">{stats.recursant}</p>
+          <p className="text-xs text-orange-600 mt-1">Reintentando</p>
+        </div>
+        
         <div className="card p-4 border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 to-indigo-100 hover:shadow-lg transition-all cursor-pointer">
           <p className="text-xs text-indigo-600 font-bold mb-2">TOTAL</p>
           <p className="text-3xl font-black text-indigo-700">{stats.total}</p>
@@ -319,17 +333,17 @@ function RoadmapPage() {
           <p className="text-xs font-bold text-gray-900">EN CURSO</p>
           <p className="text-xs text-gray-600 mt-1">Inscripto</p>
         </div>
+
+        <div className="card p-3 border-t-4 border-t-orange-600 hover:shadow-md transition-all text-center">
+          <RefreshCw size={24} className="text-orange-600 mx-auto mb-2" />
+          <p className="text-xs font-bold text-gray-900">RECURSANTE</p>
+          <p className="text-xs text-gray-600 mt-1">Reintentando</p>
+        </div>
         
         <div className="card p-3 border-t-4 border-t-amber-500 hover:shadow-md transition-all text-center">
           <Zap size={24} className="text-amber-600 mx-auto mb-2" />
           <p className="text-xs font-bold text-gray-900">DISPONIBLE</p>
           <p className="text-xs text-gray-600 mt-1">Podés inscribir</p>
-        </div>
-        
-        <div className="card p-3 border-t-4 border-t-orange-600 hover:shadow-md transition-all text-center">
-          <RefreshCw size={24} className="text-orange-600 mx-auto mb-2" />
-          <p className="text-xs font-bold text-gray-900">RECURSANTE</p>
-          <p className="text-xs text-gray-600 mt-1">Reintentando</p>
         </div>
         
         <div className="card p-3 border-t-4 border-t-gray-400 hover:shadow-md transition-all text-center">
@@ -346,6 +360,7 @@ function RoadmapPage() {
             const yearStats = {
               done: list.filter(s => s.state === 'done').length,
               current: list.filter(s => s.state === 'current').length,
+              recursant: list.filter(s => s.state === 'recursant').length,
               available: list.filter(s => s.state === 'available').length,
               total: list.length
             }
@@ -356,9 +371,10 @@ function RoadmapPage() {
                 <div className="flex items-end gap-4 pb-4 border-b-4 border-gradient-to-r from-indigo-600 to-purple-600">
                   <div>
                     <h2 className="text-4xl font-black text-gray-900">Año {year}</h2>
-                    <div className="flex gap-4 mt-2 text-sm">
+                    <div className="flex gap-4 mt-2 text-sm flex-wrap">
                       <span className="text-emerald-600 font-semibold">{yearStats.done}/{yearStats.total} Aprobadas</span>
                       <span className="text-blue-600 font-semibold">{yearStats.current} En curso</span>
+                      <span className="text-orange-600 font-semibold">{yearStats.recursant} Recursantes</span>
                       <span className="text-amber-600 font-semibold">{yearStats.available} Disponibles</span>
                     </div>
                   </div>
@@ -414,6 +430,11 @@ function RoadmapPage() {
                               {s.state === 'locked' && <Lock className="h-6 w-6 text-gray-500" />}
                               <span className="font-mono text-lg font-black text-gray-900">{s.code}</span>
                             </div>
+                            {s.attempt_number > 1 && (
+                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-orange-200 text-orange-700">
+                                Intento {s.attempt_number}
+                              </span>
+                            )}
                           </div>
                           
                           <h3 className="font-bold text-gray-900 text-sm leading-snug mb-2">{s.name}</h3>
@@ -461,28 +482,28 @@ function RoadmapPage() {
                               {s.partialGrade !== undefined && (
                                 <div className="bg-white rounded-xl p-3 text-center border-2 border-blue-200 shadow-sm">
                                   <p className="text-xs text-blue-600 font-bold mb-1">Parcial</p>
-                                  <p className="text-2xl font-black text-blue-900">{s.partialGrade}</p>
+                                  <p className="text-2xl font-black text-blue-900">{s.partialGrade.toFixed(1)}</p>
                                 </div>
                               )}
                               {s.finalGrade !== undefined && (
-                                <div className={`bg-gradient-to-br ${getGradeColor(s.finalGrade, s.allowsPromotion)} rounded-xl p-3 text-center border-2 shadow-sm ${
-                                  s.finalGrade >= 8 ? 'border-purple-400' :
+                                <div className={`bg-white rounded-xl p-3 text-center border-2 shadow-sm ${
+                                  s.finalGrade >= 8 && s.allowsPromotion ? 'border-purple-400' :
                                   s.finalGrade >= 6 ? 'border-emerald-400' :
                                   'border-red-400'
                                 }`}>
                                   <p className={`text-xs font-bold mb-1 ${
-                                    s.finalGrade >= 8 ? 'text-purple-700' :
+                                    s.finalGrade >= 8 && s.allowsPromotion ? 'text-purple-700' :
                                     s.finalGrade >= 6 ? 'text-emerald-700' :
                                     'text-red-700'
                                   }`}>
                                     Final
                                   </p>
                                   <p className={`text-2xl font-black ${
-                                    s.finalGrade >= 8 ? 'text-purple-900' :
+                                    s.finalGrade >= 8 && s.allowsPromotion ? 'text-purple-900' :
                                     s.finalGrade >= 6 ? 'text-emerald-900' :
                                     'text-red-900'
                                   }`}>
-                                    {s.finalGrade}
+                                    {s.finalGrade.toFixed(1)}
                                   </p>
                                 </div>
                               )}
@@ -506,6 +527,20 @@ function RoadmapPage() {
                                 {s.finalGrade < 6 && (
                                   <div>Desaprobado</div>
                                 )}
+                              </div>
+                            )}
+
+                            {!statusLabel && (s.partialStatus || s.finalStatus) && (
+                              <div className={`mt-2 p-3 rounded-xl text-center text-sm font-bold bg-white/60 border-2 ${
+                                s.partialStatus === 'promocionado' ? 'border-green-400 text-green-700' :
+                                s.partialStatus === 'regular' ? 'border-yellow-400 text-yellow-700' :
+                                s.partialStatus === 'desaprobado' ? 'border-red-400 text-red-700' :
+                                'border-blue-400 text-blue-700'
+                              }`}>
+                                {s.partialStatus === 'promocionado' && '🎓 Promocionado (parcial)'}
+                                {s.partialStatus === 'regular' && '📖 Regular (en espera de final)'}
+                                {s.partialStatus === 'desaprobado' && '❌ Desaprobado'}
+                                {!s.partialStatus && '⏳ En proceso'}
                               </div>
                             )}
                           </div>
@@ -555,10 +590,10 @@ function RoadmapPage() {
                 Estados
               </h3>
               <ul className="space-y-2 text-indigo-50">
-                <li><strong>✓ Aprobada:</strong> Ya cursaste y aprobaste</li>
-                <li><strong>● En curso:</strong> Actualmente inscripto</li>
+                <li><strong>✓ Aprobada:</strong> Ya cursaste y aprobaste con nota final</li>
+                <li><strong>● En curso:</strong> Actualmente inscripto sin calificaciones finales</li>
                 <li><strong>⚡ Disponible:</strong> Podés inscribirte ahora</li>
-                <li><strong>↻ Recursante:</strong> Cursaste pero no aprobaste</li>
+                <li><strong>↻ Recursante:</strong> Cursaste pero no aprobaste - Nuevo intento</li>
                 <li><strong>🔒 Bloqueada:</strong> Falta correlativa o no es tu año</li>
               </ul>
             </div>
@@ -568,11 +603,11 @@ function RoadmapPage() {
                 Calificaciones
               </h3>
               <ul className="space-y-2 text-indigo-50">
-                <li><strong>Parcial:</strong> Promedio de trabajos y parciales</li>
-                <li><strong>Final:</strong> Nota del examen final</li>
+                <li><strong>Parcial:</strong> Promedio de trabajos y parciales cargados</li>
+                <li><strong>Final:</strong> Nota del examen final (después que rindas)</li>
                 <li><strong>🎓 Promocionado:</strong> ≥8 en materia que lo permite</li>
+                <li><strong>📖 Regular:</strong> Parcial ≥6 - Pendiente de final</li>
                 <li><strong>Aprobado:</strong> Entre 6-7 ó ≥8 sin promoción</li>
-                <li><strong>Desaprobado:</strong> Menor a 6</li>
               </ul>
             </div>
           </div>

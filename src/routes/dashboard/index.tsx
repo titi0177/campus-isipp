@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useCallback, useEffect, useState, memo, useMemo } from 'react'
+import { useCallback, useEffect, useState, memo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { generateRegularCertificate } from '@/utils/generateRegularCertificate'
 import { 
@@ -25,15 +25,13 @@ export const Route = createFileRoute('/dashboard/')({
 })
 
 type Row = {
-  subject?: { name?: string; code?: string }
+  subject?: { name?: string; code?: string; allows_promotion?: boolean }
   final_grade?: number | null
   partial_grade?: number | null
-  final_exam_grade?: number | null
-  status?: string
-  allows_promotion?: boolean
+  final_status?: string
+  partial_status?: string
 }
 
-// Memoized stat card component - IMPROVED
 const StatCardMemo = memo(function StatCardComp({ 
   label, 
   value, 
@@ -65,7 +63,6 @@ const StatCardMemo = memo(function StatCardComp({
   )
 })
 
-// Memoized exam card component - IMPROVED
 const ExamCard = memo(function ExamCardComp({ 
   exam, 
   idx 
@@ -99,7 +96,6 @@ const ExamCard = memo(function ExamCardComp({
   )
 })
 
-// Memoized grades table row - IMPROVED
 const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: number }) {
   const fg = s.final_grade
   let status = 'En curso'
@@ -107,7 +103,7 @@ const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: numbe
   let statusIcon = '⏳'
   let noteColor = 'text-slate-600'
   
-  if (fg != null && fg >= 8 && s.allows_promotion) {
+  if (fg != null && fg >= 8 && s.subject?.allows_promotion) {
     status = 'Promocionado'
     statusBg = 'bg-emerald-100 text-emerald-700 font-semibold'
     statusIcon = '⭐'
@@ -122,14 +118,28 @@ const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: numbe
     statusBg = 'bg-red-100 text-red-700 font-semibold'
     statusIcon = '✗'
     noteColor = 'text-red-700 font-bold'
+  } else if (s.partial_status === 'regular') {
+    status = 'Regular'
+    statusBg = 'bg-yellow-100 text-yellow-700 font-semibold'
+    statusIcon = '📖'
+  } else if (s.partial_status === 'promocionado') {
+    status = 'Promocionado'
+    statusBg = 'bg-green-100 text-green-700 font-semibold'
+    statusIcon = '🎓'
+    noteColor = 'text-green-700 font-bold'
+  } else if (s.partial_status === 'desaprobado') {
+    status = 'Desaprobado'
+    statusBg = 'bg-red-100 text-red-700 font-semibold'
+    statusIcon = '✗'
+    noteColor = 'text-red-700 font-bold'
   }
   
   return (
     <tr key={index} className="hover:bg-blue-50 transition-colors duration-200 border-b border-slate-100 last:border-b-0">
       <td className="px-3 sm:px-4 py-3 font-medium text-slate-900 text-sm">{s.subject?.name}</td>
-      <td className="px-3 sm:px-4 py-3 text-center text-slate-600 text-sm font-medium">{s.partial_grade ?? '—'}</td>
-      <td className="hidden sm:table-cell px-4 py-3 text-center text-slate-600 text-sm font-medium">{s.final_exam_grade ?? '—'}</td>
-      <td className={`px-3 sm:px-4 py-3 text-center font-black text-lg ${noteColor}`}>{fg ?? '—'}</td>
+      <td className="px-3 sm:px-4 py-3 text-center text-slate-600 text-sm font-medium">{s.partial_grade ? s.partial_grade.toFixed(1) : '—'}</td>
+      <td className="hidden sm:table-cell px-4 py-3 text-center text-slate-600 text-sm font-medium">{fg ? fg.toFixed(1) : '—'}</td>
+      <td className={`px-3 sm:px-4 py-3 text-center font-black text-lg ${noteColor}`}>{fg ? fg.toFixed(1) : '—'}</td>
       <td className="px-3 sm:px-4 py-3 text-center">
         <span className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${statusBg} inline-flex items-center gap-1`}>
           {statusIcon} {status}
@@ -167,7 +177,6 @@ function DashboardPage() {
       if (!studentData) return
       setStudent(studentData)
 
-      // Batch load all related data in parallel
       const [enrollmentsRes, programSubjectsRes, examsRes] = await Promise.all([
         supabase
           .from('enrollments')
@@ -175,7 +184,7 @@ function DashboardPage() {
             id,
             subject_id,
             subject:subjects(name, code, allows_promotion),
-            grades(final_grade, partial_grade, final_grade_exam, status),
+            enrollment_grades(final_grade, partial_grade, final_status, partial_status),
             attendance(percentage)
           `)
           .eq('student_id', studentData.id),
@@ -191,35 +200,31 @@ function DashboardPage() {
           .limit(6),
       ])
 
-      // Process enrollments
       if (enrollmentsRes.data) {
         const mapped: Row[] = enrollmentsRes.data.map((e: any) => {
-          const g = Array.isArray(e.grades) ? e.grades[0] : e.grades
+          const g = Array.isArray(e.enrollment_grades) ? e.enrollment_grades[0] : e.enrollment_grades
           return {
             subject: e.subject,
             final_grade: g?.final_grade,
             partial_grade: g?.partial_grade,
-            final_exam_grade: g?.final_grade_exam,
-            status: g?.status,
-            allows_promotion: e.subject?.allows_promotion,
+            final_status: g?.final_status,
+            partial_status: g?.partial_status,
           }
         })
         setRows(mapped)
 
-        // Calculate GPA from mapped data
         let gpaSum = 0
         let gpaCount = 0
         for (const row of mapped) {
-          if (row.final_grade != null && (row.status === 'passed' || row.status === 'promoted')) {
+          if (row.final_grade != null && (row.final_status === 'aprobado' || row.final_status === 'promocionado')) {
             gpaSum += row.final_grade
             gpaCount++
           }
         }
         setGpa(gpaCount ? gpaSum / gpaCount : null)
 
-        // Calculate progress
         const approved = mapped.filter(r => r.final_grade != null && r.final_grade >= 6).length
-        const enCurso = mapped.filter(r => r.final_grade == null).length
+        const enCurso = mapped.filter(r => r.final_grade == null && r.partial_grade != null).length
         const pendientes = mapped.filter(r => r.final_grade != null && r.final_grade < 6).length
         const totalMaterias = programSubjectsRes.data?.length ?? 0
         const porcentaje = totalMaterias > 0 ? Math.round((approved / totalMaterias) * 100) : 0
@@ -232,7 +237,6 @@ function DashboardPage() {
           porcentaje,
         })
 
-        // Calculate average attendance
         let attSum = 0
         let attCount = 0
         for (const e of enrollmentsRes.data) {
@@ -246,7 +250,6 @@ function DashboardPage() {
         setAttendancePercent(attCount ? Math.round(attSum / attCount) : 0)
       }
 
-      // Set exams
       if (examsRes.data) {
         setUpcomingExams(examsRes.data)
       }
@@ -265,17 +268,10 @@ function DashboardPage() {
 
   if (!student) return null
 
-  const approved = rows.filter(
-    (s) =>
-      s.final_grade != null &&
-      s.final_grade >= 6 &&
-      s.status &&
-      ['promoted', 'passed', 'regular'].includes(s.status),
-  ).length
+  const approved = rows.filter(r => r.final_grade != null && r.final_grade >= 6).length
 
   return (
     <div className="space-y-8">
-      {/* Hero Header - REDESIGNED */}
       <div className="relative overflow-hidden rounded-2xl shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--isipp-bordo)] via-red-600 to-[var(--siu-blue)] opacity-90"></div>
         <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_50%)]"></div>
@@ -310,7 +306,6 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Career Progress */}
       <div>
         <CareerProgressBar
           careerName={student.program?.name ?? 'Tu carrera'}
@@ -322,7 +317,6 @@ function DashboardPage() {
         />
       </div>
 
-      {/* Stats Grid - REDESIGNED */}
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
         <StatCardMemo
           label="Promedio"
@@ -358,7 +352,6 @@ function DashboardPage() {
         />
       </div>
 
-      {/* Upcoming Exams - REDESIGNED */}
       <div className="card overflow-hidden shadow-xl border-0">
         <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-5 flex items-center gap-3">
           <Calendar className="w-6 h-6 text-white flex-shrink-0" />
@@ -390,7 +383,6 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Grades - REDESIGNED */}
       <div className="card overflow-hidden shadow-xl border-0">
         <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 px-6 py-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">

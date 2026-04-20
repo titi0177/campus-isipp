@@ -37,7 +37,7 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
         setAllowsPromotion(settings.allows_promotion || false)
       }
 
-      // Obtener regulares
+      // Obtener regulares (solo aquellos con partial_status = 'regular' y sin final_grade)
       const { data: regularData, error: err } = await supabase
         .from('enrollment_grades')
         .select(`
@@ -46,6 +46,7 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
           partial_grade,
           final_grade,
           enrollments!inner(
+            id,
             student:students(first_name, last_name),
             subject_id
           )
@@ -124,7 +125,7 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
   if (regulars.length === 0) {
     return (
       <div className="card p-6 text-center bg-blue-50 border border-blue-200">
-        <p className="text-gray-600 font-medium">No hay estudiantes en condición Regular</p>
+        <p className="text-gray-600 font-medium">No hay estudiantes en condición Regular pendientes de calificación final</p>
       </div>
     )
   }
@@ -134,7 +135,7 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
       <div className="card p-6 bg-amber-50 border border-amber-200">
         <h3 className="font-bold text-gray-900 mb-2">Carga de Notas Finales</h3>
         <p className="text-sm text-gray-700">
-          Aquí puedes cargar las notas finales de los estudiantes en condición Regular
+          Aquí puedes cargar las notas finales de los estudiantes en condición Regular ({regulars.length})
         </p>
       </div>
 
