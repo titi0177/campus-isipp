@@ -137,9 +137,9 @@ const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: numbe
   return (
     <tr key={index} className="hover:bg-blue-50 transition-colors duration-200 border-b border-slate-100 last:border-b-0">
       <td className="px-3 sm:px-4 py-3 font-medium text-slate-900 text-sm">{s.subject?.name}</td>
-      <td className="px-3 sm:px-4 py-3 text-center text-slate-600 text-sm font-medium">{s.partial_grade ? s.partial_grade.toFixed(1) : '—'}</td>
-      <td className="hidden sm:table-cell px-4 py-3 text-center text-slate-600 text-sm font-medium">{fg ? fg.toFixed(1) : '—'}</td>
-      <td className={`px-3 sm:px-4 py-3 text-center font-black text-lg ${noteColor}`}>{fg ? fg.toFixed(1) : '—'}</td>
+      <td className="px-3 sm:px-4 py-3 text-center text-slate-600 text-sm font-medium">{s.partial_grade !== null && s.partial_grade !== undefined ? s.partial_grade.toFixed(1) : '—'}</td>
+      <td className="hidden sm:table-cell px-4 py-3 text-center text-slate-600 text-sm font-medium">{fg !== null && fg !== undefined ? fg.toFixed(1) : '—'}</td>
+      <td className={`px-3 sm:px-4 py-3 text-center font-black text-lg ${noteColor}`}>{fg !== null && fg !== undefined ? fg.toFixed(1) : '—'}</td>
       <td className="px-3 sm:px-4 py-3 text-center">
         <span className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${statusBg} inline-flex items-center gap-1`}>
           {statusIcon} {status}
@@ -326,7 +326,7 @@ function DashboardPage() {
       <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4">
         <StatCardMemo
           label="Promedio"
-          value={gpa != null ? gpa.toFixed(2) : '—'}
+          value={gpa !== null && gpa !== undefined ? gpa.toFixed(2) : '—'}
           subtext="GPA"
           icon={TrendingUp}
           bg="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200"
