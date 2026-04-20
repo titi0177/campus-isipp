@@ -121,7 +121,6 @@ export function AdminDirectGradeLoader() {
           student:students(first_name, last_name, legajo)
         `)
         .eq('subject_id', selectedSubject)
-        .order('student.legajo', { ascending: true })
 
       if (err) throw err
 
@@ -138,6 +137,9 @@ export function AdminDirectGradeLoader() {
             final_status: grades?.final_status || null,
           }
         })
+
+        // Ordenar por legajo en el cliente
+        formatted.sort((a, b) => a.legajo.localeCompare(b.legajo))
 
         setStudentGrades(formatted)
 
