@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { AlertCircle, Check, Plus, RotateCcw } from 'lucide-react'
 
 type DisapprovedStudent = {
+  id: string
   enrollment_id: string
   student_id: string
   student_name: string
@@ -14,7 +15,7 @@ type DisapprovedStudent = {
   partial_grade: number
   final_grade: number
   final_status: string
-  completed_at: string
+  completed_at?: string
 }
 
 type Props = {
@@ -33,49 +34,49 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
 
   const loadDisapprovedStudents = async () => {
     try {
-      const { data, error: err } = await supabase
+      // Primero intenta con la relación completa
+      let { data, error: err } = await supabase
         .from('enrollment_grades')
         .select(`
+          id,
           enrollment_id,
           partial_grade,
           final_grade,
           final_status,
-          created_at,
           enrollments!inner(
             id,
             student_id,
             attempt_number,
             division,
-            completed_at,
             student:students(first_name, last_name, legajo),
             subject:subjects(id, name, code)
           )
         `)
         .eq('enrollments.subject_id', subjectId)
         .eq('final_status', 'desaprobado')
-        .order('completed_at', { ascending: false })
 
       if (err) {
         console.error('Error loading disapproved students:', err)
-        setError('Error al cargar desaprobados')
+        setError('Error al cargar desaprobados: ' + err.message)
         setLoading(false)
         return
       }
 
       if (data) {
         const formatted = data.map((r: any) => ({
+          id: r.id,
           enrollment_id: r.enrollment_id,
           student_id: r.enrollments.student_id,
           student_name: `${r.enrollments.student.last_name}, ${r.enrollments.student.first_name}`,
           legajo: r.enrollments.student.legajo || 'S/N',
           subject_name: r.enrollments.subject.name,
           subject_code: r.enrollments.subject.code,
-          attempt_number: r.enrollments.attempt_number,
+          attempt_number: r.enrollments.attempt_number || 1,
           division: r.enrollments.division,
           partial_grade: r.partial_grade,
           final_grade: r.final_grade,
           final_status: r.final_status,
-          completed_at: r.enrollments.completed_at,
+          completed_at: r.created_at,
         }))
         setDisapprovedStudents(formatted)
       }
@@ -83,7 +84,7 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
       setLoading(false)
     } catch (err) {
       console.error('Error:', err)
-      setError('Error al cargar datos')
+      setError('Error al cargar datos: ' + String(err))
       setLoading(false)
     }
   }
@@ -164,7 +165,7 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                 <th className="px-4 py-3 text-center font-bold">Intento</th>
                 <th className="px-4 py-3 text-center font-bold">Promedio</th>
                 <th className="px-4 py-3 text-center font-bold">Nota Final</th>
-                <th className="px-4 py-3 text-center font-bold">Completado</th>
+                <th className="px-4 py-3 text-center font-bold">Estado</th>
                 <th className="px-4 py-3 text-center font-bold">Acción</th>
               </tr>
             </thead>
@@ -191,7 +192,6 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
-                      <Check size={14} />
                       ✗ Desapr.
                     </span>
                   </td>
