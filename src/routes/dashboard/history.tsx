@@ -15,7 +15,7 @@ type ExamRecord = {
   year: number
   final_grade: number
   created_at: string
-  status: 'promoted' | 'passed'
+  status: 'promocionado' | 'aprobado'
   allows_promotion: boolean
 }
 
@@ -46,34 +46,33 @@ function HistoryPage() {
         return
       }
 
-      // QUERY ÚNICA CON JOIN: grades -> enrollments -> subjects
-      const { data: grades, error: gradesError } = await supabase
-        .from('grades')
+      // QUERY: enrollment_grades -> enrollments -> subjects
+      const { data: gradeRecords, error: gradeError } = await supabase
+        .from('enrollment_grades')
         .select(`
           id,
           final_grade,
-          final_grade_exam,
+          final_status,
           created_at,
-          status,
-          enrollment_id,
           enrollments!inner(
+            id,
             student_id,
             subject_id,
             subjects!inner(id, name, code, year, allows_promotion)
           )
         `)
 
-      if (gradesError) {
-        console.error('Error fetching grades:', gradesError)
+      if (gradeError) {
+        console.error('Error fetching enrollment grades:', gradeError)
         setLoading(false)
         return
       }
 
-      if (grades && grades.length > 0) {
+      if (gradeRecords && gradeRecords.length > 0) {
         const records: ExamRecord[] = []
 
-        for (const grade of grades) {
-          const enrollment = (grade as any).enrollments
+        for (const gr of gradeRecords) {
+          const enrollment = (gr as any).enrollments
           
           // Filtrar solo del estudiante actual
           if (!enrollment || enrollment.student_id !== s.id) continue
@@ -81,29 +80,23 @@ function HistoryPage() {
           const subject = enrollment.subjects
           if (!subject) continue
 
-          // Validar nota final >= 6 y determinar status según allows_promotion
-          const finalGrade = grade.final_grade ?? grade.final_grade_exam
+          // Solo mostrar si tiene nota final >= 6
+          const finalGrade = gr.final_grade
           
-          if (
-            finalGrade !== null && 
-            finalGrade !== undefined && 
-            finalGrade >= 6
-          ) {
-            // Determinar status: Promocional solo si la materia permite Y nota >= 8
-            // Si no permite promoción, siempre es Aprobado (si nota >= 6)
-            let recordStatus: 'promoted' | 'passed' = 'passed'
+          if (finalGrade !== null && finalGrade !== undefined && finalGrade >= 6) {
+            let recordStatus: 'promocionado' | 'aprobado' = 'aprobado'
             if (subject.allows_promotion && finalGrade >= 8) {
-              recordStatus = 'promoted'
+              recordStatus = 'promocionado'
             }
             
             records.push({
-              id: grade.id,
+              id: gr.id,
               subject_id: subject.id,
               subject_name: subject.name,
               subject_code: subject.code,
               year: subject.year,
               final_grade: finalGrade,
-              created_at: grade.created_at,
+              created_at: gr.created_at,
               status: recordStatus,
               allows_promotion: subject.allows_promotion
             })
@@ -219,12 +212,12 @@ function HistoryPage() {
                           {record.subject_code}
                         </td>
                         <td className="px-4 py-3 text-center font-bold text-lg">
-                          {record.final_grade}
+                          {record.final_grade.toFixed(1)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              {record.status === 'promoted' ? (
+                              {record.status === 'promocionado' ? (
                                 <>
                                   <CheckCircle size={18} className="text-green-700" />
                                   <span className="font-semibold text-green-700">Promocional</span>
