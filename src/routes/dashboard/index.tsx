@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState, memo } from 'react'
+import { ReinscriptionModal } from '@/components/ReinscriptionModal'
 import { supabase } from '@/lib/supabase'
 import { generateRegularCertificate } from '@/utils/generateRegularCertificate'
 import { 
@@ -59,6 +60,7 @@ const StatCardMemo = memo(function StatCardComp({
           <Icon className="w-6 h-6 sm:w-7 sm:h-7 opacity-60" />
         </div>
       </div>
+      <ReinscriptionModal isOpen={showReinscriptionModal} onClose={() => setShowReinscriptionModal(false)} />
     </div>
   )
 })
@@ -151,6 +153,7 @@ const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: numbe
 
 function DashboardPage() {
   const [student, setStudent] = useState<any>(null)
+  const [showReinscriptionModal, setShowReinscriptionModal] = useState(false)
   const [rows, setRows] = useState<Row[]>([])
   const [attendancePercent, setAttendancePercent] = useState(0)
   const [gpa, setGpa] = useState<number | null>(null)
@@ -295,12 +298,12 @@ function DashboardPage() {
               >
                 + Inscribirse
               </Link>
-              <Link
-                to="/dashboard/recursive-reinscription"
+              <button
+                onClick={() => setShowReinscriptionModal(true)}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-5 sm:px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-95"
               >
                 🔄 Reinscripción
-              </Link>
+              </button>
               <Link
                 to="/dashboard/roadmap"
                 className="bg-white/20 hover:bg-white/30 border border-white/40 text-white px-5 sm:px-6 py-2.5 rounded-lg font-semibold text-sm transition-all active:scale-95"
