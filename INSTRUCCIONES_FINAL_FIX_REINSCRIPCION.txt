@@ -1,0 +1,47 @@
+SOLUCIÓN FINAL: ERROR DE CONSTRAINT EN REINSCRIPCIÓN
+
+PROBLEMA:
+"Error: duplicate key value violates unique constraint enrollments_unique_attempt"
+
+CAUSA:
+Los constraints en la tabla `enrollments` son demasiado restrictivos y no permiten
+que un alumno se reinscribavarias veces.
+
+SOLUCIÓN DEFINITIVA EN SUPABASE:
+
+1. Abre SQL Editor: https://app.supabase.com → tu proyecto → SQL Editor
+
+2. Ejecuta EXACTAMENTE este código (de una sola vez):
+
+================================================================================
+
+-- Paso 1: Eliminar TODOS los constraints problemáticos
+ALTER TABLE public.enrollments 
+DROP CONSTRAINT IF EXISTS enrollments_unique_attempt;
+
+ALTER TABLE public.enrollments 
+DROP CONSTRAINT IF EXISTS enrollments_student_id_subject_id_academic_year_attempt_key;
+
+ALTER TABLE public.enrollments 
+DROP CONSTRAINT IF EXISTS enrollments_student_id_subject_id_key;
+
+-- Paso 2: Crear un índice sin UNIQUE para búsquedas rápidas
+CREATE INDEX IF NOT EXISTS idx_enrollments_student_subject_year_attempt 
+ON public.enrollments(student_id, subject_id, academic_year, attempt_number);
+
+================================================================================
+
+3. Debería completarse sin errores
+
+4. Recarga tu navegador (Ctrl+F5)
+
+5. Intenta reinscribirse nuevamente - ¡ahora debería funcionar!
+
+POR QUÉ FUNCIONA:
+- Antes: Un constraint UNIQUE prevenía duplicados
+- Ahora: Solo hay un índice (sin UNIQUE) que permite búsquedas rápidas
+- Resultado: Un alumno puede inscribirse múltiples veces (intentos 1, 2, 3, etc.)
+
+IMPORTANTE:
+Asegúrate de ejecutar TODO el código de una sola vez en una sola query.
+No lo ejecutes en partes separadas.
