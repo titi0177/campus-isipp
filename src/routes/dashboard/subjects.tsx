@@ -325,7 +325,7 @@ function SubjectsPage() {
                     <div className="p-4 rounded-2xl bg-white/60 border-2 border-blue-200 hover:border-blue-400 transition-colors">
                       <p className="text-xs text-blue-600 font-black mb-2 uppercase tracking-wide">PARCIAL</p>
                       <div className="flex items-center justify-between">
-                        <p className="text-3xl font-black text-blue-900">{partialGrade ? partialGrade.toFixed(1) : '—'}</p>
+                        <p className="text-3xl font-black text-blue-900">{partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '—'}</p>
                         {partialGrade && partialGrade >= 6 && (
                           <CheckCircle2 size={24} className="text-emerald-600" />
                         )}
@@ -349,7 +349,7 @@ function SubjectsPage() {
                         finalGrade && finalGrade >= 6 ? 'text-emerald-900' :
                         finalGrade ? 'text-red-900' :
                         'text-gray-600'
-                      }`}>{finalGrade ? finalGrade.toFixed(1) : '—'}</p>
+                      }`}>{finalGrade !== null && finalGrade !== undefined ? finalGrade.toFixed(1) : '—'}</p>
                     </div>
 
                     <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
@@ -390,7 +390,7 @@ function SubjectsPage() {
                           {partialGrades.map((grade, idx) => (
                             <div key={idx} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center">
                               <p className="text-xs text-blue-600 font-black mb-1 uppercase">Nota {idx + 1}</p>
-                              <p className="text-2xl font-black text-blue-900">{grade.toFixed(1)}</p>
+                              <p className="text-2xl font-black text-blue-900">{grade !== null && grade !== undefined ? grade.toFixed(1) : '-'}</p>
                             </div>
                           ))}
                         </div>
@@ -452,7 +452,7 @@ function SubjectsPage() {
                              'EN CURSO'}
                           </p>
                           {partialGrade && !finalGrade && (
-                            <p className="text-xs text-gray-600 mt-1">Parcial: {partialGrade.toFixed(1)} - Pendiente final</p>
+                            <p className="text-xs text-gray-600 mt-1">Parcial: {partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '-'} - Pendiente final</p>
                           )}
                         </div>
                         <div className="text-right">

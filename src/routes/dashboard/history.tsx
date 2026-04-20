@@ -212,7 +212,7 @@ function HistoryPage() {
                           {record.subject_code}
                         </td>
                         <td className="px-4 py-3 text-center font-bold text-lg">
-                          {record.final_grade.toFixed(1)}
+                          {record.final_grade !== null && record.final_grade !== undefined ? record.final_grade.toFixed(1) : '-'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="space-y-1">
