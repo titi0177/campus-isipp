@@ -73,17 +73,29 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         return
       }
 
+      setError('')
+
       // Obtener TODAS las calificaciones (incluso sin final_status) para cada inscripción
-      const { data: gradesData } = await supabase
+      const { data: gradesData, error: gradesError } = await supabase
         .from('enrollment_grades')
         .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status, final_status')
         .in('enrollment_id', enrollmentIds)
+      
+      if (gradesError) {
+        console.error('Error fetching enrollment_grades:', gradesError)
+        setError(`Permiso denegado. Contacta al administrador. Error: ${gradesError.message}`)
+        // Si hay error de permisos, mostrar todos los alumnos de todas formas para carga inicial
+        setActiveEnrollments(enrollments)
+        setExistingGrades({})
+        setExistingIds({})
+        return
+      }
 
       const existingGradesMap: Record<string, GradeData> = {}
       const existingIdsMap: Record<string, string> = {}
       const completedEnrollmentIds = new Set<string>()
 
-      if (gradesData) {
+      if (gradesData && gradesData.length > 0) {
         gradesData.forEach(g => {
           existingGradesMap[g.enrollment_id] = {
             grade_1: g.grade_1 || undefined,
@@ -108,11 +120,11 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       setExistingIds(existingIdsMap)
 
       // Mostrar TODOS los alumnos EXCEPTO los que ya tienen final_status = desaprobado o promocionado
-      // Esto incluye: alumnos sin calificaciones + alumnos en proceso (sin final_status) + alumnos con regular
       const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
       setActiveEnrollments(active)
     } catch (err) {
-      console.error('Error filtering enrollments:', err)
+      console.error('Error in filterActiveEnrollments:', err)
+      setError('Error inesperado al cargar calificaciones: ' + String(err))
       setActiveEnrollments(enrollments)
     }
   }
@@ -208,7 +220,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             payload.final_status = partialStatus
           }
         }
-        // Si no están todas las notas, guardamos solo las que tenemos sin calcular promedio
         payload.attempt_number = 1
 
         // Verificar si el registro ya existe
@@ -230,7 +241,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
         if (result.error) {
           console.error('Error saving grade for', enrollment.id, result.error)
-          setError(`Error al guardar nota de ${enrollment.student_name}`)
+          setError(`Error al guardar nota de ${enrollment.student_name}: ${result.error.message}`)
           setSavingStudents(prev => {
             const updated = new Set(prev)
             updated.delete(enrollment.id)
@@ -275,7 +286,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     <div className="space-y-6">
       {/* Configuración */}
       <div className="card p-6 bg-blue-50 border border-blue-200">
-        <h3 className="font-bold text-gray-900 mb-4">Configuración de Notas</h3>
+        <h3 className="font-bold text-gray-900 mb-4">Configuracion de Notas</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -331,7 +342,11 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex gap-2">
           <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-          {error}
+          <div>
+            <p className="font-semibold">Error de Permisos (403)</p>
+            <p className="text-xs mt-1">{error}</p>
+            <p className="text-xs mt-2">Por favor, ejecuta las migraciones SQL en Supabase para permitir el acceso a calificaciones.</p>
+          </div>
         </div>
       )}
 
