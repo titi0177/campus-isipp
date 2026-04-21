@@ -226,7 +226,7 @@ function DashboardPage() {
         setGpa(gpaCount ? gpaSum / gpaCount : null)
 
         const approved = mapped.filter(r => r.final_grade != null && r.final_grade >= 6).length
-        const enCurso = mapped.filter(r => r.final_grade == null && r.partial_grade != null).length
+        const enCurso = mapped.filter(r => r.final_grade == null).length
         const pendientes = mapped.filter(r => r.final_grade != null && r.final_grade < 6).length
         const totalMaterias = programSubjectsRes.data?.length ?? 0
         const porcentaje = totalMaterias > 0 ? Math.round((approved / totalMaterias) * 100) : 0
