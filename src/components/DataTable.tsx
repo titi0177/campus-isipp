@@ -38,9 +38,9 @@ export function DataTable<T extends Record<string, unknown>>({
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   return (
-    <div className="card overflow-hidden p-0">
+    <div className="card overflow-hidden p-0 shadow-sm">
       {searchable && (
-        <div className="border-b border-[var(--siu-border-light)] bg-[var(--siu-blue-soft)]/50 px-4 py-3">
+        <div className="border-b border-[var(--siu-border-light)] bg-gradient-to-r from-[var(--siu-blue-soft)]/40 to-transparent px-4 py-3">
           <div className="relative max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--siu-text-muted)]" />
             <input
@@ -48,7 +48,7 @@ export function DataTable<T extends Record<string, unknown>>({
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               placeholder={searchPlaceholder}
-              className="form-input pl-9"
+              className="form-input pl-9 py-2 text-sm"
             />
           </div>
         </div>
@@ -57,36 +57,39 @@ export function DataTable<T extends Record<string, unknown>>({
       <div className="overflow-x-auto">
         <table className="siu-table w-full border-collapse text-sm">
           <thead>
-            <tr className="table-header">
+            <tr className="table-header bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--isipp-bordo-dark)]">
               {columns.map((col) => (
-                <th key={col.key} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-white">
+                <th key={col.key} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-white shadow-sm">
                   {col.label}
                 </th>
               ))}
               {actions && (
-                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-white">
+                <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-widest text-white shadow-sm">
                   Acciones
                 </th>
               )}
             </tr>
           </thead>
-          <tbody className="border border-[var(--siu-border-light)]">
+          <tbody className="border border-[var(--siu-border-light)] divide-y divide-[var(--siu-border-light)]">
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + (actions ? 1 : 0)} className="border border-[var(--siu-border-light)] bg-white px-4 py-10 text-center text-[var(--siu-text-muted)]">
+                <td colSpan={columns.length + (actions ? 1 : 0)} className="bg-white px-4 py-12 text-center text-[var(--siu-text-muted)] font-medium">
                   {emptyMessage}
                 </td>
               </tr>
             ) : (
               paginated.map((row, i) => (
-                <tr key={i} className="border-b border-[var(--siu-border-light)] transition-colors">
+                <tr 
+                  key={i} 
+                  className="border-b border-[var(--siu-border-light)] transition-colors duration-200 hover:bg-[var(--siu-blue-soft)]/30"
+                >
                   {columns.map((col) => (
-                    <td key={col.key} className="px-4 py-2.5 text-slate-700">
+                    <td key={col.key} className="px-4 py-3 text-slate-700 text-sm">
                       {col.render ? col.render(row) : String(row[col.key] ?? '-')}
                     </td>
                   ))}
                   {actions && (
-                    <td className="px-4 py-2.5 text-right">{actions(row)}</td>
+                    <td className="px-4 py-3 text-right">{actions(row)}</td>
                   )}
                 </tr>
               ))
@@ -96,16 +99,17 @@ export function DataTable<T extends Record<string, unknown>>({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between border-t border-[var(--siu-border-light)] bg-[var(--siu-blue-soft)]/30 px-4 py-2.5">
-          <span className="text-xs font-medium text-[var(--siu-text-muted)]">
-            {filtered.length} reg. · Pág. {page} / {totalPages}
+        <div className="flex items-center justify-between border-t border-[var(--siu-border-light)] bg-gradient-to-r from-[var(--siu-blue-soft)]/20 to-transparent px-4 py-3">
+          <span className="text-xs font-semibold text-[var(--siu-text-muted)] uppercase tracking-wide">
+            {filtered.length} registros · Página {page} de {totalPages}
           </span>
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="rounded-sm border border-[var(--siu-border)] bg-white p-1.5 text-[var(--siu-navy)] hover:bg-[var(--siu-blue-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md border border-[var(--siu-border)] bg-white p-2 text-[var(--siu-navy)] hover:bg-[var(--siu-blue-soft)] transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
+              aria-label="Página anterior"
             >
               <ChevronLeft size={16} />
             </button>
@@ -113,7 +117,8 @@ export function DataTable<T extends Record<string, unknown>>({
               type="button"
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="rounded-sm border border-[var(--siu-border)] bg-white p-1.5 text-[var(--siu-navy)] hover:bg-[var(--siu-blue-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md border border-[var(--siu-border)] bg-white p-2 text-[var(--siu-navy)] hover:bg-[var(--siu-blue-soft)] transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
+              aria-label="Siguiente página"
             >
               <ChevronRight size={16} />
             </button>

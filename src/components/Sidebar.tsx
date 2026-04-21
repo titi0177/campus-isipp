@@ -127,9 +127,9 @@ export function Sidebar({ role }: SidebarProps) {
   }, [currentPath])
 
   return (
-    <aside className="sidebar h-screen flex flex-col pb-20 md:pb-0" style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
+    <aside className="sidebar h-screen flex flex-col pb-20 md:pb-0 bg-gradient-to-b from-[var(--siu-sidebar-bg)] to-white shadow-sm" style={{ backgroundColor: 'var(--siu-sidebar-bg)' }}>
       {/* Logo Section - Responsive */}
-      <div className="siu-sidebar-brand flex-shrink-0">
+      <div className="siu-sidebar-brand flex-shrink-0 bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--isipp-bordo-dark)] shadow-md">
         <div className="siu-sidebar-logo-box">
           <img 
             src={LOGO_SRC} 
@@ -140,13 +140,13 @@ export function Sidebar({ role }: SidebarProps) {
             loading="lazy"
           />
         </div>
-        <p className="mt-2 md:mt-3 text-center text-[10px] md:text-[11px] font-semibold uppercase leading-snug tracking-wide text-white/90">
+        <p className="mt-2 md:mt-3 text-center text-[10px] md:text-[11px] font-bold uppercase leading-snug tracking-widest text-white/95">
           Sistema de gestión académica
         </p>
       </div>
 
       {/* Menu Label */}
-      <div className="siu-sidebar-section-label text-xs md:text-sm flex-shrink-0">
+      <div className="siu-sidebar-section-label text-xs md:text-sm flex-shrink-0 bg-gradient-to-r from-[var(--isipp-bordo-soft)] to-transparent">
         {menuLabel}
       </div>
 
@@ -158,11 +158,11 @@ export function Sidebar({ role }: SidebarProps) {
             <Link
               key={item.href}
               to={item.href}
-              className={`sidebar-link group touch-target ${active ? 'active' : ''}`}
+              className={`sidebar-link group touch-target transition-all duration-200 ${active ? 'active' : ''}`}
               style={active ? {
                 backgroundColor: 'var(--siu-panel)',
                 color: 'var(--isipp-bordo-dark)',
-                boxShadow: 'inset 4px 0 0 var(--isipp-bordo), 0 1px 2px rgba(44, 21, 24, 0.06)',
+                boxShadow: 'inset 4px 0 0 var(--isipp-bordo), 0 2px 6px rgba(44, 21, 24, 0.08)',
                 border: '1px solid var(--siu-border-light)',
               } : {
                 color: 'var(--siu-blue)',
@@ -171,27 +171,27 @@ export function Sidebar({ role }: SidebarProps) {
               <span className="relative flex-shrink-0">
                 {item.icon}
                 {item.badge && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  <span className="absolute -top-1.5 -right-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-red-600 text-white text-[10px] font-bold shadow-sm">
                     {item.badge > 9 ? '9+' : item.badge}
                   </span>
                 )}
               </span>
               <span className="flex-1 leading-snug text-sm md:text-base truncate">{item.label}</span>
-              {active && <ChevronRight size={14} className="opacity-70 flex-shrink-0" />}
+              {active && <ChevronRight size={14} className="opacity-80 flex-shrink-0 transition-all duration-200" />}
             </Link>
           )
         })}
       </nav>
 
       {/* Logout Button - Always visible at bottom, not affected by scroll */}
-      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-white/60 p-2 md:p-3 m-2 rounded-sm">
+      <div className="mt-auto border-t border-[var(--siu-border-light)] bg-gradient-to-r from-red-50 to-white p-2 md:p-3 m-2 rounded-lg shadow-sm">
         <button
           type="button"
           onClick={handleLogout}
-          className="sidebar-link w-full text-left text-slate-600 hover:text-red-800 active:text-red-900 touch-target transition-colors flex items-center gap-3"
+          className="sidebar-link w-full text-left text-red-700 hover:text-red-900 active:text-red-950 hover:bg-red-100/50 touch-target transition-all duration-200 flex items-center gap-3 rounded-md"
         >
           <LogOut size={18} className="flex-shrink-0" />
-          <span className="font-semibold text-sm md:text-base flex-1">Cerrar sesión</span>
+          <span className="font-bold text-sm md:text-base flex-1">Cerrar sesión</span>
         </button>
       </div>
     </aside>

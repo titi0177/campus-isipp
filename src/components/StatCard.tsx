@@ -32,9 +32,11 @@ function StatCard({ icon, title, value, color }: StatCardProps) {
       })()
 
   return (
-    <div className="card flex items-center gap-4 border-l-4 border-l-[var(--isipp-bordo)] p-5">
-      <div className={`rounded-sm border p-3 ${wrapClass}`}>{iconNode}</div>
-      <div className="min-w-0">
+    <div className="card flex items-center gap-4 border-l-4 border-l-[var(--isipp-bordo)] p-5 shadow-sm hover:shadow-md transition-all duration-300 ease-out">
+      <div className={`rounded-md border p-3 shadow-xs transition-transform duration-300 ${wrapClass}`}>
+        {iconNode}
+      </div>
+      <div className="min-w-0 flex-1">
         <p className="text-xs font-bold uppercase tracking-wide text-[var(--siu-text-muted)]">{title}</p>
         <p className="text-2xl font-bold tracking-tight text-[var(--siu-navy)]">{value}</p>
       </div>
