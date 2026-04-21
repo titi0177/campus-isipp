@@ -8,33 +8,43 @@ export function useRealtimeNotifications(userId?: string) {
   const { showToast } = useToast()
   const subscriptionsRef = useRef<Array<() => void>>([])
 
-  // Escuchar cambios en calificaciones
+  // Escuchar cambios en calificaciones - Sin filtro, luego buscar el student_id
   const subscribeToGrades = useCallback(() => {
     if (!userId) return () => {}
 
     console.log('[Notificaciones] Suscribiendo a calificaciones:', userId)
 
     const subscription = supabase
-      .channel(`grades:${userId}`)
+      .channel(`grades:all`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'enrollment_grades',
-          filter: `student_id=eq.${userId}`,
         },
-        (payload) => {
-          console.log('[Notificaciones] Nueva calificación:', payload)
-          const data = payload.new as any
-          addNotification({
-            type: 'grade',
-            title: '📊 Nueva Calificación',
-            message: `Recibiste una calificación: ${data.grade}/10 en ${data.subject || 'una asignatura'}`,
-            priority: 'high',
-            data,
-          })
-          showToast(`Calificación registrada: ${data.grade}/10`, 'success')
+        async (payload) => {
+          // Obtener el enrollment para verificar si es del usuario actual
+          const enrollmentId = payload.new.enrollment_id
+          const { data: enrollment } = await supabase
+            .from('enrollments')
+            .select('student_id')
+            .eq('id', enrollmentId)
+            .single()
+
+          if (enrollment?.student_id === userId) {
+            console.log('[Notificaciones] Nueva calificación para este usuario:', payload)
+            const data = payload.new as any
+            addNotification({
+              type: 'grade',
+              title: '📊 Nueva Calificación',
+              message: `Recibiste una calificación: ${data.final_grade || data.partial_grade}/10`,
+              priority: 'high',
+              data,
+              actionUrl: '/dashboard/history',
+            })
+            showToast(`Calificación registrada: ${data.final_grade || data.partial_grade}/10`, 'success')
+          }
         }
       )
       .subscribe()
@@ -177,7 +187,7 @@ export function useRealtimeNotifications(userId?: string) {
             addNotification({
               type: 'enrollment',
               title: '✅ Inscripción Aprobada',
-              message: `Tu inscripción a ${data.subject} ha sido aprobada`,
+              message: `Tu inscripción ha sido aprobada`,
               priority: 'high',
               data,
               actionUrl: '/dashboard/subjects',
@@ -187,7 +197,7 @@ export function useRealtimeNotifications(userId?: string) {
             addNotification({
               type: 'alert',
               title: '❌ Inscripción Rechazada',
-              message: `Tu inscripción a ${data.subject} ha sido rechazada`,
+              message: `Tu inscripción ha sido rechazada`,
               priority: 'high',
               data,
             })
@@ -224,7 +234,7 @@ export function useRealtimeNotifications(userId?: string) {
           addNotification({
             type: 'exam',
             title: '📝 Examen Programado',
-            message: `Te has inscrito para el examen de ${data.subject} el ${data.exam_date}`,
+            message: `Te has inscrito para el examen`,
             priority: 'high',
             data,
             actionUrl: '/dashboard/exams',
@@ -261,7 +271,7 @@ export function useRealtimeNotifications(userId?: string) {
           addNotification({
             type: 'certificate',
             title: '🎓 Certificado Disponible',
-            message: `Tu certificado de ${data.name} está disponible para descargar`,
+            message: `Tu certificado está disponible para descargar`,
             priority: 'medium',
             data,
             actionUrl: '/dashboard/certificates',
