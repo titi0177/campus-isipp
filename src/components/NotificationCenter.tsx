@@ -88,9 +88,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [])
 
-  // Guardar notificaciones en localStorage
+  // Guardar notificaciones en localStorage (últimas 100)
   useEffect(() => {
-    localStorage.setItem('notifications', JSON.stringify(notifications.slice(0, 50)))
+    localStorage.setItem('notifications', JSON.stringify(notifications.slice(0, 100)))
   }, [notifications])
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
@@ -119,12 +119,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       })
     }
 
-    // Auto-dismiss para notificaciones no críticas
-    if (notification.priority !== 'high' && notification.type !== 'alert') {
-      setTimeout(() => {
-        dismissNotification(newNotification.id)
-      }, 6000)
-    }
+    // ✅ CAMBIO: NO auto-dismissar - las notificaciones se quedan permanentes
+    // El usuario debe hacer clic en X para eliminarlas
   }, [soundEnabled])
 
   const markAsRead = useCallback((id: string) => {
@@ -456,6 +452,7 @@ export function NotificationBell() {
                               dismissNotification(notification.id)
                             }}
                             className="flex-shrink-0 text-slate-300 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-all"
+                            title="Eliminar notificación"
                           >
                             <X size={18} />
                           </button>
