@@ -1,6 +1,7 @@
 import { HeadContent, Scripts, createRootRoute, Outlet } from '@tanstack/react-router'
 import { ToastProvider } from '@/components/Toast'
 import { NotificationProvider } from '@/components/NotificationCenter'
+import { useGlobalAnnouncements } from '@/hooks/useGlobalAnnouncements'
 import '../styles.css'
 
 export const Route = createRootRoute({
@@ -36,6 +37,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <ToastProvider>
           <NotificationProvider>
+            <GlobalNotificationsSetup />
             {children}
           </NotificationProvider>
         </ToastProvider>
@@ -43,4 +45,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </body>
     </html>
   )
+}
+
+/**
+ * Componente que activa las suscripciones globales
+ * Se renderiza dentro del NotificationProvider para que funcione
+ */
+function GlobalNotificationsSetup() {
+  useGlobalAnnouncements()
+  return null
 }
