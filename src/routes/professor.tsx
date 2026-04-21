@@ -3,7 +3,6 @@ import { AppLayout } from '@/components/AppLayout'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import { homePathForRole } from '@/lib/roles'
-import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 
 const PROFESSOR_ROLES = ['profesor', 'professor', 'admin', 'operador', 'operator']
 
@@ -31,9 +30,6 @@ function ProfessorLayout() {
       }
     })
   }, [])
-
-  // Activar notificaciones en tiempo real
-  useRealtimeNotifications(userId || undefined)
 
   return (
     <AppLayout role="professor" userName={userName}>

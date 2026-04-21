@@ -3,7 +3,6 @@ import { AppLayout } from '@/components/AppLayout'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { homePathForRole } from '@/lib/roles'
-import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 
 export const Route = createFileRoute('/dashboard')({
   beforeLoad: async () => {
@@ -29,9 +28,6 @@ function DashboardLayout() {
       }
     })
   }, [])
-
-  // Activar notificaciones en tiempo real cuando tenemos el userId
-  useRealtimeNotifications(userId || undefined)
 
   return (
     <AppLayout role="student" userName={userName}>

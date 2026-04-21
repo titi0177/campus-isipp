@@ -3,7 +3,6 @@ import { AppLayout } from '@/components/AppLayout'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { homePathForRole, isStaffRole } from '@/lib/roles'
-import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 
 export const Route = createFileRoute('/admin')({
   beforeLoad: async () => {
@@ -29,9 +28,6 @@ function AdminLayout() {
       }
     })
   }, [])
-
-  // Activar notificaciones en tiempo real
-  useRealtimeNotifications(userId || undefined)
 
   return (
     <AppLayout role="admin" userName={userName}>
