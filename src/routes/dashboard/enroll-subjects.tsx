@@ -91,13 +91,13 @@ function EnrollSubjectsPage() {
 
       const { data: currentYearEnrollments } = await supabase
         .from('enrollments')
-        .select('subject_id, division, grades(status), academic_year, subject:subjects(year)')
+        .select('subject_id, division, enrollment_grades(final_status), academic_year, subject:subjects(year)')
         .eq('student_id', studentData.id)
         .eq('academic_year', currentYear)
 
       const { data: allEnrollments } = await supabase
         .from('enrollments')
-        .select('subject_id, grades(status), academic_year')
+        .select('subject_id, enrollment_grades(final_status), academic_year')
         .eq('student_id', studentData.id)
 
       const firstYearEnrollments = currentYearEnrollments?.filter(e => {
@@ -136,8 +136,8 @@ function EnrollSubjectsPage() {
       const passedSubjectIds = new Set(
         (allEnrollments ?? [])
           .filter(e => {
-            const g = Array.isArray(e.grades) ? e.grades[0] : e.grades
-            return g && ['aprobado', 'promocionado', 'regular'].includes(g.status)
+            const g = Array.isArray(e.enrollment_grades) ? e.enrollment_grades[0] : e.enrollment_grades
+            return g && ['aprobado', 'promocionado', 'regular'].includes(g.final_status)
           })
           .map(e => e.subject_id)
       )
