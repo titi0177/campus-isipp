@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/AppLayout'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { homePathForRole, isStaffRole } from '@/lib/roles'
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 
 export const Route = createFileRoute('/admin')({
   beforeLoad: async () => {
@@ -18,12 +19,19 @@ export const Route = createFileRoute('/admin')({
 
 function AdminLayout() {
   const [userName, setUserName] = useState('')
+  const [userId, setUserId] = useState('')
   
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserName(user.user_metadata?.full_name || user.email || '')
+      if (user) {
+        setUserName(user.user_metadata?.full_name || user.email || '')
+        setUserId(user.id)
+      }
     })
   }, [])
+
+  // Activar notificaciones en tiempo real
+  useRealtimeNotifications(userId || undefined)
 
   return (
     <AppLayout role="admin" userName={userName}>

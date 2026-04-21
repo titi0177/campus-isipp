@@ -1,8 +1,8 @@
 import { useEffect, useCallback } from 'react'
+import { MessageCircle, BookOpen, DollarSign, Award, FileText, CheckCircle } from 'lucide-react'
 import { useNotifications } from '@/components/NotificationCenter'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
-import { MessageCircle, BookOpen, DollarSign, Award, FileText, CheckCircle } from 'lucide-react'
 
 export function useRealtimeNotifications(userId?: string) {
   const { addNotification } = useNotifications()
@@ -30,7 +30,6 @@ export function useRealtimeNotifications(userId?: string) {
             message: `Recibiste una calificación: ${data.grade}/10 en ${data.subject || 'una asignatura'}`,
             priority: 'high',
             data,
-            icon: <Award size={20} />,
           })
 
           showToast(`Calificación registrada: ${data.grade}/10`, 'success')
@@ -65,7 +64,6 @@ export function useRealtimeNotifications(userId?: string) {
             message: `Tu pago de $${data.amount} ha sido procesado correctamente`,
             priority: 'high',
             data,
-            icon: <DollarSign size={20} />,
             actionUrl: '/dashboard/payments',
           })
 
@@ -101,7 +99,6 @@ export function useRealtimeNotifications(userId?: string) {
             message: data.content?.substring(0, 100) || 'Tienes un mensaje nuevo',
             priority: 'medium',
             data,
-            icon: <MessageCircle size={20} />,
             actionUrl: '/dashboard/messages',
           })
 
@@ -134,7 +131,6 @@ export function useRealtimeNotifications(userId?: string) {
             message: data.title,
             priority: 'medium',
             data,
-            icon: <FileText size={20} />,
             actionUrl: '/dashboard/announcements',
           })
 
@@ -173,7 +169,6 @@ export function useRealtimeNotifications(userId?: string) {
               message: `Tu inscripción a ${data.subject} ha sido aprobada`,
               priority: 'high',
               data,
-              icon: <CheckCircle size={20} />,
               actionUrl: '/dashboard/subjects',
             })
 
@@ -220,7 +215,6 @@ export function useRealtimeNotifications(userId?: string) {
             message: `Te has inscrito para el examen de ${data.subject} el ${data.exam_date}`,
             priority: 'high',
             data,
-            icon: <FileText size={20} />,
             actionUrl: '/dashboard/exams',
           })
 
@@ -256,7 +250,6 @@ export function useRealtimeNotifications(userId?: string) {
             message: `Tu certificado de ${data.name} está disponible para descargar`,
             priority: 'medium',
             data,
-            icon: <Award size={20} />,
             actionUrl: '/dashboard/certificates',
           })
 

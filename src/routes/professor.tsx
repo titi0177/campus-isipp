@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/AppLayout'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import { homePathForRole } from '@/lib/roles'
+import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications'
 
 const PROFESSOR_ROLES = ['profesor', 'professor', 'admin', 'operador', 'operator']
 
@@ -20,12 +21,19 @@ export const Route = createFileRoute('/professor')({
 
 function ProfessorLayout() {
   const [userName, setUserName] = useState('')
+  const [userId, setUserId] = useState('')
   
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserName(user.user_metadata?.full_name || user.email || '')
+      if (user) {
+        setUserName(user.user_metadata?.full_name || user.email || '')
+        setUserId(user.id)
+      }
     })
   }, [])
+
+  // Activar notificaciones en tiempo real
+  useRealtimeNotifications(userId || undefined)
 
   return (
     <AppLayout role="professor" userName={userName}>
