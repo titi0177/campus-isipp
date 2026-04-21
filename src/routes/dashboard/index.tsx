@@ -225,7 +225,13 @@ function DashboardPage() {
         }
         setGpa(gpaCount ? gpaSum / gpaCount : null)
 
-        const approved = mapped.filter(r => r.final_grade != null && r.final_grade >= 6).length
+        // Contar solo aprobadas/promocionadas con final_status válido
+        const approved = mapped.filter(r => 
+          r.final_grade != null && 
+          r.final_grade >= 6 && 
+          (r.final_status === 'aprobado' || r.final_status === 'promocionado')
+        ).length
+        
         const enCurso = mapped.filter(r => r.final_grade == null).length
         const pendientes = mapped.filter(r => r.final_grade != null && r.final_grade < 6).length
         const totalMaterias = programSubjectsRes.data?.length ?? 0
@@ -270,7 +276,11 @@ function DashboardPage() {
 
   if (!student) return null
 
-  const approved = rows.filter(r => r.final_grade != null && r.final_grade >= 6).length
+  const approved = rows.filter(r => 
+    r.final_grade != null && 
+    r.final_grade >= 6 && 
+    (r.final_status === 'aprobado' || r.final_status === 'promocionado')
+  ).length
 
   return (
     <div className="space-y-8">
