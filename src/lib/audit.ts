@@ -12,6 +12,7 @@ export async function logAudit(
   details?: string
 ) {
   try {
+    // Intentar guardar en tabla audit_logs si existe
     const { error } = await supabase
       .from('audit_logs')
       .insert({
@@ -26,10 +27,14 @@ export async function logAudit(
       })
 
     if (error) {
-      console.error('Error logging audit:', error)
+      // Si la tabla no existe, registrar en consola
+      console.log(`[AUDIT] ${action} | ${targetType}:${targetId} | ${details}`)
+      console.log(`[OLD]`, oldValue)
+      console.log(`[NEW]`, newValue)
     }
   } catch (err) {
-    console.error('Error in logAudit:', err)
+    // Si hay error, simplemente loguear en consola
+    console.log(`[AUDIT-FALLBACK] ${action} | ${targetType}:${targetId} | ${details}`)
   }
 }
 
@@ -45,7 +50,7 @@ export async function getAuditLogs(
 
     let query = supabase
       .from('audit_logs')
-      .select('*, admin:admin_users(name, email)')
+      .select('*')
       .gte('created_at', fromDate.toISOString())
       .order('created_at', { ascending: false })
 

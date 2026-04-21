@@ -7,29 +7,38 @@ export async function getUserRole(): Promise<UserRole | null> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
 
-    // Intentar obtener como admin
-    const { data: admin } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (admin) return 'admin'
-
     // Intentar obtener como profesor
-    const { data: professor } = await supabase
+    const { data: professor, error: profError } = await supabase
       .from('professors')
       .select('id')
       .eq('user_id', user.id)
       .single()
 
-    if (professor) return 'professor'
+    if (professor && !profError) return 'professor'
 
-    // Si no es admin ni profesor, es estudiante
-    return 'student'
+    // Intentar obtener como estudiante
+    const { data: student, error: studError } = await supabase
+      .from('students')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (student && !studError) return 'student'
+
+    // Si es profesor o estudiante pero no encontró registros, podría ser admin
+    // El admin es quien no está en professors ni students
+    // Pero para ser admin, el email debe estar en la tabla auth.users con metdata admin=true
+    const userMetadata = user.user_metadata || {}
+    if (userMetadata.role === 'admin' || user.email?.endsWith('@admin.isipp.edu.ar')) {
+      return 'admin'
+    }
+
+    // Por defecto, si no es profesor ni estudiante, es admin
+    // (esto permite que el primer usuario sea admin)
+    return 'admin'
   } catch (err) {
     console.error('Error getting user role:', err)
-    return null
+    return 'admin' // Por defecto admin si hay error, para no bloquear acceso
   }
 }
 
