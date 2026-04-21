@@ -1,7 +1,10 @@
 import { HeadContent, Scripts, createRootRoute, Outlet } from '@tanstack/react-router'
 import { ToastProvider } from '@/components/Toast'
 import { NotificationProvider } from '@/components/NotificationCenter'
-import { useGlobalAnnouncements } from '@/hooks/useGlobalAnnouncements'
+import { useGlobalNotifications } from '@/hooks/useGlobalNotifications'
+import { useUserNotifications } from '@/hooks/useUserNotifications'
+import { supabase } from '@/lib/supabase'
+import { useEffect, useState } from 'react'
 import '../styles.css'
 
 export const Route = createRootRoute({
@@ -37,7 +40,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <ToastProvider>
           <NotificationProvider>
-            <GlobalNotificationsSetup />
+            <NotificationSetup />
             {children}
           </NotificationProvider>
         </ToastProvider>
@@ -48,10 +51,63 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Componente que activa las suscripciones globales
- * Se renderiza dentro del NotificationProvider para que funcione
+ * Componente que maneja TODAS las suscripciones de notificaciones
+ * Separación clara: global vs usuario-específico
  */
-function GlobalNotificationsSetup() {
-  useGlobalAnnouncements()
+function NotificationSetup() {
+  const [userId, setUserId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // ============================================================
+  // 1. Obtener userId del usuario autenticado (una sola vez)
+  // ============================================================
+  useEffect(() => {
+    console.log('[NotificationSetup] Obteniendo usuario autenticado...')
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        console.log('[NotificationSetup] ✅ Usuario encontrado:', user.id)
+        setUserId(user.id)
+      } else {
+        console.log('[NotificationSetup] ❌ No hay usuario autenticado')
+        setUserId(null)
+      }
+      setIsLoading(false)
+    })
+
+    // Escuchar cambios de autenticación (logout, etc)
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log('[NotificationSetup] Auth cambió - evento:', event)
+        if (session?.user) {
+          console.log('[NotificationSetup] ✅ Usuario sesión:', session.user.id)
+          setUserId(session.user.id)
+        } else {
+          console.log('[NotificationSetup] ❌ Sesión perdida')
+          setUserId(null)
+        }
+      }
+    )
+
+    return () => {
+      if (authListener?.subscription) {
+        authListener.subscription.unsubscribe()
+      }
+    }
+  }, [])
+
+  // ============================================================
+  // 2. Suscripciones GLOBALES (sin userId)
+  // Se crea una sola vez al montar el componente
+  // ============================================================
+  useGlobalNotifications()
+
+  // ============================================================
+  // 3. Suscripciones de USUARIO (dependen de userId)
+  // Se crean/limpian cuando userId cambia
+  // ============================================================
+  useUserNotifications(userId)
+
+  // No renderizar nada, solo efectos secundarios
   return null
 }
