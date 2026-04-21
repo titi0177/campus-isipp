@@ -160,16 +160,22 @@ function SubjectsPage() {
     setExpandedId(expandedId === id ? null : id)
   }
 
+  // Función para determinar si es promocionada
+  const isPromoted = (e: EnrollmentWithGrades) => {
+    const fg = e.grades?.final_grade
+    return fg != null && fg >= 8 && e.subject.allows_promotion
+  }
+
+  // Función para determinar si es aprobada
+  const isApproved = (e: EnrollmentWithGrades) => {
+    const fg = e.grades?.final_grade
+    return fg != null && fg >= 6
+  }
+
   const stats = {
-    approved: enrollments.filter(e => {
-      const fg = e.grades?.final_grade
-      return fg != null && fg >= 6 && (e.grades?.final_status === 'aprobado' || e.grades?.final_status === 'promocionado')
-    }).length,
-    promoted: enrollments.filter(e => {
-      const fg = e.grades?.final_grade
-      return fg != null && fg >= 8 && e.subject.allows_promotion && e.grades?.final_status === 'promocionado'
-    }).length,
-    current: enrollments.filter(e => !e.grades?.final_status).length,
+    approved: enrollments.filter(e => isApproved(e)).length,
+    promoted: enrollments.filter(e => isPromoted(e)).length,
+    current: enrollments.filter(e => !e.grades?.final_grade).length,
   }
 
   if (loading) {
@@ -260,6 +266,7 @@ function SubjectsPage() {
             const partialStatus = grades?.partial_status
             const finalStatus = grades?.final_status
 
+            // Determinar estado basado en nota
             let displayStatus = 'en_curso'
             if (finalGrade) {
               if (finalGrade >= 8 && subject.allows_promotion) {
