@@ -1,5 +1,4 @@
-import { useEffect, useCallback } from 'react'
-import { MessageCircle, BookOpen, DollarSign, Award, FileText, CheckCircle } from 'lucide-react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useNotifications } from '@/components/NotificationCenter'
 import { useToast } from '@/components/Toast'
 import { supabase } from '@/lib/supabase'
@@ -7,10 +6,13 @@ import { supabase } from '@/lib/supabase'
 export function useRealtimeNotifications(userId?: string) {
   const { addNotification } = useNotifications()
   const { showToast } = useToast()
+  const subscriptionsRef = useRef<Array<() => void>>([])
 
   // Escuchar cambios en calificaciones
   const subscribeToGrades = useCallback(() => {
-    if (!userId) return
+    if (!userId) return () => {}
+
+    console.log('[Notificaciones] Suscribiendo a calificaciones:', userId)
 
     const subscription = supabase
       .channel(`grades:${userId}`)
@@ -23,6 +25,7 @@ export function useRealtimeNotifications(userId?: string) {
           filter: `student_id=eq.${userId}`,
         },
         (payload) => {
+          console.log('[Notificaciones] Nueva calificación:', payload)
           const data = payload.new as any
           addNotification({
             type: 'grade',
@@ -31,7 +34,6 @@ export function useRealtimeNotifications(userId?: string) {
             priority: 'high',
             data,
           })
-
           showToast(`Calificación registrada: ${data.grade}/10`, 'success')
         }
       )
@@ -44,7 +46,9 @@ export function useRealtimeNotifications(userId?: string) {
 
   // Escuchar cambios en pagos
   const subscribeToPayments = useCallback(() => {
-    if (!userId) return
+    if (!userId) return () => {}
+
+    console.log('[Notificaciones] Suscribiendo a pagos:', userId)
 
     const subscription = supabase
       .channel(`payments:${userId}`)
@@ -57,6 +61,7 @@ export function useRealtimeNotifications(userId?: string) {
           filter: `student_id=eq.${userId}`,
         },
         (payload) => {
+          console.log('[Notificaciones] Nuevo pago:', payload)
           const data = payload.new as any
           addNotification({
             type: 'payment',
@@ -66,7 +71,6 @@ export function useRealtimeNotifications(userId?: string) {
             data,
             actionUrl: '/dashboard/payments',
           })
-
           showToast(`Pago procesado: $${data.amount}`, 'success')
         }
       )
@@ -79,7 +83,9 @@ export function useRealtimeNotifications(userId?: string) {
 
   // Escuchar mensajes nuevos
   const subscribeToMessages = useCallback(() => {
-    if (!userId) return
+    if (!userId) return () => {}
+
+    console.log('[Notificaciones] Suscribiendo a mensajes:', userId)
 
     const subscription = supabase
       .channel(`messages:${userId}`)
@@ -92,6 +98,7 @@ export function useRealtimeNotifications(userId?: string) {
           filter: `receiver_id=eq.${userId}`,
         },
         (payload) => {
+          console.log('[Notificaciones] Nuevo mensaje:', payload)
           const data = payload.new as any
           addNotification({
             type: 'message',
@@ -101,7 +108,6 @@ export function useRealtimeNotifications(userId?: string) {
             data,
             actionUrl: '/dashboard/messages',
           })
-
           showToast('Tienes un mensaje nuevo', 'info')
         }
       )
@@ -112,10 +118,12 @@ export function useRealtimeNotifications(userId?: string) {
     }
   }, [userId, addNotification, showToast])
 
-  // Escuchar anuncios
+  // Escuchar anuncios - SIN FILTRO (todos los usuarios)
   const subscribeToAnnouncements = useCallback(() => {
+    console.log('[Notificaciones] Suscribiendo a anuncios (global)')
+
     const subscription = supabase
-      .channel('announcements')
+      .channel('public-announcements')
       .on(
         'postgres_changes',
         {
@@ -124,17 +132,17 @@ export function useRealtimeNotifications(userId?: string) {
           table: 'announcements',
         },
         (payload) => {
+          console.log('[Notificaciones] Nuevo anuncio:', payload)
           const data = payload.new as any
           addNotification({
             type: 'announcement',
             title: '📢 Anuncio Nuevo',
-            message: data.title,
+            message: data.title || data.description || 'Nuevo anuncio disponible',
             priority: 'medium',
             data,
             actionUrl: '/dashboard/announcements',
           })
-
-          showToast(`Nuevo anuncio: ${data.title}`, 'info')
+          showToast(`Nuevo anuncio: ${data.title || 'sin título'}`, 'info')
         }
       )
       .subscribe()
@@ -146,7 +154,9 @@ export function useRealtimeNotifications(userId?: string) {
 
   // Escuchar cambios en inscripciones
   const subscribeToEnrollments = useCallback(() => {
-    if (!userId) return
+    if (!userId) return () => {}
+
+    console.log('[Notificaciones] Suscribiendo a inscripciones:', userId)
 
     const subscription = supabase
       .channel(`enrollments:${userId}`)
@@ -159,6 +169,7 @@ export function useRealtimeNotifications(userId?: string) {
           filter: `student_id=eq.${userId}`,
         },
         (payload) => {
+          console.log('[Notificaciones] Cambio de inscripción:', payload)
           const data = payload.new as any
           const status = data.status?.toLowerCase()
 
@@ -171,7 +182,6 @@ export function useRealtimeNotifications(userId?: string) {
               data,
               actionUrl: '/dashboard/subjects',
             })
-
             showToast('¡Inscripción aprobada!', 'success')
           } else if (status === 'rejected') {
             addNotification({
@@ -181,7 +191,6 @@ export function useRealtimeNotifications(userId?: string) {
               priority: 'high',
               data,
             })
-
             showToast('Inscripción rechazada', 'error')
           }
         }
@@ -195,7 +204,9 @@ export function useRealtimeNotifications(userId?: string) {
 
   // Escuchar actualizaciones de exámenes finales
   const subscribeToExams = useCallback(() => {
-    if (!userId) return
+    if (!userId) return () => {}
+
+    console.log('[Notificaciones] Suscribiendo a exámenes:', userId)
 
     const subscription = supabase
       .channel(`exams:${userId}`)
@@ -208,6 +219,7 @@ export function useRealtimeNotifications(userId?: string) {
           filter: `student_id=eq.${userId}`,
         },
         (payload) => {
+          console.log('[Notificaciones] Nuevo examen:', payload)
           const data = payload.new as any
           addNotification({
             type: 'exam',
@@ -217,7 +229,6 @@ export function useRealtimeNotifications(userId?: string) {
             data,
             actionUrl: '/dashboard/exams',
           })
-
           showToast('Examen programado exitosamente', 'success')
         }
       )
@@ -230,7 +241,9 @@ export function useRealtimeNotifications(userId?: string) {
 
   // Escuchar certificados
   const subscribeToCertificates = useCallback(() => {
-    if (!userId) return
+    if (!userId) return () => {}
+
+    console.log('[Notificaciones] Suscribiendo a certificados:', userId)
 
     const subscription = supabase
       .channel(`certificates:${userId}`)
@@ -243,6 +256,7 @@ export function useRealtimeNotifications(userId?: string) {
           filter: `student_id=eq.${userId}`,
         },
         (payload) => {
+          console.log('[Notificaciones] Nuevo certificado:', payload)
           const data = payload.new as any
           addNotification({
             type: 'certificate',
@@ -252,7 +266,6 @@ export function useRealtimeNotifications(userId?: string) {
             data,
             actionUrl: '/dashboard/certificates',
           })
-
           showToast('¡Tu certificado está listo!', 'success')
         }
       )
@@ -265,7 +278,9 @@ export function useRealtimeNotifications(userId?: string) {
 
   // Subscribirse a todos los eventos
   useEffect(() => {
-    const unsubscribes = [
+    console.log('[Notificaciones] Iniciando suscripciones con userId:', userId)
+
+    subscriptionsRef.current = [
       subscribeToGrades(),
       subscribeToPayments(),
       subscribeToMessages(),
@@ -276,7 +291,8 @@ export function useRealtimeNotifications(userId?: string) {
     ]
 
     return () => {
-      unsubscribes.forEach(unsub => unsub?.())
+      console.log('[Notificaciones] Limpiando suscripciones')
+      subscriptionsRef.current.forEach(unsub => unsub?.())
     }
   }, [
     subscribeToGrades,
