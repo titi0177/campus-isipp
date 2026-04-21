@@ -161,8 +161,14 @@ function SubjectsPage() {
   }
 
   const stats = {
-    approved: enrollments.filter(e => e.grades?.final_status === 'aprobado').length,
-    promoted: enrollments.filter(e => e.grades?.final_status === 'promocionado').length,
+    approved: enrollments.filter(e => {
+      const fg = e.grades?.final_grade
+      return fg != null && fg >= 6 && (e.grades?.final_status === 'aprobado' || e.grades?.final_status === 'promocionado')
+    }).length,
+    promoted: enrollments.filter(e => {
+      const fg = e.grades?.final_grade
+      return fg != null && fg >= 8 && e.subject.allows_promotion && e.grades?.final_status === 'promocionado'
+    }).length,
     current: enrollments.filter(e => !e.grades?.final_status).length,
   }
 
