@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { logAudit } from '@/lib/audit'
+import { isValidGrade, VALID_FINAL_STATUS } from '@/lib/permissions'
 import { AlertCircle, Save, Download } from 'lucide-react'
 
 type Career = {
@@ -36,6 +38,16 @@ export function AdminDirectGradeLoader() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [adminId, setAdminId] = useState<string>('')
+
+  // Obtener admin ID
+  useEffect(() => {
+    const getAdminId = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setAdminId(user.id)
+    }
+    getAdminId()
+  }, [])
 
   // Cargar carreras
   useEffect(() => {
@@ -138,12 +150,10 @@ export function AdminDirectGradeLoader() {
           }
         })
 
-        // Ordenar por legajo en el cliente
         formatted.sort((a, b) => a.legajo.localeCompare(b.legajo))
 
         setStudentGrades(formatted)
 
-        // Inicializar grades con notas existentes
         const initialGrades: Record<string, number | null> = {}
         formatted.forEach(sg => {
           initialGrades[sg.enrollment_id] = sg.final_grade
@@ -161,6 +171,13 @@ export function AdminDirectGradeLoader() {
 
   const handleGradeChange = (enrollmentId: string, value: string) => {
     const numValue = value === '' ? null : parseFloat(value)
+    
+    // Validar que sea un número válido
+    if (numValue !== null && !isValidGrade(numValue)) {
+      setError('La nota debe estar entre 0 y 10')
+      return
+    }
+
     setGrades(prev => ({
       ...prev,
       [enrollmentId]: numValue,
@@ -182,10 +199,27 @@ export function AdminDirectGradeLoader() {
           continue
         }
 
+        // Validar nota
+        if (!isValidGrade(newGrade)) {
+          setError(`Nota inválida para ${student.student_name}`)
+          setSaving(false)
+          return
+        }
+
+        // Determinar estado basado en la nota
+        const finalStatus = newGrade >= 8 ? 'promocionado' : newGrade >= 6 ? 'aprobado' : 'desaprobado'
+
+        // Validar estado
+        if (!VALID_FINAL_STATUS.includes(finalStatus)) {
+          setError(`Estado inválido para ${student.student_name}`)
+          setSaving(false)
+          return
+        }
+
         const payload = {
           enrollment_id: student.enrollment_id,
           final_grade: newGrade,
-          final_status: newGrade >= 6 ? 'aprobado' : 'desaprobado',
+          final_status: finalStatus,
           attempt_number: 1,
         }
 
@@ -197,11 +231,37 @@ export function AdminDirectGradeLoader() {
             .from('enrollment_grades')
             .update(payload)
             .eq('id', student.id)
+
+          // Registrar auditoría
+          if (!result.error && adminId) {
+            await logAudit(
+              'UPDATE_GRADE',
+              adminId,
+              'enrollment_grades',
+              student.id,
+              { final_grade: student.final_grade, final_status: student.final_status },
+              payload,
+              `Cambio de nota para ${student.student_name}`
+            )
+          }
         } else {
           // Crear
           result = await supabase
             .from('enrollment_grades')
             .insert([payload])
+
+          // Registrar auditoría
+          if (!result.error && adminId) {
+            await logAudit(
+              'CREATE_GRADE',
+              adminId,
+              'enrollment_grades',
+              student.enrollment_id,
+              null,
+              payload,
+              `Creación de nota para ${student.student_name}`
+            )
+          }
         }
 
         if (result.error) {
@@ -308,10 +368,10 @@ export function AdminDirectGradeLoader() {
       {selectedSubject && (
         <>
           <div className="card p-4 bg-blue-50 border-2 border-blue-200">
-            <h3 className="font-bold text-blue-900 mb-2">Informacion de la Materia</h3>
+            <h3 className="font-bold text-blue-900 mb-2">Información de la Materia</h3>
             <p className="text-sm text-blue-900">
               <strong>Carrera:</strong> {careers.find(c => c.id === selectedCareer)?.name} | 
-              <strong className="ml-3">Ano:</strong> {selectedYear} | 
+              <strong className="ml-3">Año:</strong> {selectedYear} | 
               <strong className="ml-3">Materia:</strong> {selectedSubjectData?.code} - {selectedSubjectData?.name}
             </p>
             <p className="text-sm text-blue-900 mt-2">
@@ -345,11 +405,11 @@ export function AdminDirectGradeLoader() {
                       {studentGrades.map((sg, idx) => {
                         const gradeValue = grades[sg.enrollment_id]
                         const status = gradeValue !== null && gradeValue !== undefined 
-                          ? (gradeValue >= 6 ? 'Aprobado' : 'Desaprobado')
+                          ? (gradeValue >= 8 ? 'Promocionado' : gradeValue >= 6 ? 'Aprobado' : 'Desaprobado')
                           : (sg.final_status ? sg.final_status.charAt(0).toUpperCase() + sg.final_status.slice(1) : '-')
                         const statusColor = gradeValue !== null && gradeValue !== undefined
                           ? (gradeValue >= 6 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')
-                          : (sg.final_status === 'aprobado' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700')
+                          : (sg.final_status === 'aprobado' || sg.final_status === 'promocionado' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700')
 
                         return (
                           <tr key={sg.enrollment_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
