@@ -87,7 +87,7 @@ const ExamCard = memo(function ExamCardComp({
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-4 h-4" />
-            {new Date(exam.exam_date).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+            {exam.exam_time || '-'}
           </span>
           {exam.location && <span className="hidden sm:flex items-center gap-1">📍 {exam.location}</span>}
         </div>
@@ -196,7 +196,7 @@ function DashboardPage() {
           .eq('program_id', studentData.program_id),
         supabase
           .from('final_exams')
-          .select('id, exam_date, location, subject:subjects(name)')
+          .select('id, exam_date, exam_time, location, subject:subjects(name)')
           .gte('exam_date', new Date().toISOString())
           .order('exam_date', { ascending: true })
           .limit(6),
