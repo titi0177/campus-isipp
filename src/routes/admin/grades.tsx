@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { AdminDirectGradeLoader } from '@/components/AdminDirectGradeLoader'
+import { supabase } from '@/lib/supabase'
 
 export const Route = createFileRoute('/admin/grades')({
   component: GradesPage,
@@ -57,17 +58,17 @@ function LegacyGradeLoader() {
   const [rows, setRows] = useState<any[]>([])
 
   const loadSubjects = async () => {
-    const { data } = await (window as any).supabase.from('subjects').select('*')
+    const { data } = await supabase.from('subjects').select('*')
     setSubjects(data || [])
   }
 
   const loadStudents = async (subjectId: string) => {
-    const { data } = await (window as any).supabase
+    const { data } = await supabase
       .from('enrollments')
       .select(`
         id,
         student:students(first_name,last_name),
-        grade:grades(*)
+        enrollment_grades(id, partial_grade, final_grade)
       `)
       .eq('subject_id', subjectId)
 
@@ -82,34 +83,32 @@ function LegacyGradeLoader() {
 
   const saveAll = async () => {
     for (const r of rows) {
-      const existing = r.grade?.[0]
-      const final = r.final_exam_grade ?? r.partial_grade
+      const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
+      const final = r.final_grade ?? r.partial_grade
       const status =
-        final >= 7
-          ? 'promoted'
-          : final >= 4
-            ? 'passed'
-            : 'failed'
+        final >= 8
+          ? 'promocionado'
+          : final >= 6
+            ? 'aprobado'
+            : 'desaprobado'
 
-      if (existing) {
-        await (window as any).supabase
-          .from('grades')
+      if (enrollmentGrades?.id) {
+        await supabase
+          .from('enrollment_grades')
           .update({
             partial_grade: r.partial_grade,
-            final_exam_grade: r.final_exam_grade,
-            final_grade: final,
-            status,
+            final_grade: r.final_grade,
+            final_status: status,
           })
-          .eq('id', existing.id)
+          .eq('id', enrollmentGrades.id)
       } else {
-        await (window as any).supabase
-          .from('grades')
+        await supabase
+          .from('enrollment_grades')
           .insert({
             enrollment_id: r.id,
             partial_grade: r.partial_grade,
-            final_exam_grade: r.final_exam_grade,
-            final_grade: final,
-            status,
+            final_grade: r.final_grade,
+            final_status: status,
           })
       }
     }
@@ -151,7 +150,8 @@ function LegacyGradeLoader() {
             </thead>
             <tbody>
               {rows.map((r, i) => {
-                const final = r.final_exam_grade ?? r.partial_grade
+                const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
+                const final = r.final_grade ?? enrollmentGrades?.partial_grade
                 return (
                   <tr key={r.id} className="border-b border-gray-200">
                     <td className="border border-gray-200 px-4 py-2">
@@ -161,16 +161,16 @@ function LegacyGradeLoader() {
                       <input
                         type="number"
                         className="w-full px-2 py-1 border border-gray-300 rounded"
-                        value={r.partial_grade ?? ''}
-                        onChange={e => updateValue(i, 'partial_grade', +e.target.value)}
+                        value={r.partial_grade ?? enrollmentGrades?.partial_grade ?? ''}
+                        onChange={e => updateValue(i, 'partial_grade', e.target.value ? +e.target.value : null)}
                       />
                     </td>
                     <td className="border border-gray-200 px-4 py-2">
                       <input
                         type="number"
                         className="w-full px-2 py-1 border border-gray-300 rounded"
-                        value={r.final_exam_grade ?? ''}
-                        onChange={e => updateValue(i, 'final_exam_grade', +e.target.value)}
+                        value={r.final_grade ?? enrollmentGrades?.final_grade ?? ''}
+                        onChange={e => updateValue(i, 'final_grade', e.target.value ? +e.target.value : null)}
                       />
                     </td>
                     <td className="border border-gray-200 px-4 py-2 text-center font-bold">{final ?? '-'}</td>

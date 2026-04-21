@@ -30,7 +30,7 @@ export async function checkAdvancedStudentException(studentId: string): Promise<
       .from('enrollments')
       .select(`
         subject_id,
-        grades(status, created_at)
+        enrollment_grades(final_status, created_at)
       `)
       .eq('student_id', studentId)
       .in('subject_id', firstYearSubjectIds)
@@ -39,8 +39,8 @@ export async function checkAdvancedStudentException(studentId: string): Promise<
 
     // Filter only passed/promoted grades
     const passedEnrollments = enrollments.filter(e => {
-      const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
-      return grade && ['promoted', 'passed'].includes(grade.status)
+      const grade = Array.isArray(e.enrollment_grades) ? e.enrollment_grades[0] : e.enrollment_grades
+      return grade && ['aprobado', 'promocionado'].includes(grade.final_status)
     })
 
     // Must have passed at least as many as there are 1st year subjects
@@ -51,7 +51,7 @@ export async function checkAdvancedStudentException(studentId: string): Promise<
     // Get the dates when each subject was marked as passed/promoted
     const passedDates = passedEnrollments
       .map(e => {
-        const grade = Array.isArray(e.grades) ? e.grades[0] : e.grades
+        const grade = Array.isArray(e.enrollment_grades) ? e.enrollment_grades[0] : e.enrollment_grades
         if (grade && grade.created_at) {
           return new Date(grade.created_at).toDateString() // Normalize to date only
         }
