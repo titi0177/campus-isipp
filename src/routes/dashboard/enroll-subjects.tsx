@@ -175,7 +175,7 @@ function EnrollSubjectsPage() {
           continue
         }
         
-        const baseKey = `${subject.name}_${subject.code}`
+        const baseKey = enrolledDivision ? subject.id : `${subject.name}_${subject.code}`
         if (!subjectsByBase.has(baseKey)) {
           subjectsByBase.set(baseKey, [])
         }
