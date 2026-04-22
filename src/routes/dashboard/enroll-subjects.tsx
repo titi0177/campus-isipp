@@ -159,24 +159,10 @@ function EnrollSubjectsPage() {
       const isAnalystProgram = program?.name.includes('Analista')
       const isFirstYear = studentData.year === 1
 
-      // Agrupar materias - NO FILTRAR POR DIVISIÓN EN CARGA INICIAL
-      // Mostrar todas hasta que división esté confirmada
-      const subjectsByBase = new Map<string, any[]>()
-      for (const subject of allSubjects) {
-        // Don't filter by division here - let user see all first year subjects
-        // until they choose one
-        const baseKey = `${subject.name}_${subject.code}`
-        if (!subjectsByBase.has(baseKey)) {
-          subjectsByBase.set(baseKey, [])
-        }
-        subjectsByBase.get(baseKey)!.push(subject)
-      }
-
+      // Process each subject directly - NO grouping
       const processed: SubjectWithStatus[] = []
 
-      for (const [, variants] of subjectsByBase) {
-        // Usar la primera variante como referencia
-        const subject = variants[0]
+      for (const subject of allSubjects) {
         const isEnrolledThisYear = currentYearEnrollmentIds.has(subject.id)
         const isPassed = passedSubjectIds.has(subject.id)
         const isRecursant = !isPassed && passedSubjectIds.has(subject.id) === false && 
@@ -270,6 +256,10 @@ function EnrollSubjectsPage() {
           }
         }
 
+        // Check if this subject has multiple divisions
+        const subjectsWithSameName = allSubjects.filter(s => s.name === subject.name && s.code === subject.code)
+        const hasMultipleDivisions = subjectsWithSameName.length > 1
+
         processed.push({
           id: subject.id,
           name: subject.name,
@@ -284,7 +274,7 @@ function EnrollSubjectsPage() {
           blockedReason,
           isEnrolled: isEnrolledThisYear || isPassed,
           isRecursant: isRecursant && !isEnrolledThisYear && !isPassed,
-          hasMultipleDivisions: variants.length > 1,
+          hasMultipleDivisions,
         })
       }
 
