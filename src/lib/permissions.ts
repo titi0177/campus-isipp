@@ -12,7 +12,7 @@ export async function getUserRole(): Promise<UserRole | null> {
       .from('professors')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (professor && !profError) return 'professor'
 
@@ -21,7 +21,7 @@ export async function getUserRole(): Promise<UserRole | null> {
       .from('students')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (student && !studError) return 'student'
 
