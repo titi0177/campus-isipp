@@ -361,7 +361,8 @@ function EnrollSubjectsPage() {
 
   const filteredSubjects = availableSubjects.filter(subject => {
     // Si tiene división seleccionada y es de primer año, filtrar por esa división
-    if (enrolledDivision && subject.year === 1 && subject.division !== enrolledDivision) {
+    // PERO: si la materia NO tiene división (null), siempre mostrarla
+    if (enrolledDivision && subject.year === 1 && subject.division !== null && subject.division !== enrolledDivision) {
       console.log('🟢 FILTERING OUT:', subject.code, subject.division, '!==', enrolledDivision)
       return false
     }
