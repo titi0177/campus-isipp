@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUserSession } from '@/hooks/useUserSession'
 import { getUserRole, canAccessAdmin } from '@/lib/permissions'
 import { StatCard } from '@/components/StatCard'
+import { OnlineUsersCard } from '@/components/OnlineUsersCard'
 import { Users, BookOpen, GraduationCap, UserCheck, TrendingUp, Award, AlertCircle } from 'lucide-react'
 import { Bar, Doughnut } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js'
@@ -14,6 +16,7 @@ export const Route = createFileRoute('/admin/')({
 })
 
 function AdminDashboard() {
+  useUserSession() // Track user session
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [unauthorized, setUnauthorized] = useState(false)
@@ -173,6 +176,10 @@ function AdminDashboard() {
         <StatCard title="Profesores" value={stats.professors} icon={<UserCheck size={24} />} color="orange" />
         <StatCard title="Inscripciones" value={stats.enrollments} icon={<TrendingUp size={24} />} color="purple" />
         <StatCard title="Promedio" value={stats.avg !== null && stats.avg !== undefined ? stats.avg.toFixed(2) : '0.00'} icon={<Award size={24} />} color="bordeaux" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <OnlineUsersCard />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
