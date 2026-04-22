@@ -23,6 +23,7 @@ interface Payment {
   payment_method: string | null
   student_name: string
   increment_percentage: number
+  amount_modified: boolean
 }
 
 interface Student {
@@ -180,6 +181,7 @@ function TreasurerPayments() {
             payment_method: p.payment_method || 'efectivo',
             student_name: `${student.first_name} ${student.last_name}`,
             increment_percentage: configData?.increment_percentage || 15,
+            amount_modified: p.amount_modified || false,
           }
         })
 
@@ -207,10 +209,18 @@ function TreasurerPayments() {
     newPaymentMethod: string
   ) {
     try {
+      // Obtener pago actual para comparar si cambió el monto
+      const currentPayment = students
+        .flatMap(s => s.payments)
+        .find(p => p.id === paymentId)
+
+      const amountChanged = currentPayment && newAmount !== currentPayment.amount
+
       let updateData: any = {
         amount: newAmount,
         status: newStatus,
         payment_method: newPaymentMethod,
+        amount_modified: amountChanged ? true : currentPayment?.amount_modified || false,
       }
 
       if (newStatus === 'pagado') {
@@ -240,6 +250,7 @@ function TreasurerPayments() {
                   status: newStatus,
                   payment_method: newPaymentMethod,
                   paid_at: newStatus === 'pagado' ? new Date().toISOString() : null,
+                  amount_modified: amountChanged ? true : p.amount_modified,
                 }
               : p
           ),
@@ -275,9 +286,7 @@ function TreasurerPayments() {
     : null
 
   // Calcular resumen diario
-  // ✅ CORRECCIÓN: Usa p.amount directamente
-  // - p.amount incluye recargos si aplican (automático)
-  // - p.amount respeta ediciones manuales (lo que vos escribiste)
+  // ✅ Lógica mejorada: usa amount_modified flag para decidir qué sumar
   const calculateDailySummary = () => {
     const summary: Record<string, DailySummary> = {}
 
@@ -299,10 +308,26 @@ function TreasurerPayments() {
             summary[date].methods[method] = { count: 0, total: 0 }
           }
 
-          // ✅ Usa p.amount: lo que está en BD (sea automático con recargo o editado manualmente)
+          // ✅ Determinar el monto a contabilizar según estado
+          let amountToCount = p.base_amount
+
+          if (p.amount_modified) {
+            // Modificado manualmente: usar lo que editaste
+            amountToCount = p.amount
+          } else {
+            // No modificado: usar lógica automática (con recargo si aplica)
+            const surchargeInfo = calculatePaymentWithSurcharge(
+              p.base_amount,
+              p.due_date,
+              p.paid_at!,
+              p.increment_percentage
+            )
+            amountToCount = surchargeInfo.totalAmount
+          }
+
           summary[date].methods[method].count += 1
-          summary[date].methods[method].total += p.amount
-          summary[date].grandTotal += p.amount
+          summary[date].methods[method].total += amountToCount
+          summary[date].grandTotal += amountToCount
         })
     })
 
@@ -644,16 +669,18 @@ function TreasurerPayments() {
                               )}
                             </td>
                             <td className="py-2 px-2 text-right">
-                              {surchargeInfo && surchargeInfo.appliedSurcharge ? (
+                              {payment.amount_modified ? (
+                                <div className="text-blue-600 font-semibold text-xs">
+                                  <p>✏️ Modificado</p>
+                                  <p>${payment.amount.toFixed(2)}</p>
+                                </div>
+                              ) : surchargeInfo && surchargeInfo.appliedSurcharge ? (
                                 <div className="text-red-600 font-semibold text-xs">
                                   <p>+${surchargeInfo.surcharge.toFixed(2)}</p>
-                                  <p>Total automático: ${surchargeInfo.totalAmount.toFixed(2)}</p>
-                                  {payment.amount !== surchargeInfo.totalAmount && (
-                                    <p className="text-blue-600">↳ Vos editaste: ${payment.amount.toFixed(2)}</p>
-                                  )}
+                                  <p>${surchargeInfo.totalAmount.toFixed(2)}</p>
                                 </div>
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-gray-400">Sin recargo</span>
                               )}
                             </td>
                             <td className="py-2 px-2 text-center">
@@ -723,11 +750,18 @@ function TreasurerPayments() {
                               p.increment_percentage
                             )
                           : null
-                      return surchargeInfo && surchargeInfo.appliedSurcharge
+                      return surchargeInfo && surchargeInfo.appliedSurcharge && !p.amount_modified
                     }) && (
                       <div className="text-xs text-red-600 pt-2 border-t">
                         <p className="font-semibold">
-                          Nota: Algunos pagos tienen incremento aplicado por pago tardío. Si editaste el monto, el resumen diario lo contabiliza editado.
+                          Nota: Algunos pagos tienen recargo automático por pago tardío.
+                        </p>
+                      </div>
+                    )}
+                    {selectedStudentData.payments.some((p) => p.amount_modified) && (
+                      <div className="text-xs text-blue-600 pt-2 border-t">
+                        <p className="font-semibold">
+                          ✏️ Algunos pagos fueron editados manualmente. El resumen diario contabiliza lo que editaste.
                         </p>
                       </div>
                     )}
@@ -753,13 +787,18 @@ function TreasurerPayments() {
             )}
           </li>
           <li>
-            • <strong>Incremento:</strong> Se aplica solo si se paga DESPUÉS del vencimiento ({paymentConfig?.increment_percentage}%)
+            • <strong>Recargo automático:</strong> Se aplica si paga después del vencimiento ({paymentConfig?.increment_percentage}%)
           </li>
           <li>
-            • <strong>Edición manual:</strong> Si editás el monto manualmente, el resumen diario contabiliza lo que vos escribiste (NO el automático)
+            • <strong>Modificado:</strong> Si editás el monto manualmente, se marca como "✏️ Modificado"
           </li>
           <li>
-            • <strong>Resumen diario:</strong> Suma p.amount de cada pago (sea automático con recargo o editado manualmente)
+            • <strong>Resumen diario contabiliza:</strong>
+            <ul className="ml-4 mt-1">
+              <li>✓ Base si pagó a tiempo (sin recargo)</li>
+              <li>✓ Base + recargo si pagó tardío (automático)</li>
+              <li>✓ Lo que editaste si modificaste manualmente</li>
+            </ul>
           </li>
         </ul>
       </div>
