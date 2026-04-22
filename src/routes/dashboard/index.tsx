@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState, memo } from 'react'
 import { ReinscriptionModal } from '@/components/ReinscriptionModal'
+import { useUserSession } from '@/hooks/useUserSession'
 import { supabase } from '@/lib/supabase'
 import { generateRegularCertificate } from '@/utils/generateRegularCertificate'
 import { 
@@ -151,6 +152,7 @@ const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: numbe
 })
 
 function DashboardPage() {
+  useUserSession() // Track user session
   const [student, setStudent] = useState<any>(null)
   const [showReinscriptionModal, setShowReinscriptionModal] = useState(false)
   const [rows, setRows] = useState<Row[]>([])

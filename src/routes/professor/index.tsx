@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useUserSession } from '@/hooks/useUserSession'
 import { BookOpen, Star, ClipboardCheck, Users, MessageCircle } from 'lucide-react'
 import { StatCard } from '@/components/StatCard'
 
@@ -9,6 +10,7 @@ export const Route = createFileRoute('/professor/')({
 })
 
 function ProfessorHome() {
+  useUserSession() // Track user session
   const [professorId, setProfessorId] = useState<string | null>(null)
   const [professorName, setProfessorName] = useState<string>('')
   const [subjectCount, setSubjectCount] = useState(0)
