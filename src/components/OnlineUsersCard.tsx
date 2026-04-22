@@ -16,15 +16,13 @@ export function OnlineUsersCard() {
 
   useEffect(() => {
     loadOnlineUsers()
-    const interval = setInterval(loadOnlineUsers, 5000) // Refresh every 5 seconds
+    const interval = setInterval(loadOnlineUsers, 5000)
     return () => clearInterval(interval)
   }, [])
 
   async function loadOnlineUsers() {
     try {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-
-      console.log('📊 Loading online users since:', fiveMinutesAgo)
 
       const { data, error } = await supabase
         .from('user_sessions')
@@ -33,11 +31,10 @@ export function OnlineUsersCard() {
         .order('last_seen', { ascending: false })
 
       if (error) {
-        console.error('❌ Error fetching user_sessions:', error)
+        console.error('Error fetching user_sessions:', error)
         return
       }
 
-      console.log('✅ Found users:', data?.length || 0, data)
       setOnlineUsers(data || [])
     } catch (err) {
       console.error('Error loading online users:', err)

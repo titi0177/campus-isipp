@@ -6,12 +6,7 @@ export function useUserSession() {
     const updateSession = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user?.id) {
-          console.log('❌ No user found')
-          return
-        }
-
-        console.log('👤 Updating session for user:', user.email)
+        if (!user?.id) return
 
         let userName = user.email?.split('@')[0] || 'User'
         let userRole = 'student'
@@ -33,7 +28,6 @@ export function useUserSession() {
             if (student && student.length > 0) {
               userName = `${student[0].first_name} ${student[0].last_name}`
               userRole = 'student'
-              console.log('✅ Found as student:', userName)
             }
           } else {
             const { count: profCount } = await supabase
@@ -51,25 +45,22 @@ export function useUserSession() {
               if (professor && professor.length > 0) {
                 userName = `${professor[0].first_name} ${professor[0].last_name}`
                 userRole = 'professor'
-                console.log('✅ Found as professor:', userName)
               }
             } else {
               userRole = 'admin'
-              console.log('✅ Determined as admin')
             }
           }
         } catch (err) {
           console.error('Error determining user role:', err)
         }
 
-        // First, try to delete any existing record for this user
+        // Delete old record and insert fresh
         await supabase
           .from('user_sessions')
           .delete()
           .eq('user_id', user.id)
 
-        // Then insert fresh
-        const { error: insertError, data: insertData } = await supabase
+        await supabase
           .from('user_sessions')
           .insert({
             user_id: user.id,
@@ -78,13 +69,6 @@ export function useUserSession() {
             user_email: user.email,
             last_seen: new Date().toISOString(),
           })
-          .select()
-
-        if (insertError) {
-          console.error('❌ Insert error:', insertError)
-        } else {
-          console.log('✅ Session inserted successfully:', insertData)
-        }
       } catch (err) {
         console.error('Error updating user session:', err)
       }
