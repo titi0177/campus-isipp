@@ -275,7 +275,9 @@ function TreasurerPayments() {
     : null
 
   // Calcular resumen diario
-  // ✅ CORRECCIÓN: Usa calculatePaymentWithSurcharge para contar el monto REAL (con recargo)
+  // ✅ CORRECCIÓN: Usa p.amount directamente
+  // - p.amount incluye recargos si aplican (automático)
+  // - p.amount respeta ediciones manuales (lo que vos escribiste)
   const calculateDailySummary = () => {
     const summary: Record<string, DailySummary> = {}
 
@@ -297,18 +299,10 @@ function TreasurerPayments() {
             summary[date].methods[method] = { count: 0, total: 0 }
           }
 
-          // Calcular el monto real (con incremento si aplica)
-          const surchargeInfo = calculatePaymentWithSurcharge(
-            p.base_amount,
-            p.due_date,
-            p.paid_at!,
-            p.increment_percentage
-          )
-          const realAmount = surchargeInfo.totalAmount
-
+          // ✅ Usa p.amount: lo que está en BD (sea automático con recargo o editado manualmente)
           summary[date].methods[method].count += 1
-          summary[date].methods[method].total += realAmount
-          summary[date].grandTotal += realAmount
+          summary[date].methods[method].total += p.amount
+          summary[date].grandTotal += p.amount
         })
     })
 
@@ -653,7 +647,10 @@ function TreasurerPayments() {
                               {surchargeInfo && surchargeInfo.appliedSurcharge ? (
                                 <div className="text-red-600 font-semibold text-xs">
                                   <p>+${surchargeInfo.surcharge.toFixed(2)}</p>
-                                  <p>Total: ${surchargeInfo.totalAmount.toFixed(2)}</p>
+                                  <p>Total automático: ${surchargeInfo.totalAmount.toFixed(2)}</p>
+                                  {payment.amount !== surchargeInfo.totalAmount && (
+                                    <p className="text-blue-600">↳ Vos editaste: ${payment.amount.toFixed(2)}</p>
+                                  )}
                                 </div>
                               ) : (
                                 <span className="text-gray-400">-</span>
@@ -730,7 +727,7 @@ function TreasurerPayments() {
                     }) && (
                       <div className="text-xs text-red-600 pt-2 border-t">
                         <p className="font-semibold">
-                          Nota: Algunos pagos tienen incremento aplicado por pago tardío
+                          Nota: Algunos pagos tienen incremento aplicado por pago tardío. Si editaste el monto, el resumen diario lo contabiliza editado.
                         </p>
                       </div>
                     )}
@@ -756,14 +753,13 @@ function TreasurerPayments() {
             )}
           </li>
           <li>
-            • <strong>Incremento:</strong> Se aplica solo si se paga DESPUÉS del vencimiento Y
-            después del primer día hábil a partir del 10 del mes ({paymentConfig?.increment_percentage}%)
+            • <strong>Incremento:</strong> Se aplica solo si se paga DESPUÉS del vencimiento ({paymentConfig?.increment_percentage}%)
           </li>
           <li>
-            • <strong>Exportar:</strong> Botón "Exportar Carrera" genera CSV detallado de todos los estudiantes. Botón "Descargar Pagos" para estudiante individual.
+            • <strong>Edición manual:</strong> Si editás el monto manualmente, el resumen diario contabiliza lo que vos escribiste (NO el automático)
           </li>
           <li>
-            • El <strong>resumen diario</strong> agrupa los pagos por fecha y método de pago (contabiliza el monto REAL pagado, con recargo si aplica)
+            • <strong>Resumen diario:</strong> Suma p.amount de cada pago (sea automático con recargo o editado manualmente)
           </li>
         </ul>
       </div>
