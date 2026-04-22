@@ -100,25 +100,18 @@ function EnrollSubjectsPage() {
         .select('subject_id, enrollment_grades(final_status), academic_year')
         .eq('student_id', studentData.id)
 
+      // Get current division from database
+      let currentDivision: string | null = null
       const firstYearEnrollments = currentYearEnrollments?.filter(e => {
         const year = (e as any).subject?.year
         return year === 1 && e.division
       })
 
       if (firstYearEnrollments && firstYearEnrollments.length > 0) {
-        const division = (firstYearEnrollments[0] as any).division
-        setEnrolledDivision(division)
+        currentDivision = (firstYearEnrollments[0] as any).division
+        setEnrolledDivision(currentDivision)
       } else {
-        // Check if this is first year in Tecnicatura en Analista en Sistemas
-        const { data: program } = await supabase
-          .from('programs')
-          .select('name')
-          .eq('id', studentData.program_id)
-          .single()
-        
-        if (program?.name.includes('Analista') && studentData.year === 1) {
-          setEnrolledDivision(null)
-        }
+        setEnrolledDivision(null)
       }
 
       const enrolledThisYearByAnyYear = new Map<number, boolean>()
@@ -165,17 +158,17 @@ function EnrollSubjectsPage() {
       
       const isAnalystProgram = program?.name.includes('Analista')
       const isFirstYear = studentData.year === 1
-      const shouldFilterByDivision = isAnalystProgram && isFirstYear && enrolledDivision
+      const shouldFilterByDivision = isAnalystProgram && isFirstYear && currentDivision
 
       // Agrupar materias por nombre base (sin división)
       const subjectsByBase = new Map<string, any[]>()
       for (const subject of allSubjects) {
-        // Filtrar por división si es necesario
-        if (shouldFilterByDivision && subject.year === 1 && subject.division !== enrolledDivision) {
+        // Filtrar por división si es necesario - USE currentDivision (from DB)
+        if (shouldFilterByDivision && subject.year === 1 && subject.division !== currentDivision) {
           continue
         }
         
-        const baseKey = enrolledDivision ? subject.id : `${subject.name}_${subject.code}`
+        const baseKey = currentDivision ? subject.id : `${subject.name}_${subject.code}`
         if (!subjectsByBase.has(baseKey)) {
           subjectsByBase.set(baseKey, [])
         }
@@ -313,24 +306,30 @@ function EnrollSubjectsPage() {
   async function enrollSubject(subjectId: string, division: string | null) {
     if (!student) return
 
-    const { error } = await supabase
-      .from('enrollments')
-      .insert({
-        student_id: student.id,
-        subject_id: subjectId,
-        academic_year: currentYear,
-        division: division,
-        status: 'active',
-      })
+    try {
+      const { error } = await supabase
+        .from('enrollments')
+        .insert({
+          student_id: student.id,
+          subject_id: subjectId,
+          academic_year: currentYear,
+          division: division,
+          status: 'active',
+        })
 
-    if (error) {
-      showToast('Error al inscribirse: ' + error.message, 'error')
-      return
+      if (error) {
+        showToast('Error al inscribirse: ' + error.message, 'error')
+        return
+      }
+
+      showToast('Inscripción completada')
+      setDivisionModal(null)
+      
+      // Reload data to get fresh DB state
+      void loadData()
+    } catch (err) {
+      showToast('Error inesperado: ' + String(err), 'error')
     }
-
-    showToast('Inscripción completada')
-    setDivisionModal(null)
-    void loadData()
   }
 
   function handleEnrollClick(subject: SubjectWithStatus) {
@@ -389,7 +388,7 @@ function EnrollSubjectsPage() {
             <div>
               <h3 className="font-semibold text-yellow-900">✨ Estado Especial: Alumno Avanzado</h3>
               <p className="text-sm text-yellow-800 mt-1">
-                ¡Excelente desempeño! Has aprobado todas las materias del primer año el{' '}
+                Has aprobado todas las materias del primer año el{' '}
                 <strong>{new Date(advancedExceptionDate).toLocaleDateString('es-AR')}</strong>.
               </p>
               <p className="text-sm text-yellow-800 mt-1">
@@ -556,6 +555,3 @@ function EnrollSubjectsPage() {
     </div>
   )
 }
-
-
-
