@@ -275,6 +275,7 @@ function TreasurerPayments() {
     : null
 
   // Calcular resumen diario
+  // ✅ CORRECCIÓN: Usa calculatePaymentWithSurcharge para contar el monto REAL (con recargo)
   const calculateDailySummary = () => {
     const summary: Record<string, DailySummary> = {}
 
@@ -296,9 +297,18 @@ function TreasurerPayments() {
             summary[date].methods[method] = { count: 0, total: 0 }
           }
 
+          // Calcular el monto real (con incremento si aplica)
+          const surchargeInfo = calculatePaymentWithSurcharge(
+            p.base_amount,
+            p.due_date,
+            p.paid_at!,
+            p.increment_percentage
+          )
+          const realAmount = surchargeInfo.totalAmount
+
           summary[date].methods[method].count += 1
-          summary[date].methods[method].total += p.base_amount
-          summary[date].grandTotal += p.base_amount
+          summary[date].methods[method].total += realAmount
+          summary[date].grandTotal += realAmount
         })
     })
 
@@ -753,7 +763,7 @@ function TreasurerPayments() {
             • <strong>Exportar:</strong> Botón "Exportar Carrera" genera CSV detallado de todos los estudiantes. Botón "Descargar Pagos" para estudiante individual.
           </li>
           <li>
-            • El <strong>resumen diario</strong> agrupa los pagos por fecha y método de pago
+            • El <strong>resumen diario</strong> agrupa los pagos por fecha y método de pago (contabiliza el monto REAL pagado, con recargo si aplica)
           </li>
         </ul>
       </div>
