@@ -158,17 +158,14 @@ function EnrollSubjectsPage() {
       
       const isAnalystProgram = program?.name.includes('Analista')
       const isFirstYear = studentData.year === 1
-      const shouldFilterByDivision = isAnalystProgram && isFirstYear && currentDivision
 
-      // Agrupar materias por nombre base (sin división)
+      // Agrupar materias - NO FILTRAR POR DIVISIÓN EN CARGA INICIAL
+      // Mostrar todas hasta que división esté confirmada
       const subjectsByBase = new Map<string, any[]>()
       for (const subject of allSubjects) {
-        // Filtrar por división si es necesario - USE currentDivision (from DB)
-        if (shouldFilterByDivision && subject.year === 1 && subject.division !== currentDivision) {
-          continue
-        }
-        
-        const baseKey = currentDivision ? subject.id : `${subject.name}_${subject.code}`
+        // Don't filter by division here - let user see all first year subjects
+        // until they choose one
+        const baseKey = `${subject.name}_${subject.code}`
         if (!subjectsByBase.has(baseKey)) {
           subjectsByBase.set(baseKey, [])
         }
@@ -342,7 +339,7 @@ function EnrollSubjectsPage() {
       })
     } else {
       // Inscribir con la división ya seleccionada o sin división
-      enrollSubject(subject.id, enrolledDivision || null)
+      void enrollSubject(subject.id, enrolledDivision || null)
     }
   }
 
@@ -351,7 +348,10 @@ function EnrollSubjectsPage() {
   }
 
   const filteredSubjects = availableSubjects.filter(subject => {
-    // Siempre mostrar todas las materias del año actual
+    // Si tiene división seleccionada y es de primer año, filtrar por esa división
+    if (enrolledDivision && subject.year === 1 && subject.division !== enrolledDivision) {
+      return false
+    }
     return true
   })
 
@@ -520,13 +520,13 @@ function EnrollSubjectsPage() {
 
             <div className="space-y-3">
               <button
-                onClick={() => enrollSubject(divisionModal.subjectId, 'A')}
+                onClick={() => void enrollSubject(divisionModal.subjectId, 'A')}
                 className="w-full p-4 border-2 border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-lg font-semibold text-blue-900 transition-colors"
               >
                 División A
               </button>
               <button
-                onClick={() => enrollSubject(divisionModal.subjectId, 'B')}
+                onClick={() => void enrollSubject(divisionModal.subjectId, 'B')}
                 className="w-full p-4 border-2 border-indigo-300 bg-indigo-50 hover:bg-indigo-100 rounded-lg font-semibold text-indigo-900 transition-colors"
               >
                 División B
