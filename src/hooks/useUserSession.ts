@@ -6,13 +6,17 @@ export function useUserSession() {
     const updateSession = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user?.id) return
+        if (!user?.id) {
+          console.log('❌ No user found')
+          return
+        }
+
+        console.log('👤 Updating session for user:', user.email)
 
         let userName = user.email?.split('@')[0] || 'User'
         let userRole = 'student'
 
         // Determinar rol basándose en si existe en la tabla students o professors
-        // Usar una consulta simple sin filtros complejos
         try {
           const { count: studentCount } = await supabase
             .from('students')
@@ -29,6 +33,7 @@ export function useUserSession() {
             if (student && student.length > 0) {
               userName = `${student[0].first_name} ${student[0].last_name}`
               userRole = 'student'
+              console.log('✅ Found as student:', userName)
             }
           } else {
             const { count: profCount } = await supabase
@@ -46,9 +51,11 @@ export function useUserSession() {
               if (professor && professor.length > 0) {
                 userName = `${professor[0].first_name} ${professor[0].last_name}`
                 userRole = 'professor'
+                console.log('✅ Found as professor:', userName)
               }
             } else {
               userRole = 'admin'
+              console.log('✅ Determined as admin')
             }
           }
         } catch (err) {
@@ -56,7 +63,7 @@ export function useUserSession() {
         }
 
         // Simple update approach - just update, don't try to insert
-        const { error } = await supabase
+        const { error: updateError, data: updateData } = await supabase
           .from('user_sessions')
           .update({
             user_name: userName,
@@ -65,11 +72,13 @@ export function useUserSession() {
             last_seen: new Date().toISOString(),
           })
           .eq('user_id', user.id)
+          .select()
 
-        // If update didn't find a record, insert
-        if (error || !user.id) {
+        if (updateError) {
+          console.log('⚠️ Update failed, trying insert:', updateError.message)
+          // If update didn't find a record, insert
           try {
-            await supabase
+            const { error: insertError, data: insertData } = await supabase
               .from('user_sessions')
               .insert({
                 user_id: user.id,
@@ -78,9 +87,18 @@ export function useUserSession() {
                 user_email: user.email,
                 last_seen: new Date().toISOString(),
               })
+              .select()
+
+            if (insertError) {
+              console.error('❌ Insert error:', insertError)
+            } else {
+              console.log('✅ Session inserted successfully')
+            }
           } catch (insertErr) {
-            console.error('Error inserting session:', insertErr)
+            console.error('❌ Error inserting session:', insertErr)
           }
+        } else {
+          console.log('✅ Session updated successfully')
         }
       } catch (err) {
         console.error('Error updating user session:', err)
