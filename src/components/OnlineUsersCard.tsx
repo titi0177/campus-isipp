@@ -16,7 +16,7 @@ export function OnlineUsersCard() {
 
   useEffect(() => {
     loadOnlineUsers()
-    const interval = setInterval(loadOnlineUsers, 10000) // Refresh every 10 seconds
+    const interval = setInterval(loadOnlineUsers, 5000) // Refresh every 5 seconds
     return () => clearInterval(interval)
   }, [])
 
@@ -24,12 +24,20 @@ export function OnlineUsersCard() {
     try {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
 
-      const { data } = await supabase
+      console.log('📊 Loading online users since:', fiveMinutesAgo)
+
+      const { data, error } = await supabase
         .from('user_sessions')
         .select('user_id, user_name, user_role, user_email, last_seen')
         .gt('last_seen', fiveMinutesAgo)
         .order('last_seen', { ascending: false })
 
+      if (error) {
+        console.error('❌ Error fetching user_sessions:', error)
+        return
+      }
+
+      console.log('✅ Found users:', data?.length || 0, data)
       setOnlineUsers(data || [])
     } catch (err) {
       console.error('Error loading online users:', err)
@@ -116,7 +124,7 @@ export function OnlineUsersCard() {
       )}
 
       <div className="text-xs text-slate-500 mt-4 text-center border-t pt-3">
-        Se actualiza cada 10 segundos • Activos en últimos 5 minutos
+        Se actualiza cada 5 segundos • Activos en últimos 5 minutos
       </div>
     </div>
   )
