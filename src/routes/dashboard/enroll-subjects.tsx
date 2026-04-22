@@ -85,9 +85,6 @@ function EnrollSubjectsPage() {
         return
       }
 
-      console.log('🔵 allSubjects count:', allSubjects.length)
-      console.log('🔵 allSubjects sample:', allSubjects.slice(0, 3))
-
       const subjectNameMap = new Map(
         allSubjects.map((s: any) => [s.id, s.name])
       )
@@ -103,9 +100,6 @@ function EnrollSubjectsPage() {
         .select('subject_id, enrollment_grades(final_status), academic_year')
         .eq('student_id', studentData.id)
 
-      console.log('🔵 currentYearEnrollments:', currentYearEnrollments)
-      console.log('🔵 allEnrollments:', allEnrollments)
-
       // Get current division from database
       let currentDivision: string | null = null
       const firstYearEnrollments = currentYearEnrollments?.filter(e => {
@@ -116,10 +110,8 @@ function EnrollSubjectsPage() {
       if (firstYearEnrollments && firstYearEnrollments.length > 0) {
         currentDivision = (firstYearEnrollments[0] as any).division
         setEnrolledDivision(currentDivision)
-        console.log('🔵 currentDivision from DB:', currentDivision)
       } else {
         setEnrolledDivision(null)
-        console.log('🔵 No currentDivision found')
       }
 
       const enrolledThisYearByAnyYear = new Map<number, boolean>()
@@ -288,11 +280,8 @@ function EnrollSubjectsPage() {
 
       console.log('🔵 processed count BEFORE sort:', processed.length)
       processed.sort((a, b) => a.year - b.year)
-      console.log('🔵 processed count AFTER sort:', processed.length)
-      console.log('🔵 processed sample:', processed.slice(0, 3))
 
       setAvailableSubjects(processed)
-      console.log('🔵 setAvailableSubjects called with:', processed.length, 'items')
 
     } catch (err) {
       console.error('Error loading:', err)
@@ -306,7 +295,6 @@ function EnrollSubjectsPage() {
     if (!student) return
 
     try {
-      console.log('📝 enrollSubject called:', { subjectId, division })
       const { error } = await supabase
         .from('enrollments')
         .insert({
@@ -318,28 +306,23 @@ function EnrollSubjectsPage() {
         })
 
       if (error) {
-        console.error('📝 Insert error:', error)
         showToast('Error al inscribirse: ' + error.message, 'error')
         return
       }
 
-      console.log('📝 Insert success, calling loadData')
       showToast('Inscripción completada')
       setDivisionModal(null)
       
       // Reload data to get fresh DB state
       void loadData()
     } catch (err) {
-      console.error('📝 enrollSubject exception:', err)
       showToast('Error inesperado: ' + String(err), 'error')
     }
   }
 
   function handleEnrollClick(subject: SubjectWithStatus) {
-    console.log('🔘 handleEnrollClick:', { subject: subject.name, year: subject.year, enrolledDivision })
     // Mostrar modal de división solo para primer año
     if (subject.year === 1 && !enrolledDivision) {
-      console.log('🔘 Showing division modal')
       setDivisionModal({
         subjectId: subject.id,
         subjectName: subject.name,
@@ -347,7 +330,6 @@ function EnrollSubjectsPage() {
       })
     } else {
       // Inscribir con la división ya seleccionada o sin división
-      console.log('🔘 Calling enrollSubject directly')
       void enrollSubject(subject.id, enrolledDivision || null)
     }
   }
@@ -356,20 +338,14 @@ function EnrollSubjectsPage() {
     return <p className="text-slate-600">Cargando materias...</p>
   }
 
-  console.log('🟢 RENDER - availableSubjects count:', availableSubjects.length)
-  console.log('🟢 RENDER - enrolledDivision:', enrolledDivision)
-
   const filteredSubjects = availableSubjects.filter(subject => {
     // Si tiene división seleccionada y es de primer año, filtrar por esa división
     // PERO: si la materia NO tiene división (null), siempre mostrarla
     if (enrolledDivision && subject.year === 1 && subject.division !== null && subject.division !== enrolledDivision) {
-      console.log('🟢 FILTERING OUT:', subject.code, subject.division, '!==', enrolledDivision)
       return false
     }
     return true
   })
-
-  console.log('🟢 RENDER - filteredSubjects count:', filteredSubjects.length)
 
   const enrolledCount = filteredSubjects.filter(s => s.isEnrolled).length
   const availableCount = filteredSubjects.filter(s => s.canEnroll && !s.isEnrolled).length
