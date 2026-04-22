@@ -91,7 +91,7 @@ function EnrollSubjectsPage() {
 
       const { data: currentYearEnrollments } = await supabase
         .from('enrollments')
-        .select('subject_id, division, enrollment_grades(final_status), academic_year, subject:subjects(year)')
+        .select('subject_id, division, enrollment_grades(final_status), academic_year, subject:subjects(id, year, name, code)')
         .eq('student_id', studentData.id)
         .eq('academic_year', currentYear)
 
@@ -556,3 +556,4 @@ function EnrollSubjectsPage() {
     </div>
   )
 }
+
