@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Edit2, Save, X, Download, BarChart3, FileDown } from 'lucide-react'
+import { Edit2, Save, X, Download, BarChart3, FileDown, RotateCcw } from 'lucide-react'
 import { calculatePaymentWithSurcharge, formatDateES } from '@/lib/paymentUtils'
 import { exportPaymentsToCSV, exportStudentPaymentsToCSV } from '@/lib/exportPaymentsUtil'
 
@@ -24,6 +24,7 @@ interface Payment {
   student_name: string
   increment_percentage: number
   amount_modified: boolean
+  original_amount: number | null
 }
 
 interface Student {
@@ -182,6 +183,7 @@ function TreasurerPayments() {
             student_name: `${student.first_name} ${student.last_name}`,
             increment_percentage: configData?.increment_percentage || 15,
             amount_modified: p.amount_modified || false,
+            original_amount: p.original_amount || null,
           }
         })
 
@@ -223,6 +225,11 @@ function TreasurerPayments() {
         amount_modified: amountChanged ? true : currentPayment?.amount_modified || false,
       }
 
+      // Si es la primera vez que se modifica, guardar el monto original
+      if (amountChanged && !currentPayment?.original_amount) {
+        updateData.original_amount = currentPayment?.amount
+      }
+
       if (newStatus === 'pagado') {
         updateData.paid_at = new Date().toISOString()
       } else {
@@ -251,6 +258,7 @@ function TreasurerPayments() {
                   payment_method: newPaymentMethod,
                   paid_at: newStatus === 'pagado' ? new Date().toISOString() : null,
                   amount_modified: amountChanged ? true : p.amount_modified,
+                  original_amount: amountChanged && !p.original_amount ? p.amount : p.original_amount,
                 }
               : p
           ),
@@ -258,6 +266,49 @@ function TreasurerPayments() {
       )
 
       setEditingId(null)
+    } catch (err) {
+      console.error('Error:', err)
+    }
+  }
+
+  async function restorePaymentAmount(paymentId: string) {
+    try {
+      const currentPayment = students
+        .flatMap(s => s.payments)
+        .find(p => p.id === paymentId)
+
+      if (!currentPayment?.original_amount) {
+        alert('No hay monto original para restaurar')
+        return
+      }
+
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          amount: currentPayment.original_amount,
+          amount_modified: false,
+        })
+        .eq('id', paymentId)
+
+      if (error) {
+        console.error('Error restoring payment:', error)
+        return
+      }
+
+      setStudents((prev) =>
+        prev.map((student) => ({
+          ...student,
+          payments: student.payments.map((p) =>
+            p.id === paymentId
+              ? {
+                  ...p,
+                  amount: currentPayment.original_amount!,
+                  amount_modified: false,
+                }
+              : p
+          ),
+        }))
+      )
     } catch (err) {
       console.error('Error:', err)
     }
@@ -673,6 +724,11 @@ function TreasurerPayments() {
                                 <div className="text-blue-600 font-semibold text-xs">
                                   <p>✏️ Modificado</p>
                                   <p>${payment.amount.toFixed(2)}</p>
+                                  {payment.original_amount && (
+                                    <p className="text-gray-500 text-[10px] mt-1">
+                                      (Era: ${payment.original_amount.toFixed(2)})
+                                    </p>
+                                  )}
                                 </div>
                               ) : surchargeInfo && surchargeInfo.appliedSurcharge ? (
                                 <div className="text-red-600 font-semibold text-xs">
@@ -709,18 +765,29 @@ function TreasurerPayments() {
                                   </button>
                                 </div>
                               ) : (
-                                <button
-                                  onClick={() => {
-                                    setEditingId(payment.id)
-                                    setEditAmount(payment.amount)
-                                    setEditStatus(payment.status)
-                                    setEditPaymentMethod(payment.payment_method || 'efectivo')
-                                  }}
-                                  className="text-blue-600 hover:text-blue-800"
-                                  title="Editar"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
+                                <div className="flex gap-2 justify-center">
+                                  <button
+                                    onClick={() => {
+                                      setEditingId(payment.id)
+                                      setEditAmount(payment.amount)
+                                      setEditStatus(payment.status)
+                                      setEditPaymentMethod(payment.payment_method || 'efectivo')
+                                    }}
+                                    className="text-blue-600 hover:text-blue-800"
+                                    title="Editar"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  {payment.amount_modified && payment.original_amount && (
+                                    <button
+                                      onClick={() => restorePaymentAmount(payment.id)}
+                                      className="text-orange-600 hover:text-orange-800"
+                                      title="Restaurar monto original"
+                                    >
+                                      <RotateCcw size={16} />
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -761,7 +828,7 @@ function TreasurerPayments() {
                     {selectedStudentData.payments.some((p) => p.amount_modified) && (
                       <div className="text-xs text-blue-600 pt-2 border-t">
                         <p className="font-semibold">
-                          ✏️ Algunos pagos fueron editados manualmente. El resumen diario contabiliza lo que editaste.
+                          ✏️ Algunos pagos fueron editados manualmente. Click en ↻ para restaurar el monto original.
                         </p>
                       </div>
                     )}
@@ -790,7 +857,10 @@ function TreasurerPayments() {
             • <strong>Recargo automático:</strong> Se aplica si paga después del vencimiento ({paymentConfig?.increment_percentage}%)
           </li>
           <li>
-            • <strong>Modificado:</strong> Si editás el monto manualmente, se marca como "✏️ Modificado"
+            • <strong>Modificado (✏️):</strong> Si editás el monto manualmente. Muestra monto actual y lo que era
+          </li>
+          <li>
+            • <strong>Restaurar (↻):</strong> Vuelve al monto original/automático. Solo visible si fue modificado
           </li>
           <li>
             • <strong>Resumen diario contabiliza:</strong>
