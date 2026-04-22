@@ -12,38 +12,57 @@ export function useUserSession() {
         let userName = user.email?.split('@')[0] || 'User'
         let userRole = 'student'
 
-        const { data: student } = await supabase
+        // Check if student
+        const { data: student, error: studentError } = await supabase
           .from('students')
           .select('first_name, last_name')
           .eq('user_id', user.id)
           .maybeSingle()
 
-        if (student) {
+        if (student && !studentError) {
           userName = `${student.first_name} ${student.last_name}`
+          userRole = 'student'
         } else {
-          const { data: professor } = await supabase
+          // Check if professor
+          const { data: professor, error: professorError } = await supabase
             .from('professors')
             .select('first_name, last_name')
             .eq('user_id', user.id)
             .maybeSingle()
 
-          if (professor) {
+          if (professor && !professorError) {
             userName = `${professor.first_name} ${professor.last_name}`
             userRole = 'professor'
+          } else {
+            userRole = 'admin'
           }
         }
 
-        // Upsert session
-        await supabase.from('user_sessions').upsert(
-          {
+        // Insert or update session (use insert with do nothing on conflict for simpler RLS)
+        const { error } = await supabase
+          .from('user_sessions')
+          .insert({
             user_id: user.id,
             user_name: userName,
             user_role: userRole,
             user_email: user.email,
             last_seen: new Date().toISOString(),
-          },
-          { onConflict: 'user_id' }
-        )
+          }, { 
+            ignoreDuplicates: false // Allow upsert
+          })
+          .select()
+
+        // If insert fails due to duplicate, try update
+        if (error && error.code === 'PGRST116') {
+          await supabase
+            .from('user_sessions')
+            .update({
+              user_name: userName,
+              user_role: userRole,
+              last_seen: new Date().toISOString(),
+            })
+            .eq('user_id', user.id)
+        }
       } catch (err) {
         console.error('Error updating user session:', err)
       }
