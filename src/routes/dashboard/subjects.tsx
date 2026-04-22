@@ -118,14 +118,14 @@ function SubjectsPage() {
           .from('enrollment_grades')
           .select('id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, final_grade, partial_status, final_status')
           .eq('enrollment_id', enr.id)
-          .single()
+          .maybeSingle()
 
         // Obtener attendance
         const { data: attData } = await supabase
           .from('attendance')
           .select('percentage')
           .eq('enrollment_id', enr.id)
-          .single()
+          .maybeSingle()
 
         // Obtener profesor
         let professor: any = undefined
