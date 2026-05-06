@@ -188,6 +188,10 @@ function LoginPage() {
           data: {
             first_name: registerData.firstName,
             last_name: registerData.lastName,
+            program_id: registerData.programId,
+            legajo: registerData.legajo,
+            dni: registerData.dni,
+            year: registerData.year,
           },
         },
       })

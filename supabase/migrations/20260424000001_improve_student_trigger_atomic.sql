@@ -11,11 +11,13 @@ DECLARE
   v_program_id UUID;
   v_legajo TEXT;
   v_dni TEXT;
+  v_year INTEGER;
 BEGIN
   -- Extraer valores de metadatos
   v_program_id := (NEW.raw_user_meta_data->>'program_id')::UUID;
   v_legajo := NEW.raw_user_meta_data->>'legajo';
   v_dni := NEW.raw_user_meta_data->>'dni';
+  v_year := COALESCE((NEW.raw_user_meta_data->>'year')::INTEGER, 1);
   
   -- ✅ VALIDAR: Legajo duplicado
   IF v_legajo IS NOT NULL AND v_legajo != '' THEN
@@ -57,7 +59,7 @@ BEGIN
     v_legajo,
     v_program_id,
     'active',
-    1
+    v_year
   );
   
   RETURN NEW;
