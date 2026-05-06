@@ -321,55 +321,96 @@ function LoginPage() {
 
       // Inscripciones automáticas según año
       const selectedYear = parseInt(registerData.year)
+      const currentAcademicYear = new Date().getFullYear()
 
       if (selectedYear === 1) {
         console.log('✅ Alumno de 1° año - sin inscripciones automáticas')
       } else if (selectedYear === 2) {
-        const { data: subjectsYear1 } = await supabase
+        console.log('⏳ Iniciando inscripción automática para 2° año...')
+        const { data: subjectsYear1, error: subjectsError } = await supabase
           .from('subjects')
-          .select('id')
+          .select('id, name')
           .eq('program_id', registerData.programId)
           .eq('year', 1)
 
-        if (subjectsYear1 && subjectsYear1.length > 0) {
+        if (subjectsError) {
+          console.error('❌ Error al consultar materias de 1° año:', subjectsError)
+          setError('Advertencia: No se pudieron inscribir automáticamente en algunas materias. Por favor inscríbete manualmente.')
+        } else if (!subjectsYear1 || subjectsYear1.length === 0) {
+          console.log('⚠️ No hay materias de 1° año disponibles para inscribir')
+        } else {
+          console.log(`📚 Encontradas ${subjectsYear1.length} materias de 1° año`)
+          
           const enrollments = subjectsYear1.map(subject => ({
             student_id: insertedStudent.id,
             subject_id: subject.id,
-            academic_year: new Date().getFullYear(),
+            academic_year: currentAcademicYear,
+            status: 'active',
+            attempt_number: 1,
           }))
 
-          const { error: enrollError } = await supabase
+          const { error: enrollError, data: enrollData } = await supabase
             .from('enrollments')
             .insert(enrollments)
+            .select('id')
 
           if (enrollError) {
             console.error('❌ Error en inscripción de 1° año:', enrollError)
-          } else {
-            console.log('✅ Alumno inscrito en todas las materias de 1° año')
+            console.error('Detalles:', {
+              code: enrollError.code,
+              message: enrollError.message,
+              details: enrollError.details,
+            })
+            // No bloquear el registro, pero advertir al usuario
+            if (!error) {
+              setSuccess('Cuenta creada. Nota: Hubo un problema con la inscripción automática. Por favor completa manualmente.')
+            }
+          } else if (enrollData && enrollData.length > 0) {
+            console.log(`✅ Alumno inscrito en ${enrollData.length} materias de 1° año`)
           }
         }
       } else if (selectedYear === 3) {
-        const { data: subjectsYear1And2 } = await supabase
+        console.log('⏳ Iniciando inscripción automática para 3° año...')
+        const { data: subjectsYear1And2, error: subjectsError } = await supabase
           .from('subjects')
-          .select('id')
+          .select('id, name, year')
           .eq('program_id', registerData.programId)
           .in('year', [1, 2])
 
-        if (subjectsYear1And2 && subjectsYear1And2.length > 0) {
+        if (subjectsError) {
+          console.error('❌ Error al consultar materias de 1° y 2° año:', subjectsError)
+          setError('Advertencia: No se pudieron inscribir automáticamente en algunas materias. Por favor inscríbete manualmente.')
+        } else if (!subjectsYear1And2 || subjectsYear1And2.length === 0) {
+          console.log('⚠️ No hay materias de 1° y 2° año disponibles para inscribir')
+        } else {
+          console.log(`📚 Encontradas ${subjectsYear1And2.length} materias de 1° y 2° año`)
+          
           const enrollments = subjectsYear1And2.map(subject => ({
             student_id: insertedStudent.id,
             subject_id: subject.id,
-            academic_year: new Date().getFullYear(),
+            academic_year: currentAcademicYear,
+            status: 'active',
+            attempt_number: 1,
           }))
 
-          const { error: enrollError } = await supabase
+          const { error: enrollError, data: enrollData } = await supabase
             .from('enrollments')
             .insert(enrollments)
+            .select('id')
 
           if (enrollError) {
             console.error('❌ Error en inscripción de 1° y 2° año:', enrollError)
-          } else {
-            console.log('✅ Alumno inscrito en todas las materias de 1° y 2° año')
+            console.error('Detalles:', {
+              code: enrollError.code,
+              message: enrollError.message,
+              details: enrollError.details,
+            })
+            // No bloquear el registro, pero advertir al usuario
+            if (!error) {
+              setSuccess('Cuenta creada. Nota: Hubo un problema con la inscripción automática. Por favor completa manualmente.')
+            }
+          } else if (enrollData && enrollData.length > 0) {
+            console.log(`✅ Alumno inscrito en ${enrollData.length} materias de 1° y 2° año`)
           }
         }
       }

@@ -5,6 +5,7 @@ import { useUserSession } from '@/hooks/useUserSession'
 import { getUserRole, canAccessAdmin } from '@/lib/permissions'
 import { StatCard } from '@/components/StatCard'
 import { OnlineUsersCard } from '@/components/OnlineUsersCard'
+import { EnrollmentAutoEnrollPanel } from '@/components/admin/EnrollmentAutoEnrollPanel'
 import { Users, BookOpen, GraduationCap, UserCheck, TrendingUp, Award, AlertCircle } from 'lucide-react'
 import { Bar, Doughnut } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js'
@@ -192,6 +193,10 @@ function AdminDashboard() {
           <h2 className="text-lg font-bold text-slate-900 mb-4">Estado Académico</h2>
           {statusData ? <Doughnut data={statusData} /> : <p className="text-slate-400">Sin datos</p>}
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        <EnrollmentAutoEnrollPanel />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
