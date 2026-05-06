@@ -154,30 +154,6 @@ function LoginPage() {
 
     setLoading(true)
 
-    // ✅ VALIDACIÓN PREVIA: Verificar legajo y DNI duplicados ANTES de registrarse
-    try {
-      const { data: validation, error: validationError } = await supabase.rpc('check_duplicate_legajo_dni', {
-        p_legajo: registerData.legajo.trim(),
-        p_dni: registerData.dni.trim(),
-      })
-
-      if (validationError) {
-        console.error('Error validating duplicates:', validationError)
-        setError('Error al validar datos. Por favor intenta de nuevo.')
-        setLoading(false)
-        return
-      }
-
-      if (validation && validation.length > 0 && validation[0].is_duplicate) {
-        setError(validation[0].error_message || 'Este dato ya está registrado en el sistema.')
-        setLoading(false)
-        return
-      }
-    } catch (err) {
-      console.error('Validation check error:', err)
-      // No bloquear si falla la validación previa
-    }
-
     try {
       await new Promise(resolve => setTimeout(resolve, 500))
 
@@ -197,10 +173,6 @@ function LoginPage() {
           setError('Este correo ya está registrado. Por favor inicia sesión.')
           setMode('login')
           setLoginData({ email: registerData.email, password: '' })
-        } else if (authError.message.includes('El legajo') && authError.message.includes('ya está registrado')) {
-          setError('El legajo ya está registrado en el sistema.')
-        } else if (authError.message.includes('El DNI') && authError.message.includes('ya está registrado')) {
-          setError('El DNI ya está registrado en el sistema.')
         } else if (authError.message.includes('rate')) {
           setError('Demasiados intentos. Por favor espera 1 minuto y vuelve a intentar.')
         } else if (authError.message.includes('Invalid email')) {
@@ -255,53 +227,43 @@ function LoginPage() {
         .single()
 
       if (insertError) {
-        // Si el error es de duplicado (UNIQUE constraint)
+        // Si el error es de duplicado, esperar y buscar
         if (insertError.code === '23505') {
-          // Mejorado: Distinguir entre legajo duplicado y DNI duplicado
-          if (insertError.message.includes('legajo')) {
-            setError('El legajo ya está registrado en el sistema.')
-          } else if (insertError.message.includes('dni')) {
-            setError('El DNI ya está registrado en el sistema.')
-          } else if (insertError.message.includes('email')) {
-            setError('El correo electrónico ya está registrado en el sistema.')
-          } else {
-            // Si fue creado por trigger (caso esperado: el usuario se está registrando por primera vez)
-            console.log('⏳ Estudiante creado por trigger, esperando y recuperando...')
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            
-            const { data: existingStudent, error: selectError } = await supabase
-              .from('students')
-              .select('id')
-              .eq('user_id', authData.user.id)
-              .single()
-            
-            if (selectError || !existingStudent) {
-              console.error('❌ No se pudo recuperar estudiante:', selectError)
-              setError('Error al obtener registro de estudiante')
-              setLoading(false)
-              return
-            }
-            
-            // Actualizar con los datos correctos
-            const { error: updateError } = await supabase
-              .from('students')
-              .update({
-                program_id: registerData.programId,
-                dni: registerData.dni,
-                legajo: registerData.legajo,
-                year: parseInt(registerData.year),
-              })
-              .eq('id', existingStudent.id)
-            
-            if (updateError) {
-              console.error('❌ Error updating student:', updateError)
-              setError('Error al actualizar estudiante')
-              setLoading(false)
-              return
-            }
-            
-            insertedStudent.id = existingStudent.id
+          console.log('⏳ Estudiante ya existe (creado por trigger), esperando y recuperando...')
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          const { data: existingStudent, error: selectError } = await supabase
+            .from('students')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+          
+          if (selectError || !existingStudent) {
+            console.error('❌ No se pudo recuperar estudiante:', selectError)
+            setError('Error al obtener registro de estudiante')
+            setLoading(false)
+            return
           }
+          
+          // Actualizar con los datos correctos
+          const { error: updateError } = await supabase
+            .from('students')
+            .update({
+              program_id: registerData.programId,
+              dni: registerData.dni,
+              legajo: registerData.legajo,
+              year: parseInt(registerData.year),
+            })
+            .eq('id', existingStudent.id)
+          
+          if (updateError) {
+            console.error('❌ Error updating student:', updateError)
+            setError('Error al actualizar estudiante')
+            setLoading(false)
+            return
+          }
+          
+          insertedStudent.id = existingStudent.id
         } else {
           console.error('❌ Student insertion error:', insertError)
           setError('Error al crear estudiante: ' + insertError.message)
