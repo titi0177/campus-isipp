@@ -239,101 +239,26 @@ function LoginPage() {
         console.error('❌ Profile creation error:', profileError)
       }
 
-      // INSERTAR estudiante (esto es lo que dispara el trigger de pagos)
-      const studentPayload = {
-        user_id: authData.user.id,
-        first_name: registerData.firstName,
-        last_name: registerData.lastName,
-        email: registerData.email.trim().toLowerCase(),
-        dni: registerData.dni,
-        legajo: registerData.legajo,
-        program_id: registerData.programId,
-        year: parseInt(registerData.year),
-        status: 'active',
-      }
-
-      const { data: insertedStudent, error: insertError } = await supabase
+      // El trigger automáticamente creará el estudiante en students table
+      // Solo necesitamos esperar y recuperarlo
+      console.log('⏳ Esperando que el trigger cree el estudiante...')
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      const { data: studentRecord, error: studentError } = await supabase
         .from('students')
-        .insert([studentPayload])
         .select('id')
+        .eq('user_id', authData.user.id)
         .single()
 
-      if (insertError) {
-        // Si el error es de duplicado (UNIQUE constraint)
-        if (insertError.code === '23505') {
-          // Mejorado: Distinguir entre legajo duplicado y DNI duplicado
-          if (insertError.message.includes('legajo')) {
-            setError('El legajo ya está registrado en el sistema.')
-          } else if (insertError.message.includes('dni')) {
-            setError('El DNI ya está registrado en el sistema.')
-          } else if (insertError.message.includes('email')) {
-            setError('El correo electrónico ya está registrado en el sistema.')
-          } else {
-            // Si fue creado por trigger (caso esperado: el usuario se está registrando por primera vez)
-            console.log('⏳ Estudiante creado por trigger, esperando y recuperando...')
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            
-            const { data: existingStudent, error: selectError } = await supabase
-              .from('students')
-              .select('id')
-              .eq('user_id', authData.user.id)
-              .single()
-            
-            if (selectError || !existingStudent) {
-              console.error('❌ No se pudo recuperar estudiante:', selectError)
-              setError('Error al obtener registro de estudiante')
-              setLoading(false)
-              return
-            }
-            
-            // Actualizar con los datos correctos
-            const { error: updateError } = await supabase
-              .from('students')
-              .update({
-                program_id: registerData.programId,
-                dni: registerData.dni,
-                legajo: registerData.legajo,
-                year: parseInt(registerData.year),
-              })
-              .eq('id', existingStudent.id)
-            
-            if (updateError) {
-              console.error('❌ Error updating student:', updateError)
-              setError('Error al actualizar estudiante')
-              setLoading(false)
-              return
-            }
-            
-            // IMPORTANTE: Asignar el ID del estudiante recuperado
-            const studentId = existingStudent.id
-            
-            // Verificar que tenemos el ID antes de continuar
-            if (!studentId) {
-              console.error('❌ studentId es null después de recuperar')
-              setError('Error: No se pudo obtener el ID del estudiante')
-              setLoading(false)
-              return
-            }
-            
-            // Ahora usar studentId en lugar de insertedStudent.id
-            insertedStudent.id = studentId
-          }
-        } else {
-          console.error('❌ Student insertion error:', insertError)
-          setError('Error al crear estudiante: ' + insertError.message)
-          setLoading(false)
-          return
-        }
-      }
-
-      if (!insertedStudent?.id) {
-        setError('No se pudo crear el registro de estudiante')
+      if (studentError || !studentRecord) {
+        console.error('❌ No se pudo recuperar estudiante creado por trigger:', studentError)
+        setError('Error al obtener registro de estudiante')
         setLoading(false)
         return
       }
 
-      console.log('✅ Estudiante listo:', insertedStudent.id)
-      console.log('✅ Trigger de pagos debería haber ejecutado')
+      const studentId = studentRecord.id
+      console.log('✅ Estudiante recuperado del trigger:', studentId)
 
       // Inscripciones automáticas según año
       const selectedYear = parseInt(registerData.year)
@@ -351,14 +276,11 @@ function LoginPage() {
 
         if (subjectsError) {
           console.error('❌ Error al consultar materias de 1° año:', subjectsError)
-          setError('Advertencia: No se pudieron inscribir automáticamente en algunas materias. Por favor inscríbete manualmente.')
-        } else if (!subjectsYear1 || subjectsYear1.length === 0) {
-          console.log('⚠️ No hay materias de 1° año disponibles para inscribir')
-        } else {
+        } else if (subjectsYear1 && subjectsYear1.length > 0) {
           console.log(`📚 Encontradas ${subjectsYear1.length} materias de 1° año`)
           
           const enrollments = subjectsYear1.map(subject => ({
-            student_id: insertedStudent.id,
+            student_id: studentId,
             subject_id: subject.id,
             academic_year: currentAcademicYear,
             status: 'active',
@@ -372,15 +294,6 @@ function LoginPage() {
 
           if (enrollError) {
             console.error('❌ Error en inscripción de 1° año:', enrollError)
-            console.error('Detalles:', {
-              code: enrollError.code,
-              message: enrollError.message,
-              details: enrollError.details,
-            })
-            // No bloquear el registro, pero advertir al usuario
-            if (!error) {
-              setSuccess('Cuenta creada. Nota: Hubo un problema con la inscripción automática. Por favor completa manualmente.')
-            }
           } else if (enrollData && enrollData.length > 0) {
             console.log(`✅ Alumno inscrito en ${enrollData.length} materias de 1° año`)
           }
@@ -395,14 +308,11 @@ function LoginPage() {
 
         if (subjectsError) {
           console.error('❌ Error al consultar materias de 1° y 2° año:', subjectsError)
-          setError('Advertencia: No se pudieron inscribir automáticamente en algunas materias. Por favor inscríbete manualmente.')
-        } else if (!subjectsYear1And2 || subjectsYear1And2.length === 0) {
-          console.log('⚠️ No hay materias de 1° y 2° año disponibles para inscribir')
-        } else {
+        } else if (subjectsYear1And2 && subjectsYear1And2.length > 0) {
           console.log(`📚 Encontradas ${subjectsYear1And2.length} materias de 1° y 2° año`)
           
           const enrollments = subjectsYear1And2.map(subject => ({
-            student_id: insertedStudent.id,
+            student_id: studentId,
             subject_id: subject.id,
             academic_year: currentAcademicYear,
             status: 'active',
@@ -416,15 +326,6 @@ function LoginPage() {
 
           if (enrollError) {
             console.error('❌ Error en inscripción de 1° y 2° año:', enrollError)
-            console.error('Detalles:', {
-              code: enrollError.code,
-              message: enrollError.message,
-              details: enrollError.details,
-            })
-            // No bloquear el registro, pero advertir al usuario
-            if (!error) {
-              setSuccess('Cuenta creada. Nota: Hubo un problema con la inscripción automática. Por favor completa manualmente.')
-            }
           } else if (enrollData && enrollData.length > 0) {
             console.log(`✅ Alumno inscrito en ${enrollData.length} materias de 1° y 2° año`)
           }
