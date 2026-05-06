@@ -158,32 +158,35 @@ export async function getStudentsMissingEnrollments(programId?: string) {
       // Obtener solo materias de años ANTERIORES
       const { data: requiredSubjects, error: subjectsError } = await supabase
         .from('subjects')
-        .select('id')
+        .select('id, year')
         .eq('program_id', student.program_id)
         .in('year', yearFilter)  // Solo años anteriores
 
-      if (subjectsError) continue
+      if (subjectsError) {
+        console.error('Error getting subjects:', subjectsError)
+        continue
+      }
 
-      // Verificar si está inscripto EN MATERIAS DE AÑOS ANTERIORES
-      const { data: enrolled, error: enrollError } = await supabase
+      const requiredIds = new Set(requiredSubjects?.map((s: any) => s.id) || [])
+
+      // Obtener TODOS los enrollments del estudiante en el año actual
+      const { data: allEnrolled, error: enrollError } = await supabase
         .from('enrollments')
-        .select('subject:subjects(id, year)')
+        .select('subject_id')
         .eq('student_id', student.id)
         .eq('academic_year', currentYear)
 
-      if (enrollError) continue
+      if (enrollError) {
+        console.error('Error getting enrollments:', enrollError)
+        continue
+      }
 
-      // Filtrar solo los enrollments de años ANTERIORES
-      const enrolledInPriorYears = enrolled
-        ?.filter((e: any) => {
-          const subjectYear = e.subject?.year
-          return (student.year === 2 && subjectYear === 1) || 
-                 (student.year === 3 && subjectYear && subjectYear <= 2)
-        })
-        ?.map((e: any) => e.subject.id) || []
+      // Contar solo los que están en MATERIAS DE AÑOS ANTERIORES
+      const enrolledInPriorYears = allEnrolled
+        ?.filter((e: any) => requiredIds.has(e.subject_id))
+        ?.map((e: any) => e.subject_id) || []
 
       const enrolledIds = new Set(enrolledInPriorYears)
-      const requiredIds = new Set(requiredSubjects?.map((s: any) => s.id) || [])
 
       const missing = [...requiredIds].filter(id => !enrolledIds.has(id))
 
