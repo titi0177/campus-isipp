@@ -8,8 +8,8 @@ import { supabase } from '@/lib/supabase'
 export async function autoEnrollStudentsByYear(academicYear?: number) {
   try {
     const { data, error } = await supabase.rpc(
-      'auto_enroll_students_by_year',
-      { p_academic_year: academicYear || null }
+      'auto_enroll_all_students',
+      { p_year: academicYear || null }
     )
 
     if (error) {
@@ -25,22 +25,32 @@ export async function autoEnrollStudentsByYear(academicYear?: number) {
       }
     }
 
+    // Mapear campos de la nueva función (sid, sname, pid, yr, cnt, err)
+    const mappedData = data.map((row: any) => ({
+      student_id: row.sid,
+      student_name: row.sname,
+      program_id: row.pid,
+      year: row.yr,
+      subjects_enrolled: row.cnt,
+      error_message: row.err,
+    }))
+
     // Procesar resultados
     const summary = {
-      total_students: data.length,
-      students_processed: data.filter((r: any) => !r.error_message).length,
-      students_with_errors: data.filter((r: any) => r.error_message).length,
-      total_subjects_enrolled: data.reduce((sum: number, row: any) => sum + (row.subjects_enrolled || 0), 0),
+      total_students: mappedData.length,
+      students_processed: mappedData.filter((r: any) => !r.error_message).length,
+      students_with_errors: mappedData.filter((r: any) => r.error_message).length,
+      total_subjects_enrolled: mappedData.reduce((sum: number, row: any) => sum + (row.subjects_enrolled || 0), 0),
     }
 
     console.log('✅ Auto-inscripción completada:', summary)
-    console.table(data)
+    console.table(mappedData)
 
     return {
       success: true,
       message: `Inscripción completada. ${summary.students_processed} estudiantes procesados.`,
       summary,
-      data,
+      data: mappedData,
     }
   } catch (err) {
     console.error('Error en autoEnrollStudentsByYear:', err)
@@ -153,14 +163,14 @@ export async function getStudentsMissingEnrollments(programId?: string) {
 
     for (const student of students) {
       // Determinar materias ANTERIORES que debería tener (NO del año en curso)
-      const yearFilter = student.year === 2 ? [1] : [1, 2]  // 2° solo 1°, 3° solo 1° y 2°
+      const yearFilter = student.year === 2 ? [1] : [1, 2]
 
       // Obtener solo materias de años ANTERIORES
       const { data: requiredSubjects, error: subjectsError } = await supabase
         .from('subjects')
         .select('id, year')
         .eq('program_id', student.program_id)
-        .in('year', yearFilter)  // Solo años anteriores
+        .in('year', yearFilter)
 
       if (subjectsError) {
         console.error('Error getting subjects:', subjectsError)
