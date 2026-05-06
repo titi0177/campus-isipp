@@ -126,12 +126,18 @@ export async function getStudentsMissingEnrollments(programId?: string) {
     const currentYear = new Date().getFullYear()
 
     // Obtener estudiantes de 2° y 3° año
-    const { data: students, error: studentError } = await supabase
+    let query = supabase
       .from('students')
       .select('id, first_name, last_name, program_id, year')
       .in('year', [2, 3])
       .eq('status', 'active')
-      .eq(programId ? 'program_id' : 'id', programId || '')
+
+    // Solo filtrar por programa si se proporciona
+    if (programId) {
+      query = query.eq('program_id', programId)
+    }
+
+    const { data: students, error: studentError } = await query
 
     if (studentError) throw studentError
     if (!students || students.length === 0) {
