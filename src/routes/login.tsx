@@ -300,7 +300,19 @@ function LoginPage() {
               return
             }
             
-            insertedStudent.id = existingStudent.id
+            // IMPORTANTE: Asignar el ID del estudiante recuperado
+            const studentId = existingStudent.id
+            
+            // Verificar que tenemos el ID antes de continuar
+            if (!studentId) {
+              console.error('❌ studentId es null después de recuperar')
+              setError('Error: No se pudo obtener el ID del estudiante')
+              setLoading(false)
+              return
+            }
+            
+            // Ahora usar studentId en lugar de insertedStudent.id
+            insertedStudent.id = studentId
           }
         } else {
           console.error('❌ Student insertion error:', insertError)
