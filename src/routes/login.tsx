@@ -4,6 +4,7 @@ import React from 'react'
 import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useNavigate } from '@tanstack/react-router'
+import { GraduationCelebration } from '@/components/GraduationCelebration'
 
 export const Route = createFileRoute('/login')({
   beforeLoad: async () => {
@@ -39,6 +40,8 @@ function LoginPage() {
 
   const [codeValidated, setCodeValidated] = useState(false)
   const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([])
+  const [showGraduationModal, setShowGraduationModal] = useState(false)
+  const [graduationData, setGraduationData] = useState<{ studentName: string; programName: string } | null>(null)
 
   React.useEffect(() => {
     const loadPrograms = async () => {
@@ -86,6 +89,50 @@ function LoginPage() {
       return
     }
 
+    // ✅ VALIDAR STATUS DEL ESTUDIANTE
+    try {
+      const { data: student, error: studentError } = await supabase
+        .from('students')
+        .select('status, first_name, program:programs(name)')
+        .eq('user_id', user.id)
+        .single()
+
+      if (studentError) {
+        console.warn('Advertencia al obtener estudiante:', studentError.message)
+        // Continuar si no es un error crítico
+      }
+
+      const studentStatus = student?.status ?? 'active'
+
+      // ❌ SUSPENDIDO O INACTIVO
+      if (studentStatus === 'suspended') {
+        setError('Tu cuenta ha sido suspendida. Por favor contacta con administración.')
+        setLoading(false)
+        return
+      }
+
+      if (studentStatus === 'inactive') {
+        setError('Tu cuenta está inactiva. Por favor contacta con administración para reactivarla.')
+        setLoading(false)
+        return
+      }
+
+      // 🎓 GRADUADO
+      if (studentStatus === 'graduated' && student) {
+        setGraduationData({
+          studentName: `${student.first_name}`,
+          programName: student.program?.name ?? 'Tu carrera',
+        })
+        setShowGraduationModal(true)
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      console.error('Error validando estudiante:', err)
+      // Continuar si falla la validación (mejor UX que bloquear)
+    }
+
+    // ✅ OBTENER PERFIL Y NAVEGAR
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
@@ -356,6 +403,11 @@ function LoginPage() {
     }
   }
 
+  const handleDownloadCertificate = () => {
+    // Redirigir a la página de certificados o descargar directamente
+    window.location.href = '/dashboard/certificates'
+  }
+
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -375,6 +427,18 @@ function LoginPage() {
   }
 
   return (
+    <>
+      {showGraduationModal && graduationData && (
+        <GraduationCelebration
+          studentName={graduationData.studentName}
+          programName={graduationData.programName}
+          onContinue={() => {
+            setShowGraduationModal(false)
+            navigate({ to: '/dashboard' })
+          }}
+          onDownloadCert={handleDownloadCertificate}
+        />
+      )}
     <div className="siu-login-page relative flex items-center justify-center p-4 min-h-screen bg-cover bg-center bg-no-repeat" style={{
       backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(/isipp-building.jpg)',
       backgroundAttachment: 'fixed',
@@ -757,5 +821,6 @@ function LoginPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

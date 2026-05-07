@@ -166,6 +166,7 @@ function DashboardPage() {
     porcentaje: 0,
   })
   const [upcomingExams, setUpcomingExams] = useState<any[]>([])
+  const [studentStatus, setStudentStatus] = useState<string>('active')
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -180,6 +181,7 @@ function DashboardPage() {
 
       if (!studentData) return
       setStudent(studentData)
+      setStudentStatus(studentData.status ?? 'active')
 
       const [enrollmentsRes, programSubjectsRes, examsRes] = await Promise.all([
         supabase
@@ -285,6 +287,21 @@ function DashboardPage() {
   ).length
 
   return (
+    <>
+      {/* BANNER PARA GRADUADOS */}
+      {studentStatus === 'graduated' && (
+        <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300 p-6 rounded-xl shadow-lg animate-in fade-in slide-in-from-top duration-500 mb-8">
+          <div className="flex items-start gap-4">
+            <span className="text-3xl flex-shrink-0">🎓</span>
+            <div>
+              <h2 className="text-lg font-bold text-yellow-900 mb-1">Felicitaciones, eres un alumno graduado</h2>
+              <p className="text-sm text-yellow-800">
+                Puedes consultar tu historial académico y descargar tu certificado. Los botones de inscripción no están disponibles para graduados.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     <div className="space-y-8">
       <div className="relative overflow-hidden rounded-2xl shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--isipp-bordo)] via-red-600 to-[var(--siu-blue)] opacity-90"></div>
@@ -305,13 +322,23 @@ function DashboardPage() {
             <div className="flex gap-3 flex-wrap pt-4 border-t border-white/20">
               <Link
                 to="/dashboard/enroll-subjects"
-                className="bg-white text-[var(--siu-blue)] hover:bg-slate-100 px-5 sm:px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-95"
+                className={`bg-white text-[var(--siu-blue)] hover:bg-slate-100 px-5 sm:px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-95 ${
+                  studentStatus === 'graduated' ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                onClick={(e) => {
+                  if (studentStatus === 'graduated') {
+                    e.preventDefault()
+                  }
+                }}
               >
                 + Inscribirse
               </Link>
               <button
                 onClick={() => setShowReinscriptionModal(true)}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-5 sm:px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-95"
+                disabled={studentStatus === 'graduated'}
+                className={`bg-orange-500 hover:bg-orange-600 text-white px-5 sm:px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg hover:shadow-xl active:scale-95 ${
+                  studentStatus === 'graduated' ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 🔄 Reinscripción
               </button>
@@ -456,5 +483,6 @@ function DashboardPage() {
       </div>
       <ReinscriptionModal isOpen={showReinscriptionModal} onClose={() => setShowReinscriptionModal(false)} />
     </div>
+    </>
   )
 }
