@@ -78,7 +78,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       // Obtener TODAS las calificaciones (incluso sin final_status) para cada inscripción
       const { data: gradesData, error: gradesError } = await supabase
         .from('enrollment_grades')
-        .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status, final_status, final_grade')
+        .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status, final_status')
         .in('enrollment_id', enrollmentIds)
       
       if (gradesError) {
@@ -109,8 +109,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           }
           existingIdsMap[g.enrollment_id] = g.id
           
-          // Marcar como completado si tiene final_grade cargada (nota final por admin o cualquier otro origen)
-          if (g.final_grade !== null && g.final_grade !== undefined) {
+          // Marcar como completado si tiene final_status de desaprobado o promocionado
+          if (g.final_status && ['desaprobado', 'promocionado'].includes(g.final_status)) {
             completedEnrollmentIds.add(g.enrollment_id)
           }
         })
@@ -119,7 +119,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       setExistingGrades(existingGradesMap)
       setExistingIds(existingIdsMap)
 
-      // Mostrar TODOS los alumnos EXCEPTO los que ya tienen final_grade cargada
+      // Mostrar TODOS los alumnos EXCEPTO los que ya tienen final_status = desaprobado o promocionado
       const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
       setActiveEnrollments(active)
     } catch (err) {
