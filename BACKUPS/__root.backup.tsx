@@ -3,8 +3,6 @@ import { ToastProvider } from '@/components/Toast'
 import { NotificationProvider } from '@/components/NotificationCenter'
 import { useGlobalNotifications } from '@/hooks/useGlobalNotifications'
 import { useUserNotifications } from '@/hooks/useUserNotifications'
-import { useAnnouncementsOnLogin } from '@/hooks/useAnnouncementsOnLogin'
-import { AnnouncementModal } from '@/components/AnnouncementModal'
 import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import '../styles.css'
@@ -55,7 +53,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 /**
  * Componente que maneja TODAS las suscripciones de notificaciones
  * Separación clara: global vs usuario-específico
- * Incluye anuncios institucionales al login
  */
 function NotificationSetup() {
   const [userId, setUserId] = useState<string | null>(null)
@@ -111,36 +108,6 @@ function NotificationSetup() {
   // ============================================================
   useUserNotifications(userId)
 
-  // ============================================================
-  // 4. ANUNCIOS AL LOGIN (dependen de userId)
-  // Hook que carga anuncios cuando el usuario inicia sesión
-  // ============================================================
-  const {
-    announcements,
-    currentIndex,
-    showModal,
-    loading: announcementsLoading,
-    handleNext,
-    handlePrev,
-    handleClose,
-    currentAnnouncement,
-  } = useAnnouncementsOnLogin(userId)
-
-  // ============================================================
-  // RENDERIZAR MODAL DE ANUNCIOS
-  // ============================================================
-  return (
-    <>
-      <AnnouncementModal
-        announcement={currentAnnouncement}
-        open={showModal}
-        currentIndex={currentIndex}
-        totalCount={announcements.length}
-        onClose={handleClose}
-        onNext={handleNext}
-        onPrev={handlePrev}
-        loading={announcementsLoading}
-      />
-    </>
-  )
+  // No renderizar nada, solo efectos secundarios
+  return null
 }
