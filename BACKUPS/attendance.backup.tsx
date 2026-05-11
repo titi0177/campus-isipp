@@ -44,15 +44,13 @@ function StudentAttendancePage() {
         return
       }
 
-      // Get enrollments with enrollment_grades to filter by final_status
       const { data: enrollments } = await supabase
         .from('enrollments')
         .select(`
           id,
           subject_id,
           subject:subjects(id, name, code, year, professor_id),
-          attendance(id, enrollment_id, percentage),
-          enrollment_grades(final_grade, final_status)
+          attendance(id, enrollment_id, percentage)
         `)
         .eq('student_id', student.id)
         .order('subject_id')
@@ -63,21 +61,8 @@ function StudentAttendancePage() {
         return
       }
 
-      // Filter enrollments to exclude those with final_grade (aprobado/promocionado)
-      const activeEnrollments = enrollments.filter((e: any) => {
-        const eg = e.enrollment_grades
-        // Only include if there's NO final_grade (not yet graded or in progress)
-        return !eg || (eg.final_grade === null || eg.final_grade === undefined)
-      })
-
-      if (activeEnrollments.length === 0) {
-        setSubjects([])
-        setLoading(false)
-        return
-      }
-
       const profIds = [...new Set(
-        activeEnrollments
+        enrollments
           .map((e: any) => e.subject?.professor_id)
           .filter(Boolean)
       )]
@@ -91,7 +76,7 @@ function StudentAttendancePage() {
         profsData?.forEach((p: any) => { professors[p.id] = p })
       }
 
-      const subjectList = activeEnrollments.map((enr: any) => {
+      const subjectList = enrollments.map((enr: any) => {
         const att = Array.isArray(enr.attendance) ? enr.attendance[0] : enr.attendance
         const percentage = att?.percentage ?? 0
         const prof = enr.subject?.professor_id ? professors[enr.subject.professor_id] : null
