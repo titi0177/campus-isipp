@@ -27,11 +27,6 @@ export function AnnouncementModal({
   const isFirst = currentIndex === 0
   const isLast = currentIndex === totalCount - 1
 
-  const handleCloseClick = async () => {
-    // Llamar onClose que marca como visto en la BD
-    await onClose()
-  }
-
   return (
     <div className="modal-overlay">
       <div className="modal-content w-full max-w-2xl">
@@ -41,10 +36,9 @@ export function AnnouncementModal({
             📢 Anuncio Institucional
           </h2>
           <button
-            onClick={handleCloseClick}
+            onClick={onClose}
             className="rounded-sm p-1.5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
             aria-label="Cerrar"
-            disabled={loading}
           >
             <X size={20} />
           </button>
@@ -104,7 +98,7 @@ export function AnnouncementModal({
 
             {/* Botón cerrar principal */}
             <button
-              onClick={handleCloseClick}
+              onClick={onClose}
               disabled={loading}
               className="px-4 py-2 bg-gradient-to-r from-[var(--isipp-bordo)] to-[var(--isipp-bordo-deep)] text-white font-bold rounded-sm hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 min-h-[44px] whitespace-nowrap"
             >

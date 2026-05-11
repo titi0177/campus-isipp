@@ -55,11 +55,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 /**
  * Componente que maneja TODAS las suscripciones de notificaciones
  * Separación clara: global vs usuario-específico
- * Incluye anuncios institucionales al login con tracking de vistas
+ * Incluye anuncios institucionales al login
  */
 function NotificationSetup() {
   const [userId, setUserId] = useState<string | null>(null)
-  const [studentId, setStudentId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   // ============================================================
@@ -72,25 +71,9 @@ function NotificationSetup() {
       if (user) {
         console.log('[NotificationSetup] ✅ Usuario encontrado:', user.id)
         setUserId(user.id)
-        
-        // Obtener student_id para anuncios
-        supabase
-          .from('students')
-          .select('id')
-          .eq('user_id', user.id)
-          .single()
-          .then(({ data, error }) => {
-            if (!error && data) {
-              console.log('[NotificationSetup] ✅ Student ID:', data.id)
-              setStudentId(data.id)
-            } else if (error) {
-              console.warn('[NotificationSetup] ⚠️ Error obteniendo student_id:', error.message)
-            }
-          })
       } else {
         console.log('[NotificationSetup] ❌ No hay usuario autenticado')
         setUserId(null)
-        setStudentId(null)
       }
       setIsLoading(false)
     })
@@ -102,22 +85,9 @@ function NotificationSetup() {
         if (session?.user) {
           console.log('[NotificationSetup] ✅ Usuario sesión:', session.user.id)
           setUserId(session.user.id)
-          
-          // Obtener student_id cuando hay sesión
-          supabase
-            .from('students')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .single()
-            .then(({ data, error }) => {
-              if (!error && data) {
-                setStudentId(data.id)
-              }
-            })
         } else {
           console.log('[NotificationSetup] ❌ Sesión perdida')
           setUserId(null)
-          setStudentId(null)
         }
       }
     )
@@ -142,8 +112,8 @@ function NotificationSetup() {
   useUserNotifications(userId)
 
   // ============================================================
-  // 4. ANUNCIOS AL LOGIN (dependen de userId y studentId)
-  // Hook que carga anuncios no vistos cuando el usuario inicia sesión
+  // 4. ANUNCIOS AL LOGIN (dependen de userId)
+  // Hook que carga anuncios cuando el usuario inicia sesión
   // ============================================================
   const {
     announcements,
@@ -154,7 +124,7 @@ function NotificationSetup() {
     handlePrev,
     handleClose,
     currentAnnouncement,
-  } = useAnnouncementsOnLogin(userId, studentId)
+  } = useAnnouncementsOnLogin(userId)
 
   // ============================================================
   // RENDERIZAR MODAL DE ANUNCIOS
