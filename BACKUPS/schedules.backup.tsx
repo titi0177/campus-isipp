@@ -67,10 +67,9 @@ function StudentSchedulesPage() {
         return
       }
 
-      // Get enrollments with enrollment_grades to filter by final_status
       const { data: enrollments } = await supabase
         .from('enrollments')
-        .select('id, subject_id, division, enrollment_grades(final_grade, final_status)')
+        .select('subject_id, division')
         .eq('student_id', student.id)
 
       if (!enrollments || enrollments.length === 0) {
@@ -79,26 +78,13 @@ function StudentSchedulesPage() {
         return
       }
 
-      // Filter enrollments to exclude those with final_grade (aprobado/promocionado)
-      const activeEnrollments = enrollments.filter((e: any) => {
-        const eg = e.enrollment_grades
-        // Only include if there's NO final_grade (not yet graded or in progress)
-        return !eg || (eg.final_grade === null || eg.final_grade === undefined)
-      })
-
-      if (activeEnrollments.length === 0) {
-        setSchedules([])
-        setLoading(false)
-        return
-      }
-
       // Create a map of subject_id -> division for filtering
       const enrollmentDivisionMap: Record<string, string | null> = {}
-      activeEnrollments.forEach((e: any) => {
+      enrollments.forEach(e => {
         enrollmentDivisionMap[e.subject_id] = e.division
       })
 
-      const subjectIds = activeEnrollments.map((e: any) => e.subject_id)
+      const subjectIds = enrollments.map(e => e.subject_id)
 
       const { data } = await supabase
         .from('schedules')
