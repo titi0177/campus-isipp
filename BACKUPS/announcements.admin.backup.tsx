@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { Plus, Pencil, Trash2, Bell } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Announcement } from '@/types'
 
 export const Route = createFileRoute('/admin/announcements')({
@@ -14,7 +14,7 @@ export const Route = createFileRoute('/admin/announcements')({
 function AnnouncementsAdminPage() {
   const [items, setItems] = useState<Announcement[]>([])
   const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<Partial<Announcement & { show_at_login?: boolean }>>({})
+  const [editing, setEditing] = useState<Partial<Announcement>>({})
   const { showToast } = useToast()
 
   useEffect(() => { load() }, [])
@@ -26,13 +26,12 @@ function AnnouncementsAdminPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { id, created_at, show_at_login, ...data } = editing as any
+    const { id, created_at, ...data } = editing as any
     try {
-      const payload = { ...data, show_at_login: show_at_login || false }
       if (id) {
-        await supabase.from('announcements').update(payload).eq('id', id)
+        await supabase.from('announcements').update(data).eq('id', id)
       } else {
-        await supabase.from('announcements').insert(payload)
+        await supabase.from('announcements').insert(data)
       }
       showToast('Anuncio guardado.', 'success')
       setModalOpen(false)
@@ -58,14 +57,13 @@ function AnnouncementsAdminPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Anuncios Institucionales</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Anuncios</h1>
         <button 
           onClick={() => { 
             setEditing({ 
               title: '',
               description: '',
-              date: new Date().toISOString().slice(0, 10),
-              show_at_login: false
+              date: new Date().toISOString().slice(0, 10) 
             })
             setModalOpen(true) 
           }} 
@@ -75,44 +73,11 @@ function AnnouncementsAdminPage() {
         </button>
       </div>
 
-      {/* Info Box */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-l-4 border-l-blue-500">
-        <div className="flex items-start gap-3">
-          <Bell size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-bold text-blue-900 mb-1">Anuncios al Login</h3>
-            <p className="text-sm text-blue-800">
-              Los anuncios marcados con "Mostrar al login" aparecerán en un modal cuando los estudiantes inicien sesión. Útil para comunicados urgentes.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <DataTable
         columns={[
           { key: 'title', label: 'Título' },
           { key: 'description', label: 'Descripción', render: (r: any) => <span className="line-clamp-1">{r.description}</span> },
           { key: 'date', label: 'Fecha', render: (r: any) => new Date(r.date).toLocaleDateString('es-AR') },
-          { 
-            key: 'show_at_login', 
-            label: 'Mostrar al Login', 
-            render: (r: any) => (
-              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-bold ${
-                r.show_at_login 
-                  ? 'bg-green-100 text-green-700' 
-                  : 'bg-gray-100 text-gray-600'
-              }`}>
-                {r.show_at_login ? (
-                  <>
-                    <Bell size={12} />
-                    Sí
-                  </>
-                ) : (
-                  'No'
-                )}
-              </span>
-            )
-          },
         ]}
         data={items as any}
         actions={(row: any) => (
@@ -142,7 +107,6 @@ function AnnouncementsAdminPage() {
         open={modalOpen} 
         onClose={() => setModalOpen(false)} 
         title={editing.id ? 'Editar Anuncio' : 'Nuevo Anuncio'}
-        size="lg"
       >
         <form onSubmit={handleSave} className="space-y-4">
           <div>
@@ -155,7 +119,6 @@ function AnnouncementsAdminPage() {
               placeholder="Ej: Clausura de inscripciones"
             />
           </div>
-
           <div>
             <label className="form-label">Descripción *</label>
             <textarea 
@@ -167,7 +130,6 @@ function AnnouncementsAdminPage() {
               placeholder="Escribe el contenido del anuncio"
             />
           </div>
-
           <div>
             <label className="form-label">Fecha *</label>
             <input 
@@ -178,23 +140,6 @@ function AnnouncementsAdminPage() {
               onChange={e => setEditing(p => ({ ...p, date: e.target.value }))}
             />
           </div>
-
-          {/* Checkbox para mostrar al login */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={editing.show_at_login || false}
-                onChange={e => setEditing(p => ({ ...p, show_at_login: e.target.checked }))}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <div>
-                <div className="font-semibold text-gray-900">Mostrar este anuncio al login</div>
-                <div className="text-xs text-gray-600">Los estudiantes verán este anuncio en un modal cuando inicien sesión</div>
-              </div>
-            </label>
-          </div>
-
           <div className="flex gap-3 pt-2">
             <button type="submit" className="btn-primary flex-1">Publicar</button>
             <button 
