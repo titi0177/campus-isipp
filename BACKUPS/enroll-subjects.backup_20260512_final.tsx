@@ -165,8 +165,19 @@ function EnrollSubjectsPage() {
         return 'Sin calificar'
       }
 
+      const firstYearSubjectIds = await getFirstYearSubjects(studentData.id)
+
+      // Verificar si es Tecnicatura en Analista en Sistemas
+      const { data: program } = await supabase
+        .from('programs')
+        .select('name')
+        .eq('id', studentData.program_id)
+        .single()
+      
+      const isAnalystProgram = program?.name.includes('Analista')
+      const isFirstYear = studentData.year === 1
+
       // Helper: validar correlativas solo para CURSAR (required_status = 'regular')
-      // Ignora 'aprobado' (es para examen final) y 'any' (sin restricción)
       const validateCorrelativesForEnrolling = (reqs: Array<{id: string, required_status: string}>): {met: boolean, lines: string[]} => {
         let allReqsMet = true
         const requirementLines: string[] = []
@@ -190,18 +201,6 @@ function EnrollSubjectsPage() {
 
         return { met: allReqsMet, lines: requirementLines }
       }
-
-      const firstYearSubjectIds = await getFirstYearSubjects(studentData.id)
-
-      // Verificar si es Tecnicatura en Analista en Sistemas
-      const { data: program } = await supabase
-        .from('programs')
-        .select('name')
-        .eq('id', studentData.program_id)
-        .single()
-      
-      const isAnalystProgram = program?.name.includes('Analista')
-      const isFirstYear = studentData.year === 1
 
       // Process each subject directly - NO grouping
       const processed: SubjectWithStatus[] = []
