@@ -85,6 +85,12 @@ function LegacyGradeLoader() {
     for (const r of rows) {
       const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
       const final = r.final_grade ?? r.partial_grade
+      
+      // Solo procesar si hay al menos una nota - evitar crear registros vacíos
+      if (final === null || final === undefined) {
+        continue
+      }
+      
       const status =
         final >= 8
           ? 'promocionado'
