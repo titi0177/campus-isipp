@@ -2,11 +2,16 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Plus, Trash2, ChevronDown, Eye } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Eye, X } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/correlatives')({
   component: CorrelativesPage,
 })
+
+interface CorrelativeEntry {
+  requires_subject_id: string
+  required_status: 'aprobado' | 'regular' | 'any'
+}
 
 interface CorrelativeWithStatus {
   id: string
@@ -28,7 +33,8 @@ function CorrelativesPage() {
   const [subjectsByProgram, setSubjectsByProgram] = useState<Record<string, SubjectWithCorrelatives[]>>({})
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
   const [availableCorrelatives, setAvailableCorrelatives] = useState<SubjectWithCorrelatives[]>([])
-  const [selectedCorrelatives, setSelectedCorrelatives] = useState<Map<string, 'aprobado' | 'regular' | 'any'>>(new Map())
+  // Cambio clave: Array en lugar de Map para permitir múltiples entradas por materia
+  const [selectedCorrelatives, setSelectedCorrelatives] = useState<CorrelativeEntry[]>([])
   const [expandedProgram, setExpandedProgram] = useState<string | null>(null)
   const [expandedViewProgram, setExpandedViewProgram] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -100,31 +106,40 @@ function CorrelativesPage() {
 
     setAvailableCorrelatives(available)
 
-    // Cargar correlativas actuales de esta materia
+    // Cargar correlativas actuales de esta materia (como Array)
     const subject = (subjectsByProgram[programName] || [])
       .find(s => s.id === subjectId)
 
-    const corrMap = new Map<string, 'aprobado' | 'regular' | 'any'>()
-    subject?.correlatives.forEach(c => {
-      corrMap.set(c.requires_subject_id, c.required_status)
-    })
-    setSelectedCorrelatives(corrMap)
+    // Convertir correlativas a Array (permite múltiples por materia)
+    const corrArray: CorrelativeEntry[] = subject?.correlatives.map(c => ({
+      requires_subject_id: c.requires_subject_id,
+      required_status: c.required_status,
+    })) || []
+
+    setSelectedCorrelatives(corrArray)
   }
 
-  const handleToggleCorrelative = (correlativeId: string) => {
-    const newMap = new Map(selectedCorrelatives)
-    if (newMap.has(correlativeId)) {
-      newMap.delete(correlativeId)
-    } else {
-      newMap.set(correlativeId, 'aprobado')
-    }
-    setSelectedCorrelatives(newMap)
+  // Agregar un nuevo requisito (puede ser la misma materia con diferente status)
+  const handleAddCorrelative = (correlativeId: string, status: 'aprobado' | 'regular' | 'any') => {
+    setSelectedCorrelatives([
+      ...selectedCorrelatives,
+      {
+        requires_subject_id: correlativeId,
+        required_status: status,
+      },
+    ])
   }
 
-  const handleChangeStatus = (correlativeId: string, status: 'aprobado' | 'regular' | 'any') => {
-    const newMap = new Map(selectedCorrelatives)
-    newMap.set(correlativeId, status)
-    setSelectedCorrelatives(newMap)
+  // Remover un requisito específico por índice
+  const handleRemoveCorrelative = (index: number) => {
+    setSelectedCorrelatives(selectedCorrelatives.filter((_, i) => i !== index))
+  }
+
+  // Cambiar status de un requisito específico
+  const handleChangeStatus = (index: number, status: 'aprobado' | 'regular' | 'any') => {
+    const updated = [...selectedCorrelatives]
+    updated[index].required_status = status
+    setSelectedCorrelatives(updated)
   }
 
   const handleSaveCorrelatives = async () => {
@@ -134,12 +149,12 @@ function CorrelativesPage() {
       // Eliminar correlativas actuales
       await supabase.from('subject_correlatives').delete().eq('subject_id', selectedSubject)
 
-      // Insertar nuevas correlativas con required_status
-      if (selectedCorrelatives.size > 0) {
-        const newCorrelatives = Array.from(selectedCorrelatives).map(([requires_subject_id, required_status]) => ({
+      // Insertar nuevas correlativas con required_status (permite múltiples)
+      if (selectedCorrelatives.length > 0) {
+        const newCorrelatives = selectedCorrelatives.map(entry => ({
           subject_id: selectedSubject,
-          requires_subject_id,
-          required_status,
+          requires_subject_id: entry.requires_subject_id,
+          required_status: entry.required_status,
         }))
 
         const { error } = await supabase.from('subject_correlatives').insert(newCorrelatives)
@@ -168,7 +183,7 @@ function CorrelativesPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Correlativas</h1>
-        <p className="text-gray-500 text-sm mt-1">Establece requisitos previos para cursar y rendir exámenes finales</p>
+        <p className="text-gray-500 text-sm mt-1">Establece requisitos previos para cursar y rendir exámenes finales. Puedes asignar la misma materia con diferentes requisitos.</p>
       </div>
 
       {/* Main Layout */}
@@ -223,80 +238,79 @@ function CorrelativesPage() {
                   Selecciona correlativas requeridas
                 </h3>
                 <p className="text-sm text-gray-500">
-                  Marca las materias que deben estar aprobadas/regularizadas y especifica el tipo de requisito
+                  Puedes agregar la misma materia múltiples veces con diferentes tipos de requisito
                 </p>
               </div>
 
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              {/* Correlativas seleccionadas */}
+              {selectedCorrelatives.length > 0 && (
+                <div className="space-y-2 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs font-semibold text-blue-900 mb-3">Requisitos configurados:</p>
+                  {selectedCorrelatives.map((corr, idx) => {
+                    const statusLabel = corr.required_status === 'aprobado' 
+                      ? 'Aprobada' 
+                      : corr.required_status === 'regular' 
+                      ? 'Regularizada' 
+                      : 'Sin restricción'
+                    const statusColor = corr.required_status === 'aprobado' 
+                      ? 'bg-red-100 text-red-800' 
+                      : corr.required_status === 'regular' 
+                      ? 'bg-amber-100 text-amber-800' 
+                      : 'bg-gray-100 text-gray-800'
+
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border border-blue-200">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{getSubjectName(corr.requires_subject_id)}</p>
+                          <span className={`inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium ${statusColor}`}>
+                            {statusLabel}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveCorrelative(idx)}
+                          className="p-2 text-red-600 hover:bg-red-100 rounded transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Agregar nuevas correlativas */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-700">Agregar nuevo requisito:</p>
                 {availableCorrelatives.length === 0 ? (
                   <p className="text-center text-gray-500 py-8">No hay otras materias disponibles</p>
                 ) : (
-                  availableCorrelatives.map(correlative => {
-                    const isSelected = selectedCorrelatives.has(correlative.requires_subject_id)
-                    const currentStatus = selectedCorrelatives.get(correlative.requires_subject_id) || 'aprobado'
-                    
-                    return (
-                      <div
-                        key={correlative.requires_subject_id}
-                        className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-start gap-3 mb-2">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => handleToggleCorrelative(correlative.requires_subject_id)}
-                            className="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-2 focus:ring-indigo-500 mt-1"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 text-sm">{getSubjectName(correlative.requires_subject_id)}</p>
-                          </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {availableCorrelatives.map(correlative => (
+                      <div key={correlative.requires_subject_id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        <p className="font-medium text-gray-900 text-sm mb-2">{getSubjectName(correlative.requires_subject_id)}</p>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => handleAddCorrelative(correlative.requires_subject_id, 'aprobado')}
+                            className="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded font-semibold transition-colors"
+                          >
+                            + Aprobada
+                          </button>
+                          <button
+                            onClick={() => handleAddCorrelative(correlative.requires_subject_id, 'regular')}
+                            className="px-2 py-1 text-xs bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-semibold transition-colors"
+                          >
+                            + Regularizada
+                          </button>
+                          <button
+                            onClick={() => handleAddCorrelative(correlative.requires_subject_id, 'any')}
+                            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 rounded font-semibold transition-colors"
+                          >
+                            + Sin restricción
+                          </button>
                         </div>
-
-                        {isSelected && (
-                          <div className="ml-7 mb-2">
-                            <label className="block text-xs text-gray-700 font-semibold mb-2">
-                              Tipo de requisito:
-                            </label>
-                            <div className="space-y-1">
-                              <label className="flex items-center gap-2 text-xs">
-                                <input
-                                  type="radio"
-                                  name={`status-${correlative.requires_subject_id}`}
-                                  value="aprobado"
-                                  checked={currentStatus === 'aprobado'}
-                                  onChange={(e) => handleChangeStatus(correlative.requires_subject_id, 'aprobado')}
-                                  className="w-3 h-3 text-indigo-600"
-                                />
-                                <span>Aprobada/Promocionada (para examen final)</span>
-                              </label>
-                              <label className="flex items-center gap-2 text-xs">
-                                <input
-                                  type="radio"
-                                  name={`status-${correlative.requires_subject_id}`}
-                                  value="regular"
-                                  checked={currentStatus === 'regular'}
-                                  onChange={(e) => handleChangeStatus(correlative.requires_subject_id, 'regular')}
-                                  className="w-3 h-3 text-indigo-600"
-                                />
-                                <span>Regularizada (para cursar)</span>
-                              </label>
-                              <label className="flex items-center gap-2 text-xs">
-                                <input
-                                  type="radio"
-                                  name={`status-${correlative.requires_subject_id}`}
-                                  value="any"
-                                  checked={currentStatus === 'any'}
-                                  onChange={(e) => handleChangeStatus(correlative.requires_subject_id, 'any')}
-                                  className="w-3 h-3 text-indigo-600"
-                                />
-                                <span>Sin restricción (cualquier estado)</span>
-                              </label>
-                            </div>
-                          </div>
-                        )}
                       </div>
-                    )
-                  })
+                    ))}
+                  </div>
                 )}
               </div>
 
@@ -371,7 +385,7 @@ function CorrelativesPage() {
                             </div>
                           </div>
                           <div className="space-y-1">
-                            {subject.correlatives.map(corr => {
+                            {subject.correlatives.map((corr, idx) => {
                               const statusLabel = corr.required_status === 'aprobado' 
                                 ? '(Aprobada)' 
                                 : corr.required_status === 'regular' 
@@ -385,7 +399,7 @@ function CorrelativesPage() {
                                 : 'bg-gray-100 text-gray-800'
 
                               return (
-                                <div key={corr.id} className="flex items-center gap-2 text-xs">
+                                <div key={idx} className="flex items-center gap-2 text-xs">
                                   <span className="font-medium text-gray-700">{getSubjectName(corr.requires_subject_id)}</span>
                                   <span className={`inline-flex px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
                                     {statusLabel}
