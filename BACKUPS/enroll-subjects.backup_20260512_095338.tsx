@@ -137,13 +137,13 @@ function EnrollSubjectsPage() {
 
       const { data: correlatives } = await supabase
         .from('subject_correlatives')
-        .select('subject_id, requires_subject_id, required_status')
+        .select('subject_id, requires_subject_id')
 
-      const requiresMap = new Map<string, Array<{id: string, required_status: string}>>()
+      const requiresMap = new Map<string, string[]>()
 
       for (const c of correlatives ?? []) {
         const arr = requiresMap.get(c.subject_id) ?? []
-        arr.push({id: c.requires_subject_id, required_status: c.required_status || 'aprobado'})
+        arr.push(c.requires_subject_id)
         requiresMap.set(c.subject_id, arr)
       }
 
@@ -178,12 +178,12 @@ function EnrollSubjectsPage() {
         } 
         else if (isRecursant) {
           const reqs = requiresMap.get(subject.id) ?? []
-          const allReqsPassed = reqs.every(req => passedSubjectIds.has(req.id))
+          const allReqsPassed = reqs.every(rid => passedSubjectIds.has(rid))
 
           if (!allReqsPassed) {
-            const missingReqs = reqs.filter(req => !passedSubjectIds.has(req.id))
+            const missingReqs = reqs.filter(rid => !passedSubjectIds.has(rid))
             const missingNames = missingReqs
-              .map(req => subjectNameMap.get(req.id))
+              .map(id => subjectNameMap.get(id))
               .filter(Boolean)
               .join(', ')
             blockedReason = `Requiere (recursante): ${missingNames}`
@@ -204,12 +204,12 @@ function EnrollSubjectsPage() {
         else {
           if (isAdvancedStudent && subject.year === studentData.year + 1) {
             const reqs = requiresMap.get(subject.id) ?? []
-            const allReqsPassed = reqs.every(req => passedSubjectIds.has(req.id))
+            const allReqsPassed = reqs.every(rid => passedSubjectIds.has(rid))
 
             if (!allReqsPassed) {
-              const missingReqs = reqs.filter(req => !passedSubjectIds.has(req.id))
+              const missingReqs = reqs.filter(rid => !passedSubjectIds.has(rid))
               const missingNames = missingReqs
-                .map(req => subjectNameMap.get(req.id))
+                .map(id => subjectNameMap.get(id))
                 .filter(Boolean)
                 .join(', ')
               blockedReason = `Requiere: ${missingNames}`
@@ -231,12 +231,12 @@ function EnrollSubjectsPage() {
             blockedReason = `Año ${subject.year} (Tu año actual: ${studentData.year})`
           } else {
             const reqs = requiresMap.get(subject.id) ?? []
-            const allReqsPassed = reqs.every(req => passedSubjectIds.has(req.id))
+            const allReqsPassed = reqs.every(rid => passedSubjectIds.has(rid))
 
             if (!allReqsPassed) {
-              const missingReqs = reqs.filter(req => !passedSubjectIds.has(req.id))
+              const missingReqs = reqs.filter(rid => !passedSubjectIds.has(rid))
               const missingNames = missingReqs
-                .map(req => subjectNameMap.get(req.id))
+                .map(id => subjectNameMap.get(id))
                 .filter(Boolean)
                 .join(', ')
               blockedReason = `Requiere: ${missingNames}`

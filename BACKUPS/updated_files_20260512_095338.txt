@@ -1,0 +1,3 @@
+src/routes/dashboard/enroll-subjects.tsx
+src/routes/dashboard/exams.tsx
+src/routes/admin/correlatives.tsx

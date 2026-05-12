@@ -154,8 +154,10 @@ function ExamsPage() {
         .eq('subject_id', subjectId)
 
       if (correlativesData && correlativesData.length > 0) {
-        // Para EXAMEN FINAL: validar correlativas según required_status
+        // Para EXAMEN FINAL: debe verificar solo correlativas con required_status = 'aprobado'
+        // o validated to be 'aprobado' (promoted, passed)
         for (const corr of correlativesData) {
+          // Solo validar correlativas marcadas para examen final
           const requiredStatus = corr.required_status || 'aprobado'
           
           // Obtener estado del alumno en esta correlativa
