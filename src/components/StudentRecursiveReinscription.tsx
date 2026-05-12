@@ -15,6 +15,7 @@ type FailedSubject = {
   can_reinscribe: boolean
   reason: string
   is_already_reinscribed: boolean
+  next_available_year?: number
 }
 
 export function StudentRecursiveReinscription() {
@@ -43,7 +44,6 @@ export function StudentRecursiveReinscription() {
 
       if (!student) return
 
-      // Obtener todas las materias en las que desaprobó (final_status = 'desaprobado')
       const { data: failedData, error: err } = await supabase
         .from('enrollment_grades')
         .select(`
@@ -79,7 +79,6 @@ export function StudentRecursiveReinscription() {
         return
       }
 
-      // Obtener inscripciones actuales para detectar reinscripciones
       const { data: currentEnrollments } = await supabase
         .from('enrollments')
         .select('subject_id, academic_year')
@@ -91,7 +90,6 @@ export function StudentRecursiveReinscription() {
         currentEnrollments?.map(e => e.subject_id) || []
       )
 
-      // Procesar y deduplicar (solo la más reciente de cada materia)
       const subjectMap = new Map<string, FailedSubject>()
 
       for (const record of failedData) {
@@ -101,37 +99,80 @@ export function StudentRecursiveReinscription() {
 
         if (!subjectMap.has(subjectId)) {
           const failureYear = failedYear
-
-          // Determinar si puede reinscribirse
           let canReinscribe = false
           let reason = ''
+          let nextAvailableYear: number | undefined
 
           if (subject.dictation_type === 'anual') {
-            if (currentYear > failureYear) {
+            // Anual: solo año siguiente (failedYear + 1)
+            const nextYearForAnual = failureYear + 1
+            if (currentYear === nextYearForAnual) {
               canReinscribe = true
-              reason = `Anual: puede reinscribirse en ${currentYear}`
-            } else {
+              reason = `Anual: puede reinscribirse en ${nextYearForAnual}`
+            } else if (currentYear < nextYearForAnual) {
               canReinscribe = false
-              reason = 'Anual: solo el próximo año'
+              nextAvailableYear = nextYearForAnual
+              reason = `Anual: disponible a partir de ${nextYearForAnual}`
+            } else {
+              // currentYear > nextYearForAnual (ya pasó el año)
+              canReinscribe = false
+              nextAvailableYear = nextYearForAnual + 1
+              reason = `Anual: próximo disponible en ${nextYearForAnual + 1}`
             }
           } else if (subject.dictation_type === 'cuatrimestral') {
-            if (subject.semester === 1 && currentMonth <= 6) {
-              canReinscribe = true
-              reason = '1er cuatrimestre: disponible hasta junio'
-            } else if (subject.semester === 2 && currentMonth >= 7) {
-              canReinscribe = true
-              reason = '2do cuatrimestre: disponible desde julio'
-            } else if (subject.semester === 1) {
+            // Cuatrimestral: año siguiente, pero SOLO en período específico
+            const nextCuatYear = failureYear + 1
+            const cuatLabel = subject.semester === 1 ? '1er cuatrimestre (marzo-junio)' : '2do cuatrimestre (julio-diciembre)'
+
+            if (currentYear === nextCuatYear) {
+              // Está en el año correcto, verificar período
+              if (subject.semester === 1) {
+                // 1er cuatrimestre: marzo (3) a junio (6)
+                if (currentMonth >= 3 && currentMonth <= 6) {
+                  canReinscribe = true
+                  reason = `${cuatLabel}: disponible hasta junio ${nextCuatYear}`
+                } else if (currentMonth < 3) {
+                  // Aún no es marzo
+                  canReinscribe = false
+                  reason = `${cuatLabel}: próximo disponible en marzo ${nextCuatYear}`
+                } else {
+                  // Ya pasó junio (mes > 6)
+                  canReinscribe = false
+                  nextAvailableYear = nextCuatYear + 1
+                  reason = `${cuatLabel}: próximo disponible en marzo ${nextCuatYear + 1}`
+                }
+              } else {
+                // 2do cuatrimestre: julio (7) a diciembre (12)
+                if (currentMonth >= 7 && currentMonth <= 12) {
+                  canReinscribe = true
+                  reason = `${cuatLabel}: disponible hasta diciembre ${nextCuatYear}`
+                } else if (currentMonth < 7) {
+                  // Aún no es julio
+                  canReinscribe = false
+                  reason = `${cuatLabel}: próximo disponible en julio ${nextCuatYear}`
+                } else {
+                  // Imposible (mes nunca es > 12)
+                  canReinscribe = false
+                  reason = `${cuatLabel}: próximo disponible en julio ${nextCuatYear + 1}`
+                }
+              }
+            } else if (currentYear < nextCuatYear) {
+              // Aún no llega al año de reinscripción
               canReinscribe = false
-              reason = '1er cuatrimestre: próximo disponible en enero'
+              nextAvailableYear = nextCuatYear
+              reason = `${cuatLabel}: disponible a partir de ${nextCuatYear}`
             } else {
+              // currentYear > nextCuatYear (ya pasó el año)
               canReinscribe = false
-              reason = '2do cuatrimestre: próximo disponible en julio'
+              nextAvailableYear = nextCuatYear + 1
+              reason = `${cuatLabel}: próximo disponible en ${nextCuatYear + 1}`
             }
           } else {
             canReinscribe = true
             reason = 'Disponible para reinscribirse'
           }
+
+          const isAlreadyReinscribed = currentRecursiveIds.has(subjectId)
 
           subjectMap.set(subjectId, {
             id: subjectId,
@@ -143,15 +184,15 @@ export function StudentRecursiveReinscription() {
             final_grade: record.final_grade || 0,
             final_status: record.final_status,
             failed_year: failureYear,
-            can_reinscribe: canReinscribe,
-            reason: reason,
-            is_already_reinscribed: currentRecursiveIds.has(subjectId),
+            can_reinscribe: canReinscribe && !isAlreadyReinscribed,
+            reason: isAlreadyReinscribed ? 'Ya reinscripto este año' : reason,
+            is_already_reinscribed: isAlreadyReinscribed,
+            next_available_year: nextAvailableYear,
           })
         }
       }
 
       const processed = Array.from(subjectMap.values()).sort((a, b) => {
-        // Mostrar primero las que pueden reinscribirse
         if (a.can_reinscribe !== b.can_reinscribe) {
           return a.can_reinscribe ? -1 : 1
         }
@@ -341,6 +382,11 @@ export function StudentRecursiveReinscription() {
                   <div className="flex items-center gap-2 mt-2">
                     <Lock size={14} className="text-gray-500" />
                     <span className="text-sm text-gray-600">{subject.reason}</span>
+                    {subject.next_available_year && (
+                      <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded ml-2">
+                        Disponible: {subject.next_available_year}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -361,14 +407,12 @@ export function StudentRecursiveReinscription() {
         <h3 className="font-bold text-blue-900 mb-2">ℹ️ Cómo funciona la reinscripción</h3>
         <ul className="text-sm text-blue-900 space-y-2">
           <li>
-            <strong>Anuales:</strong> Solo puedes reinscribirse el año siguiente al que desaprobaste.
-            <br />
-            <span className="text-xs text-blue-700">Ejemplo: Desaprobaste en 2026 → Puedes reinscribirse en 2027</span>
+            <strong>Anuales:</strong> Solo puedes reinscribirse el año siguiente (ej: desaprobado 2026 → reinscripción 2027).
           </li>
           <li>
-            <strong>Cuatrimestrales:</strong> Solo en el período correspondiente.
+            <strong>Cuatrimestrales:</strong> Año siguiente, pero SOLO en el período correcto.
             <br />
-            <span className="text-xs text-blue-700">1er C: Disponible enero-junio | 2do C: Disponible julio-diciembre</span>
+            <span className="text-xs text-blue-700">1er C: Marzo-junio | 2do C: Julio-diciembre</span>
           </li>
           <li>
             <strong>Estado de recursante:</strong> Se registrará como 2do intento en el sistema.

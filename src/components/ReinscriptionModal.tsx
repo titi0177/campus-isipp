@@ -104,53 +104,61 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
         if (!subjectMap.has(subjectId)) {
           let canReinscribe = false
           let reason = ''
-          let nextAvailableYear = null
+          let nextAvailableYear: number | null = null
 
           if (subject.dictation_type === 'anual') {
-            // Anual: solo puede reinscribirse el año SIGUIENTE
-            if (currentYear > failedYear) {
+            // Anual: solo año siguiente
+            const nextYearForAnual = failedYear + 1
+            if (currentYear === nextYearForAnual) {
               canReinscribe = true
-              reason = `Anual: puede reinscribirse en ${currentYear}`
+              reason = `Anual: puede reinscribirse en ${nextYearForAnual}`
+            } else if (currentYear < nextYearForAnual) {
+              canReinscribe = false
+              nextAvailableYear = nextYearForAnual
+              reason = `Anual: disponible a partir de ${nextYearForAnual}`
             } else {
               canReinscribe = false
-              nextAvailableYear = failedYear + 1
-              reason = `Anual: solo disponible a partir de ${failedYear + 1}`
+              nextAvailableYear = nextYearForAnual + 1
+              reason = `Anual: próximo disponible en ${nextYearForAnual + 1}`
             }
           } else if (subject.dictation_type === 'cuatrimestral') {
-            // Cuatrimestral: MISMO cuatrimestre, pero SIEMPRE el año SIGUIENTE
+            // Cuatrimestral: año siguiente + período específico
             const nextCuatYear = failedYear + 1
-            const cuatLabel = subject.semester === 1 ? '1er cuatrimestre' : '2do cuatrimestre'
+            const cuatLabel = subject.semester === 1 ? '1er cuatrimestre (marzo-junio)' : '2do cuatrimestre (julio-diciembre)'
             
             if (currentYear === nextCuatYear) {
-              // Está en el año correcto, ahora verificar si es el período correcto
+              // Está en el año correcto, verificar período
               if (subject.semester === 1) {
-                // 1er cuatrimestre: enero a junio
-                if (currentMonth <= 6) {
+                // 1er cuatrimestre: marzo (3) a junio (6)
+                if (currentMonth >= 3 && currentMonth <= 6) {
                   canReinscribe = true
-                  reason = `${cuatLabel} ${nextCuatYear}: disponible hasta junio`
+                  reason = `${cuatLabel}: disponible hasta junio ${nextCuatYear}`
+                } else if (currentMonth < 3) {
+                  canReinscribe = false
+                  reason = `${cuatLabel}: próximo disponible en marzo ${nextCuatYear}`
                 } else {
                   canReinscribe = false
                   nextAvailableYear = nextCuatYear + 1
-                  reason = `${cuatLabel} ${nextCuatYear}: próximo disponible en enero ${nextCuatYear + 1}`
+                  reason = `${cuatLabel}: próximo disponible en marzo ${nextCuatYear + 1}`
                 }
               } else {
-                // 2do cuatrimestre: julio a diciembre
-                if (currentMonth >= 7) {
+                // 2do cuatrimestre: julio (7) a diciembre (12)
+                if (currentMonth >= 7 && currentMonth <= 12) {
                   canReinscribe = true
-                  reason = `${cuatLabel} ${nextCuatYear}: disponible desde julio`
+                  reason = `${cuatLabel}: disponible hasta diciembre ${nextCuatYear}`
+                } else if (currentMonth < 7) {
+                  canReinscribe = false
+                  reason = `${cuatLabel}: próximo disponible en julio ${nextCuatYear}`
                 } else {
                   canReinscribe = false
-                  nextAvailableYear = nextCuatYear + 1
-                  reason = `${cuatLabel} ${nextCuatYear}: próximo disponible en julio ${nextCuatYear + 1}`
+                  reason = `${cuatLabel}: próximo disponible en julio ${nextCuatYear + 1}`
                 }
               }
             } else if (currentYear < nextCuatYear) {
-              // Aún no llega al año de reinscripción
               canReinscribe = false
               nextAvailableYear = nextCuatYear
               reason = `${cuatLabel}: disponible a partir de ${nextCuatYear}`
             } else {
-              // Ya pasó el año de reinscripción (currentYear > nextCuatYear)
               canReinscribe = false
               nextAvailableYear = nextCuatYear + 1
               reason = `${cuatLabel}: próximo disponible en ${nextCuatYear + 1}`
@@ -175,7 +183,7 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
             can_reinscribe: canReinscribe && !isAlreadyReinscribed,
             reason: isAlreadyReinscribed ? 'Ya reinscripto este año' : reason,
             is_already_reinscribed: isAlreadyReinscribed,
-            next_available_year: nextAvailableYear,
+            next_available_year: nextAvailableYear || undefined,
           })
         }
       }
@@ -364,8 +372,9 @@ export function ReinscriptionModal({ isOpen, onClose }: Props) {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
             <p className="font-bold mb-2">Cómo funciona la reinscripción</p>
             <ul className="text-xs space-y-1">
-              <li>• <strong>Anuales:</strong> Solo el año siguiente al desaprobado (ej: desaprobado 2024 → reinscribirse 2025)</li>
-              <li>• <strong>Cuatrimestrales:</strong> Mismo cuatrimestre, pero año siguiente (ej: desaprobado 1er C 2024 → reinscribirse 1er C 2025)</li>
+              <li>• <strong>Anuales:</strong> Solo el año siguiente (ej: desaprobado 2026 → reinscribirse 2027)</li>
+              <li>• <strong>Cuatrimestrales:</strong> Año siguiente, pero SOLO en el período correcto</li>
+              <li>• <strong>1er C (marzo-junio):</strong> 2do C (julio-diciembre)</li>
               <li>• Se registrara como recursante (2do intento) en el sistema</li>
               <li>• No se pierden tus calificaciones del primer intento</li>
             </ul>
