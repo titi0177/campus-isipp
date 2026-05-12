@@ -1,0 +1,48 @@
+⚠️ PROBLEMA IDENTIFICADO Y SOLUCIONADO
+
+La columna `required_status` NO EXISTE en tu BD de Supabase. Por eso el admin no te dejaba modificar.
+
+================================================================================
+📋 PASOS PARA ARREGLARLO:
+================================================================================
+
+1. EJECUTA ESTE SQL en Supabase > SQL Editor:
+
+-----
+
+ALTER TABLE public.subject_correlatives
+  ADD COLUMN IF NOT EXISTS required_status TEXT DEFAULT 'aprobado'
+  CHECK (required_status IN ('aprobado', 'regular', 'any'));
+
+CREATE INDEX IF NOT EXISTS idx_subject_correlatives_by_status 
+ON public.subject_correlatives(subject_id, required_status);
+
+CREATE INDEX IF NOT EXISTS idx_subject_correlatives_requires 
+ON public.subject_correlatives(requires_subject_id);
+
+-----
+
+2. Después de ejecutar el SQL, ve a:
+   Admin > Correlativas
+   
+3. Las correlativas que ya tenías estarán con required_status = 'aprobado' (default)
+
+4. Ahora podrás modificarlas con los radio buttons:
+   - Aprobada/Promocionada (para examen final)
+   - Regularizada (para cursar)
+   - Sin restricción (cualquier estado)
+
+================================================================================
+QUÉ CAMBIÓ:
+================================================================================
+
+ANTES (sin required_status):
+- Todas las correlativas validaban igual
+- Sin distinción entre cursar y examen final
+
+DESPUÉS (con required_status):
+- required_status = 'aprobado' → Solo para EXAMEN FINAL
+- required_status = 'regular' → Para CURSAR
+- required_status = 'any' → Sin validación
+
+================================================================================
