@@ -29,7 +29,6 @@ function ProfessorAttendancePage() {
   const [subjects, setSubjects] = useState<any[]>([])
   const [selectedSubject, setSelectedSubject] = useState('')
   const [selectedDivision, setSelectedDivision] = useState<string | null>(null)
-  const [showAllYears, setShowAllYears] = useState(false)
   const [subjectName, setSubjectName] = useState('')
   const [students, setStudents] = useState<StudentAttendance[]>([])
   const [loading, setLoading] = useState(true)
@@ -122,8 +121,8 @@ function ProfessorAttendancePage() {
         ? allEnrollmentsData.filter(e => e.division === division)
         : allEnrollmentsData
       
-      // Filtrar por año: solo alumnos que coincidan con el año de la materia (si showAllYears=false)
-      if (enrollmentsData && subject && !showAllYears) {
+      // Filtrar por año: solo alumnos que coincidan con el año de la materia
+      if (enrollmentsData && subject) {
         enrollmentsData = enrollmentsData.filter(e => {
           const studentYear = (e as any).student?.year
           return studentYear === subject.year
@@ -468,25 +467,6 @@ function ProfessorAttendancePage() {
           </div>
         )}
       </div>
-
-      {/* Filtro de Años */}
-      {selectedSubject && (
-        <div className="card p-4 bg-purple-50 border-2 border-purple-200 rounded-lg">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showAllYears}
-              onChange={(e) => {
-                setShowAllYears(e.target.checked)
-                if (selectedSubject) loadEnrollments(selectedSubject, selectedDivision)
-              }}
-              className="w-4 h-4 rounded"
-            />
-            <span className="text-sm font-semibold text-purple-900">Mostrar alumnos de todos los años (incluyendo avanzados)</span>
-          </label>
-          <p className="text-xs text-purple-700 mt-2 ml-6">Sin marcar: solo se muestran alumnos del año correspondiente a la materia</p>
-        </div>
-      )}
 
       {/* Info Box */}
       {selectedSubject && students.length > 0 && (
