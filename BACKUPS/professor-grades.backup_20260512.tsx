@@ -77,7 +77,6 @@ function ProfessorGradesPage() {
         .from('enrollments')
         .select(`
           id,
-          division,
           student:students(id, first_name, last_name)
         `)
         .eq('subject_id', subjectId)
@@ -89,7 +88,6 @@ function ProfessorGradesPage() {
           student_id: e.student.id,
           student_name: `${e.student.last_name}, ${e.student.first_name}`,
           subject_id: subjectId,
-          division: e.division,
         }))
         setEnrollments(formatted)
       }

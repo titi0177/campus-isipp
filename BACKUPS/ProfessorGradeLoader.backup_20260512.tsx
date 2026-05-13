@@ -7,7 +7,6 @@ type Enrollment = {
   student_id: string
   student_name: string
   subject_id: string
-  division?: 'A' | 'B' | null
 }
 
 type GradeData = {
@@ -29,7 +28,6 @@ type Props = {
 export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [numGrades, setNumGrades] = useState(3)
   const [allowsPromotion, setAllowsPromotion] = useState(false)
-  const [selectedDivision, setSelectedDivision] = useState<'A' | 'B' | null>(null)
   const [grades, setGrades] = useState<Record<string, GradeData>>({})
   const [existingGrades, setExistingGrades] = useState<Record<string, GradeData>>({})
   const [existingIds, setExistingIds] = useState<Record<string, string>>({})
@@ -124,7 +122,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       // Mostrar TODOS los alumnos EXCEPTO los que ya tienen final_grade cargada
       const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
       setActiveEnrollments(active)
-      setSelectedDivision(null) // Reset division when loading new enrollments
     } catch (err) {
       console.error('Error in filterActiveEnrollments:', err)
       setError('Error inesperado al cargar calificaciones: ' + String(err))
@@ -181,11 +178,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
     try {
       let savedCount = 0
-      const enrollmentsToSave = selectedDivision
-        ? activeEnrollments.filter(e => e.division === selectedDivision)
-        : activeEnrollments
 
-      for (const enrollment of enrollmentsToSave) {
+      for (const enrollment of activeEnrollments) {
         // Verificar si hay cambios para este alumno
         let hasChanges = false
         for (let i = 1; i <= numGrades; i++) {
@@ -288,16 +282,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     return false
   })
 
-  // Get available divisions
-  const availableDivisions = Array.from(
-    new Set(activeEnrollments.map(e => e.division).filter(Boolean))
-  ).sort() as ('A' | 'B')[]
-
-  // Filter enrollments by selected division
-  const displayedEnrollments = selectedDivision
-    ? activeEnrollments.filter(e => e.division === selectedDivision)
-    : activeEnrollments
-
   return (
     <div className="space-y-6">
       {/* Configuración */}
@@ -342,38 +326,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       </div>
 
-      {/* Division Tabs (if available) */}
-      {availableDivisions.length > 0 && (
-        <div className="card p-4 bg-purple-50 border border-purple-200">
-          <p className="text-xs font-semibold text-purple-700 mb-2">Filtrar por División:</p>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setSelectedDivision(null)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                selectedDivision === null
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-purple-700 border border-purple-300 hover:bg-purple-50'
-              }`}
-            >
-              Todas
-            </button>
-            {availableDivisions.map(div => (
-              <button
-                key={div}
-                onClick={() => setSelectedDivision(div)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                  selectedDivision === div
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white text-purple-700 border border-purple-300 hover:bg-purple-50'
-                }`}
-              >
-                División {div}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Info Box */}
       <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
         <h3 className="font-bold text-emerald-900 mb-2">Carga Flexible y Progresiva</h3>
@@ -398,10 +350,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       )}
 
-      {displayedEnrollments.length === 0 ? (
+      {activeEnrollments.length === 0 ? (
         <div className="card p-6 text-center bg-blue-50 border border-blue-200">
           <p className="text-gray-600 font-medium">
-            {selectedDivision ? `No hay alumnos en División ${selectedDivision} sin calificaciones completas` : 'Todos los alumnos tienen calificaciones completas y finalizadas'}
+            Todos los alumnos tienen calificaciones completas y finalizadas
           </p>
         </div>
       ) : (
@@ -422,18 +374,13 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {displayedEnrollments.map((enrollment, idx) => {
+                  {activeEnrollments.map((enrollment, idx) => {
                     const partialGrade = calculatePartialGrade(enrollment.id)
                     const partialStatus = partialGrade ? getPartialStatus(partialGrade) : null
 
                     return (
                       <tr key={enrollment.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-4 py-3 font-medium text-gray-900">
-                          {enrollment.student_name}
-                          {enrollment.division && (
-                            <span className="text-xs text-gray-500 ml-2">(Div. {enrollment.division})</span>
-                          )}
-                        </td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{enrollment.student_name}</td>
                         {Array.from({ length: numGrades }, (_, i) => {
                           const gradeValue = getDisplayGrade(enrollment.id, i + 1)
                           const hasExisting = existingGrades[enrollment.id]?.[`grade_${i + 1}` as keyof GradeData] !== undefined
