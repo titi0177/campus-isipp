@@ -91,7 +91,7 @@ function ProfessorAttendancePage() {
           id,
           division,
           student_id,
-          student:students(id, first_name, last_name, legajo, dni)
+          student:students(id, first_name, last_name, legajo, dni, year)
         `)
         .eq('subject_id', subjectId)
         .order('student(last_name)', { ascending: true })
@@ -120,6 +120,14 @@ function ProfessorAttendancePage() {
       let enrollmentsData = division && allEnrollmentsData
         ? allEnrollmentsData.filter(e => e.division === division)
         : allEnrollmentsData
+      
+      // Filtrar por año: solo alumnos que coincidan con el año de la materia
+      if (enrollmentsData && subject) {
+        enrollmentsData = enrollmentsData.filter(e => {
+          const studentYear = (e as any).student?.year
+          return studentYear === subject.year
+        })
+      }
       
       // Excluir estudiantes con estado final
       enrollmentsData = enrollmentsData
