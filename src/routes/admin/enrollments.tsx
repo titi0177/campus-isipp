@@ -136,8 +136,7 @@ function EnrollmentsPage() {
     const { error } = await supabase.from('enrollments').insert({
       student_id: form.student_id,
       subject_id: form.subject_id,
-      year: form.year,
-      semester: form.semester,
+      academic_year: form.year,
       division: form.division || null,
       status: form.status
     })
