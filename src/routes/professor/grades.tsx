@@ -30,6 +30,7 @@ type Enrollment = {
 function ProfessorGradesPage() {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [selectedSubject, setSelectedSubject] = useState('')
+  const [showAllYears, setShowAllYears] = useState(false)
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history' | 'disapproved'>('load')
@@ -72,25 +73,30 @@ function ProfessorGradesPage() {
   async function loadEnrollments(subjectId: string) {
     try {
       setLoading(true)
+      const subject = subjects.find(s => s.id === subjectId)
 
       const { data } = await supabase
         .from('enrollments')
-        .select(`
-          id,
-          division,
-          student:students(id, first_name, last_name)
-        `)
+        .select('id, division, student_id, student:students(id, first_name, last_name, year)')
         .eq('subject_id', subjectId)
         .order('student(last_name)')
 
       if (data) {
-        const formatted: Enrollment[] = data.map((e: any) => ({
+        let formatted: Enrollment[] = data.map((e: any) => ({
           id: e.id,
           student_id: e.student.id,
           student_name: `${e.student.last_name}, ${e.student.first_name}`,
           subject_id: subjectId,
           division: e.division,
         }))
+        
+        if (subject && !showAllYears) {
+          formatted = formatted.filter((e: any) => {
+            const studentYear = data.find((d: any) => d.id === e.id)?.student?.year
+            return studentYear === subject.year
+          })
+        }
+        
         setEnrollments(formatted)
       }
 
@@ -119,10 +125,10 @@ function ProfessorGradesPage() {
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-indigo-100 text-sm font-semibold mb-2">Sistema Académico</p>
+            <p className="text-indigo-100 text-sm font-semibold mb-2">Sistema Academico</p>
             <h1 className="text-5xl font-black mb-3">Carga de Calificaciones</h1>
             <p className="text-indigo-100 text-lg">
-              Carga flexible de notas parciales (1-6) y finales con promoción automática
+              Carga flexible de notas parciales (1-6) y finales con promocion automatica
             </p>
           </div>
           <FileText size={80} className="opacity-20" />
@@ -132,7 +138,7 @@ function ProfessorGradesPage() {
       {/* Selector de Materia */}
       <div className="card p-6">
         <label htmlFor="subject-select" className="block text-sm font-bold text-gray-900 mb-3">
-          📚 Seleccionar Materia *
+          Seleccionar Materia *
         </label>
         <select
           id="subject-select"
@@ -151,6 +157,23 @@ function ProfessorGradesPage() {
 
       {selectedSubject && (
         <>
+          {/* Filtro de Anos */}
+          <div className="card p-4 bg-purple-50 border-2 border-purple-200 rounded-lg">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showAllYears}
+                onChange={(e) => {
+                  setShowAllYears(e.target.checked)
+                  if (selectedSubject) void loadEnrollments(selectedSubject)
+                }}
+                className="w-4 h-4 rounded"
+              />
+              <span className="text-sm font-semibold text-purple-900">Mostrar alumnos de todos los anos (incluyendo avanzados)</span>
+            </label>
+            <p className="text-xs text-purple-700 mt-2 ml-6">Sin marcar: solo se muestran alumnos del ano correspondiente a la materia</p>
+          </div>
+
           {/* Tabs */}
           <div className="flex gap-2 border-b border-gray-200 flex-wrap">
             <button
@@ -181,7 +204,7 @@ function ProfessorGradesPage() {
                   : 'border-b-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              🔄 Desaprobados
+              Desaprobados
             </button>
             <button
               onClick={() => setActiveTab('history')}
@@ -191,7 +214,7 @@ function ProfessorGradesPage() {
                   : 'border-b-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
-              📋 Historial de Aprobados
+              Historial de Aprobados
             </button>
           </div>
 
@@ -206,13 +229,13 @@ function ProfessorGradesPage() {
               {enrollments.length > 0 ? (
                 <>
                   <div className="card p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
-                    <h3 className="font-bold text-blue-900 mb-2">📋 Información del Sistema</h3>
+                    <h3 className="font-bold text-blue-900 mb-2">Informacion del Sistema</h3>
                     <ul className="text-sm text-blue-900 space-y-1">
-                      <li>✓ Selecciona cuántas notas usarás (1-6)</li>
-                      <li>✓ El promedio parcial se calcula automáticamente al completar todas las notas</li>
-                      <li>✓ Estados: <strong>Promocionado</strong> (≥8), <strong>Regular</strong> (6-7), <strong>Desaprobado</strong> (&lt;6)</li>
-                      <li>✓ Las notas finales se cargan en la sección "Regulares"</li>
-                      <li>✓ Puedes cargar 1 o más notas a la vez - el sistema permite carga parcial</li>
+                      <li>Selecciona cuantas notas usaras (1-6)</li>
+                      <li>El promedio parcial se calcula automaticamente al completar todas las notas</li>
+                      <li>Estados: Promocionado (mayor o igual a 8), Regular (6-7), Desaprobado (menor a 6)</li>
+                      <li>Las notas finales se cargan en la seccion Regulares</li>
+                      <li>Puedes cargar 1 o mas notas a la vez - el sistema permite carga parcial</li>
                     </ul>
                   </div>
                   <ProfessorGradeLoader enrollments={enrollments} subjectId={selectedSubject} />
@@ -220,7 +243,7 @@ function ProfessorGradesPage() {
               ) : (
                 <div className="card p-6 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
                   <p className="text-green-800 font-semibold">
-                    ✓ No hay alumnos inscritos en esta materia o todos tienen calificaciones completas
+                    No hay alumnos inscritos en esta materia o todos tienen calificaciones completas
                   </p>
                 </div>
               )}
@@ -228,9 +251,9 @@ function ProfessorGradesPage() {
           ) : activeTab === 'regulars' ? (
             <>
               <div className="card p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200">
-                <h3 className="font-bold text-amber-900 mb-2">📝 Notas Finales para Regulares</h3>
+                <h3 className="font-bold text-amber-900 mb-2">Notas Finales para Regulares</h3>
                 <p className="text-sm text-amber-900">
-                  Aquí puedes cargar las notas finales de los estudiantes en condición Regular (parcial ≥6).
+                  Aqui puedes cargar las notas finales de los estudiantes en condicion Regular (parcial mayor o igual a 6).
                 </p>
               </div>
               <ProfessorRegularGrades subjectId={selectedSubject} />
@@ -238,9 +261,9 @@ function ProfessorGradesPage() {
           ) : activeTab === 'disapproved' ? (
             <>
               <div className="card p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200">
-                <h3 className="font-bold text-red-900 mb-2">🔄 Gestión de Desaprobados</h3>
+                <h3 className="font-bold text-red-900 mb-2">Gestion de Desaprobados</h3>
                 <p className="text-sm text-red-900">
-                  Aquí puedes reinscribir a los alumnos desaprobados como recursantes (2do intento)
+                  Aqui puedes reinscribir a los alumnos desaprobados como recursantes (2do intento)
                 </p>
               </div>
               <ProfessorDisapprovedManagement subjectId={selectedSubject} />
@@ -248,9 +271,9 @@ function ProfessorGradesPage() {
           ) : (
             <>
               <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
-                <h3 className="font-bold text-emerald-900 mb-2">📋 Historial de Calificaciones</h3>
+                <h3 className="font-bold text-emerald-900 mb-2">Historial de Calificaciones</h3>
                 <p className="text-sm text-emerald-900">
-                  Visualiza el registro completo de todos los alumnos con sus notas parciales y finales, estados y condiciones académicas.
+                  Visualiza el registro completo de todos los alumnos con sus notas parciales y finales, estados y condiciones academicas.
                 </p>
               </div>
               <ProfessorApprovedHistory subjectId={selectedSubject} subjectName={subjects.find(s => s.id === selectedSubject)?.name || ''} />
