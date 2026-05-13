@@ -124,9 +124,9 @@ function EnrollmentsPage() {
       .select('id')
       .eq('student_id', form.student_id)
       .eq('subject_id', form.subject_id)
-      .eq('year', form.year)
+      .eq('academic_year', form.year)
       .eq('division', form.division || null)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       showToast('Este alumno ya está inscripto en esta materia/división en este año.', 'error')
