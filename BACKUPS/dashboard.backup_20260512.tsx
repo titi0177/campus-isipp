@@ -124,11 +124,10 @@ const GradeRow = memo(function GradeRowComp({ s, index }: { s: Row; index: numbe
     status = 'Regular'
     statusBg = 'bg-yellow-100 text-yellow-700 font-semibold'
     statusIcon = '📖'
-  } else if (s.partial_status === 'promocionado' && s.subject?.allows_promotion) {
+  } else if (s.partial_status === 'promocionado') {
     status = 'Promocionado'
     statusBg = 'bg-green-100 text-green-700 font-semibold'
     statusIcon = '🎓'
-    noteColor = 'text-green-700 font-bold'
     noteColor = 'text-green-700 font-bold'
   } else if (s.partial_status === 'desaprobado') {
     status = 'Desaprobado'
@@ -223,7 +222,7 @@ function DashboardPage() {
         let gpaSum = 0
         let gpaCount = 0
         for (const row of mapped) {
-          if (row.final_grade != null && (row.final_status === 'aprobado' || (row.final_status === 'promocionado' && row.subject?.allows_promotion))) {
+          if (row.final_grade != null && (row.final_status === 'aprobado' || row.final_status === 'promocionado')) {
             gpaSum += row.final_grade
             gpaCount++
           }
@@ -234,7 +233,7 @@ function DashboardPage() {
         const approved = mapped.filter(r => 
           r.final_grade != null && 
           r.final_grade >= 6 && 
-          (r.final_status === 'aprobado' || (r.final_status === 'promocionado' && r.subject?.allows_promotion))
+          (r.final_status === 'aprobado' || r.final_status === 'promocionado')
         ).length
         
         const enCurso = mapped.filter(r => r.final_grade == null).length
@@ -281,7 +280,11 @@ function DashboardPage() {
 
   if (!student) return null
 
-  const approved = progress.aprobadas
+  const approved = rows.filter(r => 
+    r.final_grade != null && 
+    r.final_grade >= 6 && 
+    (r.final_status === 'aprobado' || r.final_status === 'promocionado')
+  ).length
 
   return (
     <>
