@@ -119,16 +119,28 @@ function ExamsPage() {
       // 2. Verificar nota parcial (>= 6)
       const { data: gradeData } = await supabase
         .from('enrollments')
-        .select('enrollment_grades(partial_grade, partial_status)')
+        .select('grades(partial_1, partial_2, partial_3, practical_1, practical_2, practical_3, partial_grade)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
         .single()
 
-      const gradeRecord = Array.isArray(gradeData?.enrollment_grades) 
-        ? gradeData?.enrollment_grades[0] 
-        : gradeData?.enrollment_grades
+      const gradeRecord = gradeData?.grades
       
-      const partialGrade = gradeRecord?.partial_grade
+      // Intentar usar partial_grade (si existe) o calcular desde componentes
+      let partialGrade: number | null = null
+      
+      if (gradeRecord?.partial_grade !== undefined && gradeRecord?.partial_grade !== null) {
+        // Si existe partial_grade, usar ese
+        partialGrade = gradeRecord.partial_grade
+      } else if (gradeRecord) {
+        // Si no, calcular desde componentes
+        const partials = [gradeRecord.partial_1, gradeRecord.partial_2, gradeRecord.partial_3].filter(p => p != null)
+        const practicals = [gradeRecord.practical_1, gradeRecord.practical_2, gradeRecord.practical_3].filter(p => p != null)
+        const allGrades = [...partials, ...practicals]
+        if (allGrades.length > 0) {
+          partialGrade = allGrades.reduce((a, b) => a + b, 0) / allGrades.length
+        }
+      }
 
       if (!partialGrade || partialGrade < 6) {
         reasons.push(`Nota parcial insuficiente (actual: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, mínimo: 6)`)
