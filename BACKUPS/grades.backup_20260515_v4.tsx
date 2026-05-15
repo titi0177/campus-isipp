@@ -100,20 +100,14 @@ function LegacyGradeLoader() {
       }
 
       if (enrollmentGrades?.id) {
-        // UPDATE existente - SOLO actualizar campos que fueron editados
-        const updates: any = {}
-        if (r.partial_grade !== undefined) {
-          updates.partial_grade = r.partial_grade ?? null
-        }
-        if (r.final_grade !== undefined) {
-          updates.final_grade = r.final_grade ?? null
-        }
-        // Siempre actualizar status
-        updates.final_status = status
-        
+        // UPDATE existente (permitir NULL para borrar)
         await supabase
           .from('enrollment_grades')
-          .update(updates)
+          .update({
+            partial_grade: r.partial_grade ?? null,
+            final_grade: r.final_grade ?? null,
+            final_status: status,
+          })
           .eq('id', enrollmentGrades.id)
       } else {
         // INSERT nuevo (solo si tiene nota)
