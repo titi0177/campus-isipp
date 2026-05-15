@@ -67,13 +67,9 @@ function AttendancePage() {
           student:students(first_name, last_name, legajo, dni)
         `)
         .eq('subject_id', subjectId)
+        .order('student.legajo')
 
       if (data) {
-        // Ordenar por legajo en JavaScript (no en la query)
-        data.sort((a, b) => 
-          (a.student?.legajo ?? '').localeCompare(b.student?.legajo ?? '')
-        )
-        
         const studentList: StudentAttendance[] = []
         
         for (const enr of data) {
