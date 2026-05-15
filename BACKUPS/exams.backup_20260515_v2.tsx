@@ -53,7 +53,8 @@ function ExamsPage() {
         .from('final_exams')
         .select(`
           *,
-          subject:subjects(id, name, professor_id)
+          subject:subjects!final_exams_subject_id_fkey(id, name, professor_id),
+          professor:professors!final_exams_professor_id_fkey(name)
         `)
         .order('exam_date', { ascending: true })
 
@@ -66,11 +67,11 @@ function ExamsPage() {
       } else {
         console.log('[EXAMS] examsData count:', examsData?.length)
         console.log('[EXAMS] examsData:', examsData)
-        // Cargar profesor de la materia para cada examen
+        // Si exam.professor es null, cargar profesor de la materia
         const enrichedExams = await Promise.all(
           (examsData || []).map(async (exam) => {
-            console.log('[EXAMS] Processing exam:', exam.id, 'subject:', exam.subject?.id, 'subject_professor_id:', exam.subject?.professor_id)
-            if (exam.subject?.professor_id) {
+            console.log('[EXAMS] Processing exam:', exam.id, 'subject:', exam.subject?.id, 'professor:', exam.professor?.name)
+            if (!exam.professor && exam.subject?.professor_id) {
               console.log('[EXAMS] Loading professor for subject:', exam.subject.professor_id)
               const { data: profData } = await supabase
                 .from('professors')
@@ -80,7 +81,7 @@ function ExamsPage() {
               console.log('[EXAMS] Loaded professor:', profData)
               return {
                 ...exam,
-                professor: profData
+                professor: profData || exam.professor
               }
             }
             return exam
