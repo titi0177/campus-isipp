@@ -74,6 +74,7 @@ function FinalExamsPage() {
       ...rest,
       exam_date: when,
       exam_time: editing.exam_time || '09:00',
+      professor_id: editing.professor_id || null,
       president_id: editing.president_id || null,
       vocal1_id: editing.vocal1_id || null,
       vocal2_id: editing.vocal2_id || null,
