@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export const Route = createFileRoute('/reset-password')({
@@ -12,68 +12,15 @@ function ResetPasswordPage() {
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sessionReady, setSessionReady] = useState(false)
-
-  // Capturar token del URL y crear sesión
-  useEffect(() => {
-    const setupSession = async () => {
-      try {
-        // Supabase automáticamente procesa el #access_token del URL
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError) {
-          setError('Error al validar el link de recuperación. Por favor, solicita un nuevo email.')
-          console.error('Session error:', sessionError)
-          return
-        }
-
-        if (!session) {
-          setError('El link de recuperación ha expirado o no es válido. Por favor, solicita un nuevo email.')
-          return
-        }
-
-        // Sesión válida
-        setSessionReady(true)
-      } catch (err) {
-        console.error('Setup session error:', err)
-        setError('Error al procesar el link de recuperación.')
-      }
-    }
-
-    setupSession()
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (password !== confirm) { 
-      setError('Las contraseñas no coinciden.')
-      return 
-    }
-
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
-      return
-    }
-
+    if (password !== confirm) { setError('Las contraseñas no coinciden.'); return }
     setLoading(true)
-    setError('')
-
-    try {
-      const { error: err } = await supabase.auth.updateUser({ password })
-      
-      if (err) {
-        console.error('Update error:', err)
-        setError('No se pudo actualizar la contraseña. Intente nuevamente.')
-      } else {
-        setDone(true)
-      }
-    } catch (err) {
-      console.error('Unexpected error:', err)
-      setError('Error inesperado al actualizar la contraseña.')
-    } finally {
-      setLoading(false)
-    }
+    const { error: err } = await supabase.auth.updateUser({ password })
+    if (err) setError('No se pudo actualizar la contraseña. Intente nuevamente.')
+    else setDone(true)
+    setLoading(false)
   }
 
   return (
@@ -93,18 +40,12 @@ function ResetPasswordPage() {
           <p className="mt-1 text-xs text-white/85">Instituto Superior de Informática Puerto Piray</p>
         </div>
         <div className="p-8">
-          {!sessionReady && !done && (
-            <div className="text-center py-6">
-              <p className="text-slate-600">Validando link de recuperación...</p>
-            </div>
-          )}
-
           {done ? (
             <div className="text-center">
               <p className="mb-4 font-semibold text-emerald-700">Contraseña actualizada correctamente.</p>
               <a href="/login" className="btn-primary inline-block px-6">Ir al inicio de sesión</a>
             </div>
-          ) : sessionReady ? (
+          ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" style={{ borderRadius: '2px' }}>
@@ -139,11 +80,6 @@ function ResetPasswordPage() {
                 {loading ? 'Guardando…' : 'Guardar contraseña'}
               </button>
             </form>
-          ) : (
-            <div className="text-center py-6">
-              <p className="text-red-700 font-semibold mb-4">{error || 'Link inválido'}</p>
-              <a href="/login" className="btn-primary inline-block px-6">Volver al inicio de sesión</a>
-            </div>
           )}
         </div>
       </div>
