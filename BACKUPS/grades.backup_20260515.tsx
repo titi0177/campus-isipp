@@ -86,36 +86,34 @@ function LegacyGradeLoader() {
       const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
       const final = r.final_grade ?? r.partial_grade
       
-      // Permitir borrar notas (updates a NULL), pero evitar crear registros completamente vacíos (inserts)
-      if (!enrollmentGrades?.id && (final === null || final === undefined)) {
-        // Es un INSERT nuevo Y no tiene nota → BLOQUEAR
+      // Solo procesar si hay al menos una nota - evitar crear registros vacíos
+      if (final === null || final === undefined) {
         continue
       }
       
-      // Calcular status solo si hay nota
-      let status = null
-      if (final !== null && final !== undefined) {
-        status = final >= 8 ? 'promocionado' : final >= 6 ? 'aprobado' : 'desaprobado'
-      }
+      const status =
+        final >= 8
+          ? 'promocionado'
+          : final >= 6
+            ? 'aprobado'
+            : 'desaprobado'
 
       if (enrollmentGrades?.id) {
-        // UPDATE existente (permitir NULL para borrar)
         await supabase
           .from('enrollment_grades')
           .update({
-            partial_grade: r.partial_grade ?? null,
-            final_grade: r.final_grade ?? null,
+            partial_grade: r.partial_grade,
+            final_grade: r.final_grade,
             final_status: status,
           })
           .eq('id', enrollmentGrades.id)
       } else {
-        // INSERT nuevo (solo si tiene nota)
         await supabase
           .from('enrollment_grades')
           .insert({
             enrollment_id: r.id,
-            partial_grade: r.partial_grade ?? null,
-            final_grade: r.final_grade ?? null,
+            partial_grade: r.partial_grade,
+            final_grade: r.final_grade,
             final_status: status,
           })
       }
