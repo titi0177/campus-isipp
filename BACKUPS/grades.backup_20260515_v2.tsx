@@ -169,7 +169,7 @@ function LegacyGradeLoader() {
                       <input
                         type="number"
                         className="w-full px-2 py-1 border border-gray-300 rounded"
-                        value={r.partial_grade !== undefined ? r.partial_grade : (enrollmentGrades?.partial_grade ?? '')}
+                        value={r.partial_grade ?? enrollmentGrades?.partial_grade ?? ''}
                         onChange={e => updateValue(i, 'partial_grade', e.target.value ? +e.target.value : null)}
                       />
                     </td>
@@ -177,7 +177,7 @@ function LegacyGradeLoader() {
                       <input
                         type="number"
                         className="w-full px-2 py-1 border border-gray-300 rounded"
-                        value={r.final_grade !== undefined ? r.final_grade : (enrollmentGrades?.final_grade ?? '')}
+                        value={r.final_grade ?? enrollmentGrades?.final_grade ?? ''}
                         onChange={e => updateValue(i, 'final_grade', e.target.value ? +e.target.value : null)}
                       />
                     </td>
