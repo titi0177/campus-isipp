@@ -53,7 +53,7 @@ function ExamsPage() {
         .from('final_exams')
         .select(`
           *,
-          subject:subjects!final_exams_subject_id_fkey(id, name),
+          subject:subjects!final_exams_subject_id_fkey(id, name, professor_id),
           professor:professors!final_exams_professor_id_fkey(name)
         `)
         .order('exam_date', { ascending: true })
@@ -62,10 +62,27 @@ function ExamsPage() {
         showToast(examsError.message, 'error')
         setExams([])
       } else {
-        setExams(examsData || [])
+        // Si exam.professor es null, cargar profesor de la materia
+        const enrichedExams = await Promise.all(
+          (examsData || []).map(async (exam) => {
+            if (!exam.professor && exam.subject?.professor_id) {
+              const { data: profData } = await supabase
+                .from('professors')
+                .select('name')
+                .eq('id', exam.subject.professor_id)
+                .single()
+              return {
+                ...exam,
+                professor: profData || exam.professor
+              }
+            }
+            return exam
+          })
+        )
+        setExams(enrichedExams)
         
         // Verificar elegibilidad para cada examen
-        await checkEligibility(studentData, examsData || [])
+        await checkEligibility(studentData, enrichedExams)
       }
 
       const { data: regData, error: regError } = await supabase
@@ -105,7 +122,7 @@ function ExamsPage() {
         .select('attendance(percentage)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
-        .maybeSingle()
+        .single()
 
       const attendance = Array.isArray(attendanceData?.attendance) 
         ? attendanceData?.attendance[0]?.percentage 
@@ -122,7 +139,7 @@ function ExamsPage() {
         .select('enrollment_grades(partial_grade, partial_status)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
-        .maybeSingle()
+        .single()
 
       const gradeRecord = Array.isArray(gradeData?.enrollment_grades) 
         ? gradeData?.enrollment_grades[0] 
@@ -152,7 +169,7 @@ function ExamsPage() {
             .select('enrollment_grades(final_status)')
             .eq('student_id', studentData.id)
             .eq('subject_id', corr.requires_subject_id)
-            .maybeSingle()
+            .single()
 
           const finalStatus = Array.isArray(enrollmentData?.enrollment_grades)
             ? enrollmentData?.enrollment_grades[0]?.final_status
@@ -378,7 +395,7 @@ function ExamsPage() {
 
                   <p className="text-sm text-gray-500 flex items-center gap-1">
                     <User size={14} />
-                    {exam.professor?.name}
+                    {exam.professor?.name || '—'}
                   </p>
 
                 </div>
