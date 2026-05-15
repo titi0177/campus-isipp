@@ -105,7 +105,7 @@ function ExamsPage() {
         .select('attendance(percentage)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
-        .single()
+        .maybeSingle()
 
       const attendance = Array.isArray(attendanceData?.attendance) 
         ? attendanceData?.attendance[0]?.percentage 
@@ -122,7 +122,7 @@ function ExamsPage() {
         .select('enrollment_grades(partial_grade, partial_status)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
-        .single()
+        .maybeSingle()
 
       const gradeRecord = Array.isArray(gradeData?.enrollment_grades) 
         ? gradeData?.enrollment_grades[0] 
@@ -152,7 +152,7 @@ function ExamsPage() {
             .select('enrollment_grades(final_status)')
             .eq('student_id', studentData.id)
             .eq('subject_id', corr.requires_subject_id)
-            .single()
+            .maybeSingle()
 
           const finalStatus = Array.isArray(enrollmentData?.enrollment_grades)
             ? enrollmentData?.enrollment_grades[0]?.final_status
