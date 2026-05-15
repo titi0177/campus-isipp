@@ -58,19 +58,27 @@ function ExamsPage() {
         `)
         .order('exam_date', { ascending: true })
 
+      console.log('[EXAMS] Query result:', { examsData, examsError })
+
       if (examsError) {
+        console.error('[EXAMS] Query error:', examsError)
         showToast(examsError.message, 'error')
         setExams([])
       } else {
+        console.log('[EXAMS] examsData count:', examsData?.length)
+        console.log('[EXAMS] examsData:', examsData)
         // Si exam.professor es null, cargar profesor de la materia
         const enrichedExams = await Promise.all(
           (examsData || []).map(async (exam) => {
+            console.log('[EXAMS] Processing exam:', exam.id, 'subject:', exam.subject?.id, 'professor:', exam.professor?.name)
             if (!exam.professor && exam.subject?.professor_id) {
+              console.log('[EXAMS] Loading professor for subject:', exam.subject.professor_id)
               const { data: profData } = await supabase
                 .from('professors')
                 .select('name')
                 .eq('id', exam.subject.professor_id)
                 .single()
+              console.log('[EXAMS] Loaded professor:', profData)
               return {
                 ...exam,
                 professor: profData || exam.professor
@@ -79,14 +87,18 @@ function ExamsPage() {
             return exam
           })
         )
+        console.log('[EXAMS] enrichedExams count:', enrichedExams?.length)
+        console.log('[EXAMS] enrichedExams:', enrichedExams)
         // Mostrar mesas PRIMERO, independientemente de elegibilidad
         setExams(enrichedExams)
         
         // Verificar elegibilidad en background (no bloquea mesas)
         try {
+          console.log('[EXAMS] Starting eligibility check')
           await checkEligibility(studentData, enrichedExams)
+          console.log('[EXAMS] Eligibility check completed')
         } catch (eligError) {
-          console.error('Error verificando elegibilidad:', eligError)
+          console.error('[EXAMS] Error verificando elegibilidad:', eligError)
           // Las mesas ya están visibles, solo falla elegibilidad
           // Los botones mostrarán requisitos no cumplidos
         }
@@ -115,21 +127,27 @@ function ExamsPage() {
   }
 
   async function checkEligibility(studentData: any, examsData: any[]) {
+    console.log('[ELIGIBILITY] Starting with exams count:', examsData?.length)
     const eligMap = new Map()
 
     for (const exam of examsData) {
       const subjectId = exam.subject?.id
+      console.log('[ELIGIBILITY] Checking exam:', exam.id, 'subject:', subjectId)
       
       const reasons: string[] = []
       let eligible = true
 
       // 1. Verificar asistencia (> 60%)
-      const { data: attendanceData } = await supabase
+      const { data: attendanceData, error: attendanceError } = await supabase
         .from('enrollments')
         .select('attendance(percentage)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
         .single()
+
+      if (attendanceError) {
+        console.log('[ELIGIBILITY] Attendance error:', attendanceError.message)
+      }
 
       const attendance = Array.isArray(attendanceData?.attendance) 
         ? attendanceData?.attendance[0]?.percentage 
