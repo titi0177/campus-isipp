@@ -79,17 +79,10 @@ function ExamsPage() {
             return exam
           })
         )
-        // Mostrar mesas PRIMERO, independientemente de elegibilidad
         setExams(enrichedExams)
         
-        // Verificar elegibilidad en background (no bloquea mesas)
-        try {
-          await checkEligibility(studentData, enrichedExams)
-        } catch (eligError) {
-          console.error('Error verificando elegibilidad:', eligError)
-          // Las mesas ya están visibles, solo falla elegibilidad
-          // Los botones mostrarán requisitos no cumplidos
-        }
+        // Verificar elegibilidad para cada examen
+        await checkEligibility(studentData, enrichedExams)
       }
 
       const { data: regData, error: regError } = await supabase
