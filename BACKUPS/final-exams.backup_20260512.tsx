@@ -34,7 +34,7 @@ function FinalExamsPage() {
 
       const subjectsQuery = supabase
         .from('subjects')
-        .select('id, name, code, professor_id')
+        .select('id, name, code')
         .order('name')
 
       const professorsQuery = supabase
@@ -211,14 +211,12 @@ function FinalExamsPage() {
               className="form-input"
               required
               value={editing.subject_id || ''}
-              onChange={e => {
-                const selectedSubject = subjects.find(s => s.id === e.target.value)
+              onChange={e =>
                 setEditing((p: any) => ({
                   ...p,
-                  subject_id: e.target.value,
-                  professor_id: selectedSubject?.professor_id || null
+                  subject_id: e.target.value
                 }))
-              }}
+              }
             >
               <option value="">Seleccionar...</option>
               {subjects.map(s => (
@@ -264,16 +262,6 @@ function FinalExamsPage() {
               />
             </div>
 
-          </div>
-
-          <div>
-            <label className="form-label">Profesor (de la materia)</label>
-            <input
-              type="text"
-              className="form-input bg-gray-100"
-              disabled
-              value={professors.find(p => p.id === editing.professor_id)?.name || 'Sin asignar'}
-            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
