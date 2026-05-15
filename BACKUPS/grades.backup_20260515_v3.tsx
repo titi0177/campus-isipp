@@ -2,7 +2,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { AdminDirectGradeLoader } from '@/components/AdminDirectGradeLoader'
 import { supabase } from '@/lib/supabase'
-import { Trash2 } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/grades')({
   component: GradesPage,
@@ -125,34 +124,6 @@ function LegacyGradeLoader() {
     alert('Notas guardadas correctamente')
   }
 
-  const deleteGrade = async (index: number) => {
-    const r = rows[index]
-    const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
-    
-    if (!enrollmentGrades?.id) {
-      alert('No hay nota para borrar')
-      return
-    }
-
-    if (confirm('¿Estás seguro de que quieres borrar esta nota?')) {
-      try {
-        await supabase
-          .from('enrollment_grades')
-          .update({
-            partial_grade: null,
-            final_grade: null,
-            final_status: null,
-          })
-          .eq('id', enrollmentGrades.id)
-        
-        alert('Nota borrada correctamente')
-        void loadStudents(selected)  // Recargar datos
-      } catch (err) {
-        alert('Error al borrar la nota: ' + String(err))
-      }
-    }
-  }
-
   return (
     <div className="card p-6 space-y-6">
       <h2 className="text-xl font-bold text-gray-900">Carga por Materia</h2>
@@ -183,7 +154,6 @@ function LegacyGradeLoader() {
                 <th className="border border-gray-200 px-4 py-2 text-center">Parcial</th>
                 <th className="border border-gray-200 px-4 py-2 text-center">Final</th>
                 <th className="border border-gray-200 px-4 py-2 text-center">Nota</th>
-                <th className="border border-gray-200 px-4 py-2 text-center">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -212,16 +182,6 @@ function LegacyGradeLoader() {
                       />
                     </td>
                     <td className="border border-gray-200 px-4 py-2 text-center font-bold">{final ?? '-'}</td>
-                    <td className="border border-gray-200 px-4 py-2 text-center">
-                      <button
-                        onClick={() => deleteGrade(i)}
-                        className="inline-flex items-center gap-1 px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-semibold transition-colors"
-                        title="Borrar nota de este alumno"
-                      >
-                        <Trash2 size={14} />
-                        Borrar
-                      </button>
-                    </td>
                   </tr>
                 )
               })}
