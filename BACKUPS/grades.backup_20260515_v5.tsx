@@ -101,12 +101,6 @@ function LegacyGradeLoader() {
 
       if (enrollmentGrades?.id) {
         // UPDATE existente - SOLO actualizar campos que fueron editados
-        // Si NINGÚN campo fue editado, no hacer UPDATE
-        if (r.partial_grade === undefined && r.final_grade === undefined) {
-          // Nada fue editado, skip este alumno
-          continue
-        }
-        
         const updates: any = {}
         if (r.partial_grade !== undefined) {
           updates.partial_grade = r.partial_grade ?? null
