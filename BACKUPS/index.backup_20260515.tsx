@@ -223,17 +223,18 @@ function DashboardPage() {
         let gpaSum = 0
         let gpaCount = 0
         for (const row of mapped) {
-          if (row.final_grade != null && row.final_grade >= 6) {
+          if (row.final_grade != null && (row.final_status === 'aprobado' || (row.final_status === 'promocionado' && row.subject?.allows_promotion))) {
             gpaSum += row.final_grade
             gpaCount++
           }
         }
         setGpa(gpaCount ? gpaSum / gpaCount : null)
 
-        // Contar solo aprobadas: final_grade >= 6
+        // Contar solo aprobadas/promocionadas con final_status válido
         const approved = mapped.filter(r => 
           r.final_grade != null && 
-          r.final_grade >= 6
+          r.final_grade >= 6 && 
+          (r.final_status === 'aprobado' || (r.final_status === 'promocionado' && r.subject?.allows_promotion))
         ).length
         
         const enCurso = mapped.filter(r => r.final_grade == null).length
