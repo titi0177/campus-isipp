@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { sendAbsenceEmail } from '@/lib/email-service'
 import { Download, Send, AlertCircle, CheckCircle2, Calendar, Clock, BookOpen, FileText } from 'lucide-react'
 
-export const Route = createFileRoute('/professor/absences')({
+export const Route = createFileRoute('/professor/absences/')({
   component: AbsencesPage,
 })
 
