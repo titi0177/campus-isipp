@@ -25,6 +25,7 @@ const professorNav: NavItem[] = [
   { label: 'Horario de clases', href: '/professor/schedules', icon: <Calendar size={18} /> },
   { label: 'Calificaciones', href: '/professor/grades', icon: <Star size={18} /> },
   { label: 'Asistencia', href: '/professor/attendance', icon: <ClipboardCheck size={18} /> },
+  { label: 'Inasistencias Docente', href: '/inasistencia-docente', icon: <FileText size={18} /> },
   { label: 'Materiales', href: '/professor/materials', icon: <FileText size={18} /> },
   { label: 'Seguridad', href: '/professor/settings', icon: <Settings size={18} /> },
 ]
