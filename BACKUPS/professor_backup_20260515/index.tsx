@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUserSession } from '@/hooks/useUserSession'
-import { BookOpen, Star, ClipboardCheck, Users, MessageCircle, FileText } from 'lucide-react'
+import { BookOpen, Star, ClipboardCheck, Users, MessageCircle } from 'lucide-react'
 import { StatCard } from '@/components/StatCard'
 
 export const Route = createFileRoute('/professor/')({
@@ -107,11 +107,11 @@ function ProfessorHome() {
             <div className="text-sm text-slate-500">Por cursada</div>
           </div>
         </Link>
-        <Link to="/professor/absences" className="card siu-hover-card flex items-center gap-3 p-4">
-          <FileText className="h-8 w-8 text-[var(--siu-burgundy)]" />
+        <Link to="/professor/messages" className="card siu-hover-card flex items-center gap-3 p-4">
+          <MessageCircle className="h-8 w-8 text-[var(--siu-burgundy)]" />
           <div>
-            <div className="font-semibold">Inasistencias</div>
-            <div className="text-sm text-slate-500">Justificaciones</div>
+            <div className="font-semibold">Mensajes</div>
+            <div className="text-sm text-slate-500">Chatear con estudiantes</div>
           </div>
         </Link>
       </div>
