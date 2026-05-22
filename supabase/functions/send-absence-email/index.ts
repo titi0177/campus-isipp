@@ -99,7 +99,7 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "isip1206@gmail.com",
+        from: "Sistema Campus ISIPP <noreply@fenaayenee.resend.app>",
         to: toEmail,
         subject: `Justificación de Inasistencia - ${professorName} - ${absenceDate}`,
         html: emailContent,

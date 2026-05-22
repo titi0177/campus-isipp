@@ -167,20 +167,18 @@ function InasistenciaDocentePage() {
 
       const { error: insertError } = await supabase
         .from('professor_absences')
-        .insert([
-          {
-            professor_id: professor.id,
-            subject_id: formData.subject_id,
-            absence_date: formData.absence_date,
-            time_start: formData.time_start,
-            time_end: formData.time_end,
-            article: articuloLabel,
-            description: formData.description,
-            document_name: documentFile.name,
-            document_url: documentUrl,
-            status: 'enviado',
-          },
-        ])
+        .insert({
+          professor_id: professor.id,
+          subject_id: formData.subject_id,
+          absence_date: formData.absence_date,
+          time_start: formData.time_start,
+          time_end: formData.time_end,
+          article: articuloLabel,
+          description: formData.description,
+          document_name: documentFile.name,
+          document_url: documentUrl,
+          status: 'enviado',
+        })
 
       if (insertError) throw insertError
 
