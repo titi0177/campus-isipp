@@ -107,7 +107,7 @@ function ProfessorHome() {
             <div className="text-sm text-slate-500">Por cursada</div>
           </div>
         </Link>
-        <Link to="/professor/absences" className="card siu-hover-card flex items-center gap-3 p-4">
+        <Link to="/professor/absences/" className="card siu-hover-card flex items-center gap-3 p-4">
           <FileText className="h-8 w-8 text-[var(--siu-burgundy)]" />
           <div>
             <div className="font-semibold">Inasistencias</div>
