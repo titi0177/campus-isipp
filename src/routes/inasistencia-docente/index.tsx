@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { sendAbsenceEmail } from '@/lib/email-service'
-import { Download, Send, AlertCircle, CheckCircle2, Calendar, Clock, BookOpen, FileText } from 'lucide-react'
+import { Download, Send, AlertCircle, CheckCircle2, BookOpen, FileText } from 'lucide-react'
 
-export const Route = createFileRoute('/professor/absences')({
-  component: AbsencesPage,
+export const Route = createFileRoute('/inasistencia-docente')({
+  component: InasistenciaDocentePage,
 })
 
 const ARTICULOS = [
@@ -21,7 +21,7 @@ const ARTICULOS = [
   { code: 'ART_55', label: 'Art. 55 - Mudanza', type: 'general' },
 ]
 
-function AbsencesPage() {
+function InasistenciaDocentePage() {
   const [professor, setProfessor] = useState<any>(null)
   const [subjects, setSubjects] = useState<any[]>([])
   const [absences, setAbsences] = useState<any[]>([])
@@ -99,7 +99,6 @@ function AbsencesPage() {
     const isMedical = articulo?.type === 'medical'
     const fileName = isMedical ? 'licencias-medicas.docx' : 'justificacion-inasistencia.docx'
 
-    // Generar URL pública de Supabase Storage
     const bucketUrl = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/professor-absences/${fileName}`
 
     window.open(bucketUrl, '_blank')
@@ -128,7 +127,6 @@ function AbsencesPage() {
     setSuccess('')
 
     try {
-      // Validar campos
       if (!formData.absence_date || !formData.time_start || !formData.time_end || !formData.subject_id || !formData.article) {
         throw new Error('Completa todos los campos requeridos')
       }
@@ -141,7 +139,6 @@ function AbsencesPage() {
         throw new Error('Profesor no encontrado')
       }
 
-      // Subir archivo a Supabase Storage
       const timestamp = new Date().getTime()
       const fileName = `${professor.id}/${timestamp}_${documentFile.name}`
 
@@ -151,18 +148,15 @@ function AbsencesPage() {
 
       if (uploadError) throw uploadError
 
-      // Obtener URL pública
       const { data: urlData } = supabase.storage
         .from('professor-absences-submitted')
         .getPublicUrl(fileName)
 
       const documentUrl = urlData?.publicUrl || ''
 
-      // Obtener nombre de materia
       const subject = subjects.find(s => s.id === formData.subject_id)
       const articuloLabel = ARTICULOS.find(a => a.code === formData.article)?.label || formData.article
 
-      // Enviar email
       await sendAbsenceEmail(
         professor.name,
         subject?.name || 'Desconocida',
@@ -175,7 +169,6 @@ function AbsencesPage() {
         documentFile.name
       )
 
-      // Guardar registro en BD
       const { error: insertError } = await supabase
         .from('professor_absences')
         .insert([
@@ -195,7 +188,6 @@ function AbsencesPage() {
 
       if (insertError) throw insertError
 
-      // Limpiar form
       setFormData({
         absence_date: '',
         time_start: '',
@@ -207,7 +199,6 @@ function AbsencesPage() {
       setDocumentFile(null)
       setSuccess('✅ Justificación enviada correctamente. El RR.HH. recibirá tu solicitud.')
 
-      // Recargar historial
       await loadData()
 
       setTimeout(() => setSuccess(''), 5000)
@@ -232,19 +223,17 @@ function AbsencesPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-indigo-100 text-sm font-semibold mb-2">GESTIÓN DE INASISTENCIAS</p>
-            <h1 className="text-5xl font-black mb-3">Justificación de Inasistencia</h1>
+            <h1 className="text-5xl font-black mb-3">Justificación de Inasistencia Docente</h1>
             <p className="text-indigo-100 text-lg max-w-2xl">Sistema de notificación automática al departamento de Recursos Humanos</p>
           </div>
           <FileText size={80} className="opacity-20" />
         </div>
       </div>
 
-      {/* Artículos Aplicables */}
       <div className="card p-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-3xl">
         <h2 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
           <BookOpen size={28} className="text-blue-600" />
@@ -266,7 +255,6 @@ function AbsencesPage() {
         </div>
       </div>
 
-      {/* Formulario */}
       <div className="card p-8 bg-white border-2 border-gray-200 rounded-3xl">
         <h2 className="text-2xl font-black text-gray-900 mb-6">📝 Cargar Justificación</h2>
 
@@ -285,7 +273,6 @@ function AbsencesPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Fila 1: Fecha y Horas */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">📅 Fecha de inasistencia *</label>
@@ -321,7 +308,6 @@ function AbsencesPage() {
             </div>
           </div>
 
-          {/* Fila 2: Materia y Artículo */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">📚 Materia *</label>
@@ -358,7 +344,6 @@ function AbsencesPage() {
             </div>
           </div>
 
-          {/* Descripción */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">📝 Descripción adicional (opcional)</label>
             <textarea
@@ -372,7 +357,6 @@ function AbsencesPage() {
             <p className="text-xs text-gray-500 mt-1">{formData.description.length}/500 caracteres</p>
           </div>
 
-          {/* Documentación */}
           <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl border-2 border-indigo-200">
             <h3 className="font-bold text-gray-900 mb-4">📎 Documentación</h3>
 
@@ -411,7 +395,6 @@ function AbsencesPage() {
             )}
           </div>
 
-          {/* Botón Enviar */}
           <button
             type="submit"
             disabled={submitting || !documentFile}
@@ -423,7 +406,6 @@ function AbsencesPage() {
         </form>
       </div>
 
-      {/* Historial */}
       {absences.length > 0 && (
         <div className="card p-8 bg-white border-2 border-gray-200 rounded-3xl">
           <h2 className="text-2xl font-black text-gray-900 mb-6">📋 Mis Justificaciones</h2>
