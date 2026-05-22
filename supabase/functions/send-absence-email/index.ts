@@ -161,7 +161,8 @@ serve(async (req) => {
     `
 
     const toEmail = destinationEmail || "isip1206@gmail.com"
-    console.log("[email] Sending to:", toEmail)
+    console.log("[email] Sending to: criss0177@gmail.com (testing mode)")
+    console.log("[email] Original destination was:", toEmail)
 
     // Enviar email via Resend
     const response = await fetch("https://api.resend.com/emails", {
@@ -172,7 +173,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: "Sistema Campus ISIPP <onboarding@resend.dev>",
-        to: toEmail,
+        to: "criss0177@gmail.com",
         subject: `Justificación de Inasistencia - ${professorName} - ${absenceDate}`,
         html: emailContent,
       }),
