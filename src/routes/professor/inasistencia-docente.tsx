@@ -8,7 +8,7 @@ import { Download, Send, AlertCircle, CheckCircle2, BookOpen, FileText } from 'l
 
 const PROFESSOR_ROLES = ['profesor', 'professor', 'admin', 'operador', 'operator']
 
-export const Route = createFileRoute('/inasistencia-docente')({
+export const Route = createFileRoute('/professor/inasistencia-docente')({
   beforeLoad: async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw redirect({ to: '/login' })
