@@ -30,6 +30,7 @@ import { Route as ProfessorMessagesRouteImport } from './routes/professor/messag
 import { Route as ProfessorMaterialsRouteImport } from './routes/professor/materials'
 import { Route as ProfessorGradesRouteImport } from './routes/professor/grades'
 import { Route as ProfessorAttendanceRouteImport } from './routes/professor/attendance'
+import { Route as ProfessorInasistenciaDocenteRouteImport } from './routes/professor/inasistencia-docente'
 import { Route as DashboardSubjectsRouteImport } from './routes/dashboard/subjects'
 import { Route as DashboardSchedulesRouteImport } from './routes/dashboard/schedules'
 import { Route as DashboardRoadmapRouteImport } from './routes/dashboard/roadmap'
@@ -163,6 +164,11 @@ const ProfessorGradesRoute = ProfessorGradesRouteImport.update({
 const ProfessorAttendanceRoute = ProfessorAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
+  getParentRoute: () => ProfessorRoute,
+} as any)
+const ProfessorInasistenciaDocenteRoute = ProfessorInasistenciaDocenteRouteImport.update({
+  id: '/inasistencia-docente',
+  path: '/inasistencia-docente',
   getParentRoute: () => ProfessorRoute,
 } as any)
 const DashboardSubjectsRoute = DashboardSubjectsRouteImport.update({
@@ -349,6 +355,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/subjects': typeof DashboardSubjectsRoute
   '/professor/attendance': typeof ProfessorAttendanceRoute
   '/professor/grades': typeof ProfessorGradesRoute
+  '/professor/inasistencia-docente': typeof ProfessorInasistenciaDocenteRoute
   '/professor/materials': typeof ProfessorMaterialsRoute
   '/professor/messages': typeof ProfessorMessagesRoute
   '/professor/schedules': typeof ProfessorSchedulesRoute
@@ -397,6 +404,7 @@ export interface FileRoutesByTo {
   '/dashboard/subjects': typeof DashboardSubjectsRoute
   '/professor/attendance': typeof ProfessorAttendanceRoute
   '/professor/grades': typeof ProfessorGradesRoute
+  '/professor/inasistencia-docente': typeof ProfessorInasistenciaDocenteRoute
   '/professor/materials': typeof ProfessorMaterialsRoute
   '/professor/messages': typeof ProfessorMessagesRoute
   '/professor/schedules': typeof ProfessorSchedulesRoute
@@ -450,6 +458,7 @@ export interface FileRoutesById {
   '/dashboard/subjects': typeof DashboardSubjectsRoute
   '/professor/attendance': typeof ProfessorAttendanceRoute
   '/professor/grades': typeof ProfessorGradesRoute
+  '/professor/inasistencia-docente': typeof ProfessorInasistenciaDocenteRoute
   '/professor/materials': typeof ProfessorMaterialsRoute
   '/professor/messages': typeof ProfessorMessagesRoute
   '/professor/schedules': typeof ProfessorSchedulesRoute
@@ -504,6 +513,7 @@ export interface FileRouteTypes {
     | '/dashboard/subjects'
     | '/professor/attendance'
     | '/professor/grades'
+    | '/professor/inasistencia-docente'
     | '/professor/materials'
     | '/professor/messages'
     | '/professor/schedules'
@@ -552,6 +562,7 @@ export interface FileRouteTypes {
     | '/dashboard/subjects'
     | '/professor/attendance'
     | '/professor/grades'
+    | '/professor/inasistencia-docente'
     | '/professor/materials'
     | '/professor/messages'
     | '/professor/schedules'
@@ -604,6 +615,7 @@ export interface FileRouteTypes {
     | '/dashboard/subjects'
     | '/professor/attendance'
     | '/professor/grades'
+    | '/professor/inasistencia-docente'
     | '/professor/materials'
     | '/professor/messages'
     | '/professor/schedules'
@@ -776,6 +788,13 @@ declare module '@tanstack/react-router' {
       path: '/attendance'
       fullPath: '/professor/attendance'
       preLoaderRoute: typeof ProfessorAttendanceRouteImport
+      parentRoute: typeof ProfessorRoute
+    }
+    '/professor/inasistencia-docente': {
+      id: '/professor/inasistencia-docente'
+      path: '/inasistencia-docente'
+      fullPath: '/professor/inasistencia-docente'
+      preLoaderRoute: typeof ProfessorInasistenciaDocenteRouteImport
       parentRoute: typeof ProfessorRoute
     }
     '/dashboard/subjects': {
@@ -1067,6 +1086,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 interface ProfessorRouteChildren {
   ProfessorAttendanceRoute: typeof ProfessorAttendanceRoute
   ProfessorGradesRoute: typeof ProfessorGradesRoute
+  ProfessorInasistenciaDocenteRoute: typeof ProfessorInasistenciaDocenteRoute
   ProfessorMaterialsRoute: typeof ProfessorMaterialsRoute
   ProfessorMessagesRoute: typeof ProfessorMessagesRoute
   ProfessorSchedulesRoute: typeof ProfessorSchedulesRoute
@@ -1078,6 +1098,7 @@ interface ProfessorRouteChildren {
 const ProfessorRouteChildren: ProfessorRouteChildren = {
   ProfessorAttendanceRoute: ProfessorAttendanceRoute,
   ProfessorGradesRoute: ProfessorGradesRoute,
+  ProfessorInasistenciaDocenteRoute: ProfessorInasistenciaDocenteRoute,
   ProfessorMaterialsRoute: ProfessorMaterialsRoute,
   ProfessorMessagesRoute: ProfessorMessagesRoute,
   ProfessorSchedulesRoute: ProfessorSchedulesRoute,
