@@ -187,6 +187,7 @@ function LegacyGradeLoader() {
       </select>
 
       {rows.length > 0 && (
+        <form onSubmit={(e) => { e.preventDefault(); saveAll() }}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse border border-gray-200">
             <thead>
@@ -241,12 +242,13 @@ function LegacyGradeLoader() {
           </table>
 
           <button
-            onClick={saveAll}
+            type="submit"
             className="mt-4 px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors"
           >
             Guardar todo
           </button>
         </div>
+        </form>
       )}
     </div>
   )

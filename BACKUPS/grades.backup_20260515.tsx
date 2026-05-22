@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { AdminDirectGradeLoader } from '@/components/AdminDirectGradeLoader'
 import { supabase } from '@/lib/supabase'
+import { Trash2 } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/grades')({
   component: GradesPage,
@@ -86,40 +87,82 @@ function LegacyGradeLoader() {
       const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
       const final = r.final_grade ?? r.partial_grade
       
-      // Solo procesar si hay al menos una nota - evitar crear registros vacíos
-      if (final === null || final === undefined) {
+      // Permitir borrar notas (updates a NULL), pero evitar crear registros completamente vacíos (inserts)
+      if (!enrollmentGrades?.id && (final === null || final === undefined)) {
+        // Es un INSERT nuevo Y no tiene nota → BLOQUEAR
         continue
       }
       
-      const status =
-        final >= 8
-          ? 'promocionado'
-          : final >= 6
-            ? 'aprobado'
-            : 'desaprobado'
+      // Calcular status solo si hay nota
+      let status = null
+      if (final !== null && final !== undefined) {
+        status = final >= 8 ? 'promocionado' : final >= 6 ? 'aprobado' : 'desaprobado'
+      }
 
       if (enrollmentGrades?.id) {
+        // UPDATE existente - SOLO actualizar campos que fueron editados
+        // Si NINGÚN campo fue editado, no hacer UPDATE
+        if (r.partial_grade === undefined && r.final_grade === undefined) {
+          // Nada fue editado, skip este alumno
+          continue
+        }
+        
+        const updates: any = {}
+        if (r.partial_grade !== undefined) {
+          updates.partial_grade = r.partial_grade ?? null
+        }
+        if (r.final_grade !== undefined) {
+          updates.final_grade = r.final_grade ?? null
+        }
+        // Siempre actualizar status
+        updates.final_status = status
+        
         await supabase
           .from('enrollment_grades')
-          .update({
-            partial_grade: r.partial_grade,
-            final_grade: r.final_grade,
-            final_status: status,
-          })
+          .update(updates)
           .eq('id', enrollmentGrades.id)
       } else {
+        // INSERT nuevo (solo si tiene nota)
         await supabase
           .from('enrollment_grades')
           .insert({
             enrollment_id: r.id,
-            partial_grade: r.partial_grade,
-            final_grade: r.final_grade,
+            partial_grade: r.partial_grade ?? null,
+            final_grade: r.final_grade ?? null,
             final_status: status,
           })
       }
     }
 
     alert('Notas guardadas correctamente')
+  }
+
+  const deleteGrade = async (index: number) => {
+    const r = rows[index]
+    const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
+    
+    if (!enrollmentGrades?.id) {
+      alert('No hay nota para borrar')
+      return
+    }
+
+    if (confirm('¿Estás seguro de que quieres borrar esta nota?')) {
+      try {
+        await supabase
+          .from('enrollment_grades')
+          .update({
+            partial_grade: null,
+            final_grade: null,
+            final_status: null,
+          })
+          .eq('id', enrollmentGrades.id)
+        
+        alert('Nota borrada correctamente')
+        void loadStudents(selected)  // Recargar datos
+      } catch (err) {
+        alert('Error al borrar la nota: ' + String(err))
+      }
+    }
   }
 
   return (
@@ -152,6 +195,7 @@ function LegacyGradeLoader() {
                 <th className="border border-gray-200 px-4 py-2 text-center">Parcial</th>
                 <th className="border border-gray-200 px-4 py-2 text-center">Final</th>
                 <th className="border border-gray-200 px-4 py-2 text-center">Nota</th>
+                <th className="border border-gray-200 px-4 py-2 text-center">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -167,7 +211,7 @@ function LegacyGradeLoader() {
                       <input
                         type="number"
                         className="w-full px-2 py-1 border border-gray-300 rounded"
-                        value={r.partial_grade ?? enrollmentGrades?.partial_grade ?? ''}
+                        value={r.partial_grade !== undefined ? r.partial_grade : (enrollmentGrades?.partial_grade ?? '')}
                         onChange={e => updateValue(i, 'partial_grade', e.target.value ? +e.target.value : null)}
                       />
                     </td>
@@ -175,11 +219,21 @@ function LegacyGradeLoader() {
                       <input
                         type="number"
                         className="w-full px-2 py-1 border border-gray-300 rounded"
-                        value={r.final_grade ?? enrollmentGrades?.final_grade ?? ''}
+                        value={r.final_grade !== undefined ? r.final_grade : (enrollmentGrades?.final_grade ?? '')}
                         onChange={e => updateValue(i, 'final_grade', e.target.value ? +e.target.value : null)}
                       />
                     </td>
                     <td className="border border-gray-200 px-4 py-2 text-center font-bold">{final ?? '-'}</td>
+                    <td className="border border-gray-200 px-4 py-2 text-center">
+                      <button
+                        onClick={() => deleteGrade(i)}
+                        className="inline-flex items-center gap-1 px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-semibold transition-colors"
+                        title="Borrar nota de este alumno"
+                      >
+                        <Trash2 size={14} />
+                        Borrar
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
