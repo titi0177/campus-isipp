@@ -1,12 +1,24 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { sendAbsenceEmail } from '@/lib/email-service'
+import { AppLayout } from '@/components/AppLayout'
+import { homePathForRole } from '@/lib/roles'
 import { Download, Send, AlertCircle, CheckCircle2, BookOpen, FileText } from 'lucide-react'
 
-export const Route = createFileRoute('/inasistencia-docente')({\n  component: InasistenciaDocentePage,\n})
+const PROFESSOR_ROLES = ['profesor', 'professor', 'admin', 'operador', 'operator']
 
-console.log('✅ inasistencia-docente/index.tsx LOADED - Route definition executed')
+export const Route = createFileRoute('/inasistencia-docente/')({
+  beforeLoad: async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw redirect({ to: '/login' })
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (!PROFESSOR_ROLES.includes(profile?.role || '')) {
+      throw redirect({ to: homePathForRole(profile?.role) })
+    }
+  },
+  component: InasistenciaDocentePage,
+})
 
 const ARTICULOS = [
   { code: 'ART_23_A', label: 'Art. 23 inc. a - Razones particulares justificadas', type: 'general' },
@@ -22,8 +34,6 @@ const ARTICULOS = [
 ]
 
 function InasistenciaDocentePage() {
-  console.log('🟢 InasistenciaDocentePage component RENDERED')
-  
   const [professor, setProfessor] = useState<any>(null)
   const [subjects, setSubjects] = useState<any[]>([])
   const [absences, setAbsences] = useState<any[]>([])
@@ -31,8 +41,8 @@ function InasistenciaDocentePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [userName, setUserName] = useState('')
 
-  // Form state
   const [formData, setFormData] = useState({
     absence_date: '',
     time_start: '',
@@ -44,6 +54,11 @@ function InasistenciaDocentePage() {
   const [documentFile, setDocumentFile] = useState<File | null>(null)
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUserName(user.user_metadata?.full_name || user.email || '')
+      }
+    })
     loadData()
   }, [])
 
@@ -56,7 +71,6 @@ function InasistenciaDocentePage() {
         return
       }
 
-      // Obtener profesor
       const { data: profData } = await supabase
         .from('professors')
         .select('*')
@@ -71,7 +85,6 @@ function InasistenciaDocentePage() {
 
       setProfessor(profData)
 
-      // Obtener materias del profesor
       const { data: subData } = await supabase
         .from('subjects')
         .select('*')
@@ -79,7 +92,6 @@ function InasistenciaDocentePage() {
 
       setSubjects(subData || [])
 
-      // Obtener historial de inasistencias
       const { data: absData } = await supabase
         .from('professor_absences')
         .select('*')
@@ -212,18 +224,14 @@ function InasistenciaDocentePage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando...</p>
-        </div>
+  const content = loading ? (
+    <div className="flex items-center justify-center h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Cargando...</p>
       </div>
-    )
-  }
-
-  return (
+    </div>
+  ) : (
     <div className="space-y-8">
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
         <div className="flex items-start justify-between gap-4">
@@ -449,5 +457,11 @@ function InasistenciaDocentePage() {
         </div>
       )}
     </div>
+  )
+
+  return (
+    <AppLayout role="professor" userName={userName}>
+      {content}
+    </AppLayout>
   )
 }
