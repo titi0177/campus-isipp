@@ -4,9 +4,9 @@ import { supabase } from '@/lib/supabase'
 import { sendAbsenceEmail } from '@/lib/email-service'
 import { Download, Send, AlertCircle, CheckCircle2, BookOpen, FileText } from 'lucide-react'
 
-export const Route = createFileRoute('/inasistencia-docente')({
-  component: InasistenciaDocentePage,
-})
+export const Route = createFileRoute('/inasistencia-docente')({\n  component: InasistenciaDocentePage,\n})
+
+console.log('✅ inasistencia-docente/index.tsx LOADED - Route definition executed')
 
 const ARTICULOS = [
   { code: 'ART_23_A', label: 'Art. 23 inc. a - Razones particulares justificadas', type: 'general' },
@@ -22,6 +22,8 @@ const ARTICULOS = [
 ]
 
 function InasistenciaDocentePage() {
+  console.log('🟢 InasistenciaDocentePage component RENDERED')
+  
   const [professor, setProfessor] = useState<any>(null)
   const [subjects, setSubjects] = useState<any[]>([])
   const [absences, setAbsences] = useState<any[]>([])
