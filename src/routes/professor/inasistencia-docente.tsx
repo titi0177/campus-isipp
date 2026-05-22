@@ -1,22 +1,10 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { sendAbsenceEmail } from '@/lib/email-service'
-import { AppLayout } from '@/components/AppLayout'
-import { homePathForRole } from '@/lib/roles'
 import { Download, Send, AlertCircle, CheckCircle2, BookOpen, FileText } from 'lucide-react'
 
-const PROFESSOR_ROLES = ['profesor', 'professor', 'admin', 'operador', 'operator']
-
 export const Route = createFileRoute('/professor/inasistencia-docente')({
-  beforeLoad: async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw redirect({ to: '/login' })
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (!PROFESSOR_ROLES.includes(profile?.role || '')) {
-      throw redirect({ to: homePathForRole(profile?.role) })
-    }
-  },
   component: InasistenciaDocentePage,
 })
 
@@ -41,7 +29,6 @@ function InasistenciaDocentePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [userName, setUserName] = useState('')
 
   const [formData, setFormData] = useState({
     absence_date: '',
@@ -54,11 +41,6 @@ function InasistenciaDocentePage() {
   const [documentFile, setDocumentFile] = useState<File | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setUserName(user.user_metadata?.full_name || user.email || '')
-      }
-    })
     loadData()
   }, [])
 
@@ -224,14 +206,18 @@ function InasistenciaDocentePage() {
     }
   }
 
-  const content = loading ? (
-    <div className="flex items-center justify-center h-screen">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Cargando...</p>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
       </div>
-    </div>
-  ) : (
+    )
+  }
+
+  return (
     <div className="space-y-8">
       <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-8 text-white shadow-2xl">
         <div className="flex items-start justify-between gap-4">
@@ -457,11 +443,5 @@ function InasistenciaDocentePage() {
         </div>
       )}
     </div>
-  )
-
-  return (
-    <AppLayout role="professor" userName={userName}>
-      {content}
-    </AppLayout>
   )
 }
