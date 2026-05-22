@@ -389,7 +389,7 @@ export function AdminDirectGradeLoader() {
               <p className="text-gray-600">No hay alumnos inscritos en esta materia</p>
             </div>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveGrades() }}>
+            <>
               <div className="card p-0 overflow-hidden rounded-lg border border-gray-200">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -441,14 +441,14 @@ export function AdminDirectGradeLoader() {
               </div>
 
               <button
-                type="submit"
+                onClick={handleSaveGrades}
                 disabled={!hasChanges || saving}
                 className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Save size={20} />
                 {saving ? 'Guardando...' : 'Guardar Notas Finales'}
               </button>
-            </form>
+            </>
           )}
         </>
       )}
