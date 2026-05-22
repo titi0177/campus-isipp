@@ -88,8 +88,9 @@ serve(async (req) => {
 </html>
     `
 
-    const toEmail = destinationEmail || "isip1206@gmail.com"
-    console.log("[send-absence-email] Sending to:", toEmail)
+    // En testing mode, envía a tu email
+    const toEmail = "criss0177@gmail.com"
+    console.log("[send-absence-email] Sending to:", toEmail, "from professor:", professorName)
 
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -98,7 +99,7 @@ serve(async (req) => {
         Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: "Sistema Campus ISIPP <noreply@campus-isipp.com>",
+        from: "criss0177@gmail.com",
         to: toEmail,
         subject: `Justificación de Inasistencia - ${professorName} - ${absenceDate}`,
         html: emailContent,
