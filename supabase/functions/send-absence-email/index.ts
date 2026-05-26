@@ -89,7 +89,7 @@ serve(async (req) => {
     `
 
     // En testing mode, envía a isip1206@gmail.com
-    const toEmail = "isip1206@gmail.com"
+    const toEmail = "isip1206@gmail.com,rrhh@isipp.edu.ar"
     console.log("[send-absence-email] Sending to:", toEmail, "from professor:", professorName)
 
     const response = await fetch("https://api.resend.com/emails", {
