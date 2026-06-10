@@ -262,6 +262,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       }))
       return
     }
+    if (!/^[0-9]*(\.[0-9]*)?$/.test(value)) return
     const numValue = parseFloat(value)
     if (isNaN(numValue) || numValue < 0 || numValue > 10) return
     setGrades(prev => ({
