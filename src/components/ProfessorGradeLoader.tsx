@@ -130,7 +130,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           existingIdsMap[g.enrollment_id] = g.id
           finalizationStatusMap[g.enrollment_id] = g.partial_finalized || false
 
-          // Parsear labels si existen
           if (g.grade_labels) {
             try {
               const labelsObj = typeof g.grade_labels === 'string' ? JSON.parse(g.grade_labels) : g.grade_labels
@@ -174,9 +173,13 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   }
 
   const getDisplayGrade = (enrollmentId: string, gradeNum: number): number | undefined => {
-    const newGrade = grades[enrollmentId]?.[`grade_${gradeNum}` as keyof GradeData]
-    if (newGrade !== undefined && newGrade !== null) return newGrade
-    return existingGrades[enrollmentId]?.[`grade_${gradeNum}` as keyof GradeData]
+    const gradeKey = `grade_${gradeNum}` as keyof GradeData
+    // Si el profesor tocó este campo (existe en grades), mostrar lo que escribió (incluso null/vacío)
+    if (grades[enrollmentId] && gradeKey in grades[enrollmentId]) {
+      return grades[enrollmentId]?.[gradeKey]
+    }
+    // Si no lo tocó, mostrar lo existente
+    return existingGrades[enrollmentId]?.[gradeKey]
   }
 
   const getGradeLabel = (gradeNum: number): GradeLabel | undefined => {
@@ -190,9 +193,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       const grade = getDisplayGrade(enrollmentId, i)
       const label = getGradeLabel(i)
 
-      // Si es Recuperatorio, buscar la nota principal correspondiente
       if (label && label.startsWith('Recuperatorio')) {
-        // Mapeo: "Recuperatorio P1" -> "Parcial 1", "Recuperatorio TP1" -> "TP 1"
         let mainLabelToFind: string = ''
         if (label.includes('P1')) mainLabelToFind = 'Parcial 1'
         else if (label.includes('P2')) mainLabelToFind = 'Parcial 2'
@@ -201,49 +202,40 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         else if (label.includes('TP1')) mainLabelToFind = 'TP 1'
         else if (label.includes('TP2')) mainLabelToFind = 'TP 2'
 
-        // Buscar el índice de la nota principal
         const mainGradeNum = mainLabelToFind
           ? Array.from({ length: numGrades }, (_, idx) => idx + 1).find(n => getGradeLabel(n) === mainLabelToFind)
           : undefined
 
-        // Validación: recuperatorio solo cuenta si está cargado (no NULL) y es MAYOR que la nota principal
         if (mainGradeNum) {
           const mainGrade = getDisplayGrade(enrollmentId, mainGradeNum)
           const recoveryGrade = grade
 
-          // Si recuperatorio es NULL o vacío, usar nota principal
           if (recoveryGrade === undefined || recoveryGrade === null) {
             if (mainGrade !== undefined && mainGrade !== null) {
               gradeValues.push(mainGrade)
             }
           }
-          // Si recuperatorio > principal, usar recuperatorio
           else if (mainGrade !== undefined && mainGrade !== null && recoveryGrade > mainGrade) {
             gradeValues.push(recoveryGrade)
           }
-          // Si recuperatorio existe pero NO es mayor, usar principal
           else if (mainGrade !== undefined && mainGrade !== null) {
             gradeValues.push(mainGrade)
           }
-          // Si no hay principal pero hay recuperatorio, usar recuperatorio
           else if (recoveryGrade !== undefined && recoveryGrade !== null) {
             gradeValues.push(recoveryGrade)
           }
         } else {
-          // No hay nota principal correspondiente, usar recuperatorio si existe
           if (grade !== undefined && grade !== null) {
             gradeValues.push(grade)
           }
         }
       } else {
-        // No es recuperatorio, agregar directamente si no es NULL
         if (grade !== undefined && grade !== null) {
           gradeValues.push(grade)
         }
       }
     })
 
-    // Solo calcular promedio si tenemos todas las notas seleccionadas
     if (gradeValues.length === selectedIndices.size) {
       const sum = gradeValues.reduce((a, b) => a + b, 0)
       return Math.round((sum / selectedIndices.size) * 10) / 10
@@ -350,7 +342,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         : activeEnrollments
 
       for (const enrollment of enrollmentsToSave) {
-        // Verificar si hay CAMBIOS (incluyendo eliminación a null)
         let hasChanges = false
         const gradeChanges: Record<string, number | null> = {}
 
@@ -359,12 +350,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           const newGrade = grades[enrollment.id]?.[gradeKey]
           const existingGrade = existingGrades[enrollment.id]?.[gradeKey]
 
-          // Si el profesor tocó este campo (existe en el estado grades)
           if (grades[enrollment.id] && gradeKey in grades[enrollment.id]) {
             gradeChanges[gradeKey] = newGrade ?? null
             hasChanges = true
           } else {
-            // Si no lo tocó, mantener lo existente
             gradeChanges[gradeKey] = existingGrade ?? null
           }
         }
@@ -378,7 +367,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           ...gradeChanges,
         }
 
-        // Usar etiquetas globales para todos los alumnos
         const labelsObj: Record<string, GradeLabel | null> = {}
         for (let i = 1; i <= numGrades; i++) {
           labelsObj[`grade_${i}`] = globalGradeLabels[i] || null
@@ -529,7 +517,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Configuración */}
       <div className="card p-6 bg-blue-50 border border-blue-200">
         <h3 className="font-bold text-gray-900 mb-4">Configuracion de Notas</h3>
         <div className="grid grid-cols-2 gap-4">
@@ -571,7 +558,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       </div>
 
-      {/* Etiquetas globales - UNA SOLA VEZ */}
       <div className="card p-6 bg-purple-50 border border-purple-200">
         <h3 className="font-bold text-gray-900 mb-4">Asignar Tipos de Notas (se aplica a todos los alumnos)</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -598,7 +584,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       </div>
 
-      {/* Division Tabs */}
       {availableDivisions.length > 0 && (
         <div className="card p-4 bg-purple-50 border border-purple-200">
           <p className="text-xs font-semibold text-purple-700 mb-2">Filtrar por División:</p>
@@ -630,7 +615,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       )}
 
-      {/* Info Box */}
       <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
         <h3 className="font-bold text-emerald-900 mb-2">Flujo Nuevo de Carga</h3>
         <ul className="text-sm text-emerald-900 space-y-1">
@@ -643,7 +627,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </ul>
       </div>
 
-      {/* Error Box */}
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex gap-2">
           <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
@@ -704,7 +687,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                           )}
                         </td>
 
-                        {/* Notas */}
                         {Array.from({ length: numGrades }, (_, i) => {
                           const gradeNum = i + 1
                           const gradeValue = getDisplayGrade(enrollment.id, gradeNum)
@@ -773,7 +755,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             </div>
           </div>
 
-          {/* Botones de acción */}
           <div className="flex gap-3 flex-wrap">
             <button
               onClick={handleSaveGrades}
@@ -795,7 +776,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             )}
           </div>
 
-          {/* Modal de selección de notas para promedio - GLOBAL */}
           {showAveragingSelection && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
