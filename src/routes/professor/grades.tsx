@@ -7,6 +7,7 @@ import { ProfessorGradeLoader } from '@/components/ProfessorGradeLoader'
 import { ProfessorRegularGrades } from '@/components/ProfessorRegularGrades'
 import { ProfessorApprovedHistory } from '@/components/ProfessorApprovedHistory'
 import { ProfessorDisapprovedManagement } from '@/components/ProfessorDisapprovedManagement'
+import { ProfessorGradesReport } from '@/components/ProfessorGradesReport'
 
 export const Route = createFileRoute('/professor/grades')({
   component: ProfessorGradesPage,
@@ -33,7 +34,7 @@ function ProfessorGradesPage() {
   const [showAllYears, setShowAllYears] = useState(false)
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history' | 'disapproved'>('load')
+  const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history' | 'disapproved' | 'report'>('load')
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -187,6 +188,16 @@ function ProfessorGradesPage() {
               Carga de Notas Parciales
             </button>
             <button
+              onClick={() => setActiveTab('report')}
+              className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
+                activeTab === 'report'
+                  ? 'border-b-teal-600 text-teal-600'
+                  : 'border-b-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Reporte de Notas
+            </button>
+            <button
               onClick={() => setActiveTab('regulars')}
               className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
                 activeTab === 'regulars'
@@ -224,6 +235,10 @@ function ProfessorGradesPage() {
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-200 border-t-indigo-600 mb-4"></div>
               <p className="text-slate-600">Cargando alumnos...</p>
             </div>
+          ) : activeTab === 'report' ? (
+            <>
+              <ProfessorGradesReport subjectId={selectedSubject} />
+            </>
           ) : activeTab === 'load' ? (
             <>
               {enrollments.length > 0 ? (
