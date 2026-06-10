@@ -187,75 +187,63 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   }
 
   const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): number | null => {
-    // Nueva lógica: para cada par (Parcial, Recuperatorio)
-    // - Si Parcial >= 6: usa Parcial
-    // - Si Parcial < 6 y existe Rec: usa Rec
-    //   - Si Rec < 6: RETORNA Rec directamente como promedio final
-    // - Si todo >= 6: promediar normalmente
-
-    const notasAUsar: number[] = []
+    const gradeValues: number[] = []
 
     selectedIndices.forEach(i => {
-      const labelActual = getGradeLabel(i)
-      
-      // Detectar si es un Recuperatorio o Parcial
-      const esRecuperatorio = labelActual && labelActual.startsWith('Recuperatorio')
-      
-      if (esRecuperatorio) {
-        // Este es un Recuperatorio, buscar su Parcial correspondiente
-        let parcialCorrespondiente: string = ''
-        if (labelActual.includes('P1')) parcialCorrespondiente = 'Parcial 1'
-        else if (labelActual.includes('P2')) parcialCorrespondiente = 'Parcial 2'
-        else if (labelActual.includes('P3')) parcialCorrespondiente = 'Parcial 3'
-        else if (labelActual.includes('P4')) parcialCorrespondiente = 'Parcial 4'
-        else if (labelActual.includes('TP1')) parcialCorrespondiente = 'TP 1'
-        else if (labelActual.includes('TP2')) parcialCorrespondiente = 'TP 2'
+      const gradeRaw = getDisplayGrade(enrollmentId, i)
+      const grade = typeof gradeRaw === 'string' ? parseFloat(gradeRaw) : gradeRaw
+      const label = getGradeLabel(i)
 
-        // Encontrar el índice del Parcial correspondiente
-        const parcialIndex = Array.from({ length: numGrades }, (_, idx) => idx + 1).find(
-          n => getGradeLabel(n) === parcialCorrespondiente
-        )
+      if (label && label.startsWith('Recuperatorio')) {
+        let mainLabelToFind: string = ''
+        if (label.includes('P1')) mainLabelToFind = 'Parcial 1'
+        else if (label.includes('P2')) mainLabelToFind = 'Parcial 2'
+        else if (label.includes('P3')) mainLabelToFind = 'Parcial 3'
+        else if (label.includes('P4')) mainLabelToFind = 'Parcial 4'
+        else if (label.includes('TP1')) mainLabelToFind = 'TP 1'
+        else if (label.includes('TP2')) mainLabelToFind = 'TP 2'
 
-        if (parcialIndex) {
-          const parcialRaw = getDisplayGrade(enrollmentId, parcialIndex)
-          const parcial = typeof parcialRaw === 'string' ? parseFloat(parcialRaw) : parcialRaw
-          const recRaw = getDisplayGrade(enrollmentId, i)
-          const rec = typeof recRaw === 'string' ? parseFloat(recRaw) : recRaw
+        const mainGradeNum = mainLabelToFind
+          ? Array.from({ length: numGrades }, (_, idx) => idx + 1).find(n => getGradeLabel(n) === mainLabelToFind)
+          : undefined
 
-          if (parcial !== undefined && parcial !== null && parcial >= 6) {
-            // Parcial >= 6, usa Parcial
-            notasAUsar.push(parcial)
-          } else if (rec !== undefined && rec !== null) {
-            // Parcial < 6, usa Recuperatorio
-            if (rec < 6) {
-              // Recuperatorio < 6: RETORNA directamente
-              return rec as any // Fuerza retorno de la función
+        if (mainGradeNum) {
+          const mainGradeRaw = getDisplayGrade(enrollmentId, mainGradeNum)
+          const mainGrade = typeof mainGradeRaw === 'string' ? parseFloat(mainGradeRaw) : mainGradeRaw
+          const recoveryGrade = grade
+
+          if (recoveryGrade === undefined || recoveryGrade === null) {
+            if (mainGrade !== undefined && mainGrade !== null) {
+              gradeValues.push(mainGrade)
             }
-            notasAUsar.push(rec)
-          } else if (parcial !== undefined && parcial !== null) {
-            // No hay Rec, usa Parcial (aunque sea < 6)
-            notasAUsar.push(parcial)
+          }
+          else if (mainGrade !== undefined && mainGrade !== null && recoveryGrade > mainGrade) {
+            gradeValues.push(recoveryGrade)
+          }
+          else if (mainGrade !== undefined && mainGrade !== null) {
+            gradeValues.push(mainGrade)
+          }
+          else if (recoveryGrade !== undefined && recoveryGrade !== null) {
+            gradeValues.push(recoveryGrade)
+          }
+        } else {
+          if (grade !== undefined && grade !== null) {
+            gradeValues.push(grade)
           }
         }
       } else {
-        // Es un Parcial directo (sin Recuperatorio en la selección)
-        const parcialRaw = getDisplayGrade(enrollmentId, i)
-        const parcial = typeof parcialRaw === 'string' ? parseFloat(parcialRaw) : parcialRaw
-        
-        if (parcial !== undefined && parcial !== null) {
-          notasAUsar.push(parcial)
+        if (grade !== undefined && grade !== null) {
+          gradeValues.push(grade)
         }
       }
     })
 
-    // Si no hay notas válidas, retorna null
-    if (notasAUsar.length === 0) {
-      return null
+    if (gradeValues.length === selectedIndices.size) {
+      const sum = gradeValues.reduce((a, b) => a + b, 0)
+      return Math.round((sum / selectedIndices.size) * 10) / 10
     }
 
-    // Promediar todas las notas recolectadas
-    const sum = notasAUsar.reduce((a, b) => a + b, 0)
-    return Math.round((sum / notasAUsar.length) * 10) / 10
+    return null
   }
 
   const getPartialStatus = (partialGrade: number | null): string | null => {
