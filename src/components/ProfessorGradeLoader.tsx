@@ -188,31 +188,62 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
     selectedIndices.forEach(i => {
       const grade = getDisplayGrade(enrollmentId, i)
-      if (grade !== undefined && grade !== null) {
-        const label = getGradeLabel(i)
-        if (label && label.startsWith('Recuperatorio')) {
-          const mainType = label.replace('Recuperatorio ', '')
-          const mainGradeNum = Array.from({ length: numGrades }, (_, idx) => idx + 1).find(n => {
-            const mainLabel = getGradeLabel(n)
-            return mainLabel === mainType
-          })
+      const label = getGradeLabel(i)
 
-          if (mainGradeNum) {
-            const mainGrade = getDisplayGrade(enrollmentId, mainGradeNum)
-            if (mainGrade !== undefined && mainGrade !== null && grade > mainGrade) {
-              gradeValues.push(grade)
-            } else if (mainGrade !== undefined && mainGrade !== null) {
+      // Si es Recuperatorio, buscar la nota principal correspondiente
+      if (label && label.startsWith('Recuperatorio')) {
+        // Mapeo: "Recuperatorio P1" -> "Parcial 1", "Recuperatorio TP1" -> "TP 1"
+        let mainLabelToFind: string = ''
+        if (label.includes('P1')) mainLabelToFind = 'Parcial 1'
+        else if (label.includes('P2')) mainLabelToFind = 'Parcial 2'
+        else if (label.includes('P3')) mainLabelToFind = 'Parcial 3'
+        else if (label.includes('P4')) mainLabelToFind = 'Parcial 4'
+        else if (label.includes('TP1')) mainLabelToFind = 'TP 1'
+        else if (label.includes('TP2')) mainLabelToFind = 'TP 2'
+
+        // Buscar el índice de la nota principal
+        const mainGradeNum = mainLabelToFind
+          ? Array.from({ length: numGrades }, (_, idx) => idx + 1).find(n => getGradeLabel(n) === mainLabelToFind)
+          : undefined
+
+        // Validación: recuperatorio solo cuenta si está cargado (no NULL) y es MAYOR que la nota principal
+        if (mainGradeNum) {
+          const mainGrade = getDisplayGrade(enrollmentId, mainGradeNum)
+          const recoveryGrade = grade
+
+          // Si recuperatorio es NULL o vacío, usar nota principal
+          if (recoveryGrade === undefined || recoveryGrade === null) {
+            if (mainGrade !== undefined && mainGrade !== null) {
               gradeValues.push(mainGrade)
             }
-          } else {
-            gradeValues.push(grade)
+          }
+          // Si recuperatorio > principal, usar recuperatorio
+          else if (mainGrade !== undefined && mainGrade !== null && recoveryGrade > mainGrade) {
+            gradeValues.push(recoveryGrade)
+          }
+          // Si recuperatorio existe pero NO es mayor, usar principal
+          else if (mainGrade !== undefined && mainGrade !== null) {
+            gradeValues.push(mainGrade)
+          }
+          // Si no hay principal pero hay recuperatorio, usar recuperatorio
+          else if (recoveryGrade !== undefined && recoveryGrade !== null) {
+            gradeValues.push(recoveryGrade)
           }
         } else {
+          // No hay nota principal correspondiente, usar recuperatorio si existe
+          if (grade !== undefined && grade !== null) {
+            gradeValues.push(grade)
+          }
+        }
+      } else {
+        // No es recuperatorio, agregar directamente si no es NULL
+        if (grade !== undefined && grade !== null) {
           gradeValues.push(grade)
         }
       }
     })
 
+    // Solo calcular promedio si tenemos todas las notas seleccionadas
     if (gradeValues.length === selectedIndices.size) {
       const sum = gradeValues.reduce((a, b) => a + b, 0)
       return Math.round((sum / selectedIndices.size) * 10) / 10
