@@ -172,7 +172,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     }
   }
 
-  const getDisplayGrade = (enrollmentId: string, gradeNum: number): number | undefined => {
+  const getDisplayGrade = (enrollmentId: string, gradeNum: number): string | number | undefined => {
     const gradeKey = `grade_${gradeNum}` as keyof GradeData
     // Si el profesor tocó este campo (existe en grades), mostrar lo que escribió (incluso null/vacío)
     if (grades[enrollmentId] && gradeKey in grades[enrollmentId]) {
@@ -190,7 +190,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     const gradeValues: number[] = []
 
     selectedIndices.forEach(i => {
-      const grade = getDisplayGrade(enrollmentId, i)
+      const gradeRaw = getDisplayGrade(enrollmentId, i)
+      const grade = typeof gradeRaw === 'string' ? parseFloat(gradeRaw) : gradeRaw
       const label = getGradeLabel(i)
 
       if (label && label.startsWith('Recuperatorio')) {
@@ -207,7 +208,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           : undefined
 
         if (mainGradeNum) {
-          const mainGrade = getDisplayGrade(enrollmentId, mainGradeNum)
+          const mainGradeRaw = getDisplayGrade(enrollmentId, mainGradeNum)
+          const mainGrade = typeof mainGradeRaw === 'string' ? parseFloat(mainGradeRaw) : mainGradeRaw
           const recoveryGrade = grade
 
           if (recoveryGrade === undefined || recoveryGrade === null) {
@@ -262,14 +264,13 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       }))
       return
     }
-    if (!/^[0-9]*(\.[0-9]*)?$/.test(value)) return
-    const numValue = parseFloat(value)
-    if (isNaN(numValue) || numValue < 0 || numValue > 10) return
+    if (!/^[0-9]*\.?[0-9]*$/.test(value)) return
+    if ((value.match(/\./g) || []).length > 1) return
     setGrades(prev => ({
       ...prev,
       [enrollmentId]: {
         ...prev[enrollmentId],
-        [`grade_${gradeNum}`]: numValue,
+        [`grade_${gradeNum}`]: value as any,
       },
     }))
   }
@@ -348,11 +349,17 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
         for (let i = 1; i <= numGrades; i++) {
           const gradeKey = `grade_${i}` as keyof GradeData
-          const newGrade = grades[enrollment.id]?.[gradeKey]
+          const newGradeRaw = grades[enrollment.id]?.[gradeKey]
+          const newGrade = typeof newGradeRaw === 'string' ? parseFloat(newGradeRaw) : newGradeRaw
           const existingGrade = existingGrades[enrollment.id]?.[gradeKey]
 
           if (grades[enrollment.id] && gradeKey in grades[enrollment.id]) {
-            gradeChanges[gradeKey] = newGrade ?? null
+            if (typeof newGrade === 'number' && (newGrade < 0 || newGrade > 10)) {
+              setError(`Calificación inválida para ${enrollment.student_name}: debe estar entre 0 y 10`)
+              setSaving(false)
+              return
+            }
+            gradeChanges[gradeKey] = !isNaN(newGrade as number) ? newGrade : null
             hasChanges = true
           } else {
             gradeChanges[gradeKey] = existingGrade ?? null
