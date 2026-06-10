@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { AlertCircle, Check, X, Save, Lock, RotateCcw, Download } from 'lucide-react'
+import { AlertCircle, Check, X, Save, Lock, RotateCcw } from 'lucide-react'
 
 type Enrollment = {
   id: string
@@ -40,7 +40,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [allowsPromotion, setAllowsPromotion] = useState(false)
   const [selectedDivision, setSelectedDivision] = useState<'A' | 'B' | null>(null)
   const [grades, setGrades] = useState<Record<string, GradeData>>({})
-  const [gradeLabels, setGradeLabels] = useState<Record<string, Record<number, GradeLabel>>>({})
+  const [globalGradeLabels, setGlobalGradeLabels] = useState<Record<number, GradeLabel>>({})
   const [existingGrades, setExistingGrades] = useState<Record<string, GradeData>>({})
   const [existingLabels, setExistingLabels] = useState<Record<string, Record<number, GradeLabel>>>({})
   const [existingIds, setExistingIds] = useState<Record<string, string>>({})
@@ -113,6 +113,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       const existingIdsMap: Record<string, string> = {}
       const finalizationStatusMap: Record<string, boolean> = {}
       const completedEnrollmentIds = new Set<string>()
+      const globalLabelsFromDB: Record<number, GradeLabel> = {}
 
       if (gradesData && gradesData.length > 0) {
         gradesData.forEach(g => {
@@ -138,6 +139,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                 if (value) {
                   const gradeNum = parseInt(key.replace('grade_', ''))
                   labelsMap[gradeNum] = value as GradeLabel
+                  globalLabelsFromDB[gradeNum] = value as GradeLabel
                 }
               })
               existingLabelsMap[g.enrollment_id] = labelsMap
@@ -157,6 +159,9 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       setExistingLabels(existingLabelsMap)
       setExistingIds(existingIdsMap)
       setExistingFinalizationStatus(finalizationStatusMap)
+      if (Object.keys(globalLabelsFromDB).length > 0) {
+        setGlobalGradeLabels(globalLabelsFromDB)
+      }
 
       const active = enrollments.filter(e => !completedEnrollmentIds.has(e.id))
       setActiveEnrollments(active)
@@ -174,8 +179,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     return existingGrades[enrollmentId]?.[`grade_${gradeNum}` as keyof GradeData]
   }
 
-  const getGradeLabel = (enrollmentId: string, gradeNum: number): GradeLabel | undefined => {
-    return gradeLabels[enrollmentId]?.[gradeNum] || existingLabels[enrollmentId]?.[gradeNum]
+  const getGradeLabel = (gradeNum: number): GradeLabel | undefined => {
+    return globalGradeLabels[gradeNum]
   }
 
   const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): number | null => {
@@ -184,11 +189,11 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     selectedIndices.forEach(i => {
       const grade = getDisplayGrade(enrollmentId, i)
       if (grade !== undefined && grade !== null) {
-        const label = getGradeLabel(enrollmentId, i)
+        const label = getGradeLabel(i)
         if (label && label.startsWith('Recuperatorio')) {
           const mainType = label.replace('Recuperatorio ', '')
           const mainGradeNum = Array.from({ length: numGrades }, (_, idx) => idx + 1).find(n => {
-            const mainLabel = getGradeLabel(enrollmentId, n)
+            const mainLabel = getGradeLabel(n)
             return mainLabel === mainType
           })
 
@@ -234,13 +239,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     }))
   }
 
-  const handleLabelChange = (enrollmentId: string, gradeNum: number, label: GradeLabel) => {
-    setGradeLabels(prev => ({
+  const handleGlobalLabelChange = (gradeNum: number, label: GradeLabel) => {
+    setGlobalGradeLabels(prev => ({
       ...prev,
-      [enrollmentId]: {
-        ...(prev[enrollmentId] || {}),
-        [gradeNum]: label,
-      },
+      [gradeNum]: label,
     }))
   }
 
@@ -334,9 +336,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           payload[gradeKey] = newGrade !== undefined ? newGrade : existingGrade
         }
 
+        // Usar etiquetas globales para todos los alumnos
         const labelsObj: Record<string, GradeLabel | null> = {}
         for (let i = 1; i <= numGrades; i++) {
-          labelsObj[`grade_${i}`] = gradeLabels[enrollment.id]?.[i] || existingLabels[enrollment.id]?.[i] || null
+          labelsObj[`grade_${i}`] = globalGradeLabels[i] || null
         }
         payload.grade_labels = labelsObj
 
@@ -539,6 +542,33 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         </div>
       </div>
 
+      {/* Etiquetas globales - UNA SOLA VEZ */}
+      <div className="card p-6 bg-purple-50 border border-purple-200">
+        <h3 className="font-bold text-gray-900 mb-4">Asignar Tipos de Notas (se aplica a todos los alumnos)</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {Array.from({ length: numGrades }, (_, i) => {
+            const gradeNum = i + 1
+            return (
+              <div key={gradeNum}>
+                <label className="block text-xs font-semibold text-gray-700 mb-2">Nota {gradeNum}</label>
+                <select
+                  value={globalGradeLabels[gradeNum] || ''}
+                  onChange={e => handleGlobalLabelChange(gradeNum, e.target.value as GradeLabel)}
+                  className="w-full px-2 py-2 border border-purple-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                >
+                  <option value="">-- Selecciona tipo --</option>
+                  {AVAILABLE_LABELS.map(label => (
+                    <option key={label} value={label}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Division Tabs */}
       {availableDivisions.length > 0 && (
         <div className="card p-4 bg-purple-50 border border-purple-200">
@@ -575,7 +605,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       <div className="card p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200">
         <h3 className="font-bold text-emerald-900 mb-2">Flujo Nuevo de Carga</h3>
         <ul className="text-sm text-emerald-900 space-y-1">
-          <li>1. Asigna un tipo a cada casilla (Parcial 1, TP, Recuperatorio P1, etc)</li>
+          <li>1. Asigna los tipos de nota UNA SOLA VEZ arriba (se aplica a todos los alumnos)</li>
           <li>2. Carga las notas con "Guardar Notas" - quedaran registradas sin promedio</li>
           <li>3. Cuando estes listo, presiona "Cerrar Notas" para seleccionar cuales usar</li>
           <li>4. El promedio se calcula SOLO con las notas seleccionadas</li>
@@ -609,16 +639,15 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                 <thead>
                   <tr className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
                     <th className="px-3 py-2 text-left font-bold">Estudiante</th>
-                    {Array.from({ length: numGrades }, (_, i) => (
-                      <th key={i + 1} className="px-2 py-2 text-center font-bold text-xs">
-                        Tipo
-                      </th>
-                    ))}
-                    {Array.from({ length: numGrades }, (_, i) => (
-                      <th key={`note_${i + 1}`} className="px-2 py-2 text-center font-bold text-xs">
-                        Nota {i + 1}
-                      </th>
-                    ))}
+                    {Array.from({ length: numGrades }, (_, i) => {
+                      const gradeNum = i + 1
+                      const label = getGradeLabel(gradeNum)
+                      return (
+                        <th key={`type_${gradeNum}`} className="px-2 py-2 text-center font-bold text-xs">
+                          {label || `Nota ${gradeNum}`}
+                        </th>
+                      )
+                    })}
                     <th className="px-2 py-2 text-center font-bold text-xs">Promedio</th>
                     <th className="px-2 py-2 text-center font-bold text-xs">Estado</th>
                     <th className="px-2 py-2 text-center font-bold text-xs">Acción</th>
@@ -646,28 +675,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                             </span>
                           )}
                         </td>
-
-                        {/* Tipo de cada nota */}
-                        {Array.from({ length: numGrades }, (_, i) => {
-                          const gradeNum = i + 1
-                          return (
-                            <td key={`type_${gradeNum}`} className="px-1 py-2 text-center">
-                              <select
-                                value={getGradeLabel(enrollment.id, gradeNum) || ''}
-                                onChange={e => handleLabelChange(enrollment.id, gradeNum, e.target.value as GradeLabel)}
-                                disabled={isFinalized}
-                                className="w-full px-1 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
-                              >
-                                <option value="">-</option>
-                                {AVAILABLE_LABELS.map(label => (
-                                  <option key={label} value={label}>
-                                    {label}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                          )
-                        })}
 
                         {/* Notas */}
                         {Array.from({ length: numGrades }, (_, i) => {
@@ -777,7 +784,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                         {Array.from({ length: numGrades }, (_, i) => {
                           const gradeNum = i + 1
                           const gradeValue = getDisplayGrade(enrollment.id, gradeNum)
-                          const label = getGradeLabel(enrollment.id, gradeNum)
+                          const label = getGradeLabel(gradeNum)
                           const isSelected = selectedGradesForAveraging[enrollment.id]?.has(gradeNum) || false
 
                           if (gradeValue === undefined || gradeValue === null) {
