@@ -51,7 +51,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [closing, setClosing] = useState(false)
   const [savingStudents, setSavingStudents] = useState<Set<string>>(new Set())
   const [activeEnrollments, setActiveEnrollments] = useState<Enrollment[]>([])
-  const [selectedGradesForAveraging, setSelectedGradesForAveraging] = useState<Record<string, Set<number>>>({})
+  const [globalSelectedGradesForAveraging, setGlobalSelectedGradesForAveraging] = useState<Set<number>>(new Set())
   const [showAveragingSelection, setShowAveragingSelection] = useState(false)
   const [undoing, setUndoing] = useState(false)
   const [undoingStudent, setUndoingStudent] = useState<string | null>(null)
@@ -246,19 +246,15 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     }))
   }
 
-  const handleToggleGradeSelection = (enrollmentId: string, gradeNum: number) => {
-    setSelectedGradesForAveraging(prev => {
-      const current = prev[enrollmentId] || new Set<number>()
-      const updated = new Set(current)
+  const handleToggleGradeSelection = (gradeNum: number) => {
+    setGlobalSelectedGradesForAveraging(prev => {
+      const updated = new Set(prev)
       if (updated.has(gradeNum)) {
         updated.delete(gradeNum)
       } else {
         updated.add(gradeNum)
       }
-      return {
-        ...prev,
-        [enrollmentId]: updated,
-      }
+      return updated
     })
   }
 
@@ -406,12 +402,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         : activeEnrollments
 
       for (const enrollment of enrollmentsToClose) {
-        const selectedIndices = selectedGradesForAveraging[enrollment.id]
-        if (!selectedIndices || selectedIndices.size === 0) {
-          continue
-        }
-
-        const partialGrade = calculatePartialGradeWithSelection(enrollment.id, selectedIndices)
+        const partialGrade = calculatePartialGradeWithSelection(enrollment.id, globalSelectedGradesForAveraging)
         if (partialGrade === null) {
           setError(`Error: No se puede calcular promedio para ${enrollment.student_name}. Verifica las notas seleccionadas.`)
           setClosing(false)
@@ -426,7 +417,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           partial_status: partialStatus,
           partial_finalized: true,
           partial_finalized_at: new Date().toISOString(),
-          selected_grades_for_averaging: Array.from(selectedIndices),
+          selected_grades_for_averaging: Array.from(globalSelectedGradesForAveraging),
         }
 
         if (partialStatus === 'desaprobado' || partialStatus === 'promocionado') {
@@ -459,7 +450,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
       alert(`${closedCount} calificacion${closedCount !== 1 ? 'es' : ''} finalizada${closedCount !== 1 ? 's' : ''}. Se han calculado los promedios con las notas seleccionadas.`)
       setShowAveragingSelection(false)
-      setSelectedGradesForAveraging({})
+      setGlobalSelectedGradesForAveraging(new Set())
       await filterActiveEnrollments()
     } catch (err) {
       setError('Error al cerrar notas: ' + String(err))
@@ -480,15 +471,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     return false
   })
 
-  const hasAllSelectionsForClosing = selectedDivision
-    ? activeEnrollments.filter(e => e.division === selectedDivision).every(e => {
-        const selected = selectedGradesForAveraging[e.id]
-        return selected && selected.size > 0
-      })
-    : activeEnrollments.every(e => {
-        const selected = selectedGradesForAveraging[e.id]
-        return selected && selected.size > 0
-      })
+  const hasSelectionsForClosing = globalSelectedGradesForAveraging.size > 0
 
   const availableDivisions = Array.from(
     new Set(activeEnrollments.map(e => e.division).filter(Boolean))
@@ -607,9 +590,9 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         <ul className="text-sm text-emerald-900 space-y-1">
           <li>1. Asigna los tipos de nota UNA SOLA VEZ arriba (se aplica a todos los alumnos)</li>
           <li>2. Carga las notas con "Guardar Notas" - quedaran registradas sin promedio</li>
-          <li>3. Cuando estes listo, presiona "Cerrar Notas" para seleccionar cuales usar</li>
-          <li>4. El promedio se calcula SOLO con las notas seleccionadas</li>
-          <li>5. Recuperatorios solo cuentan si son mayores a la nota original</li>
+          <li>3. Cuando estes listo, presiona "Cerrar Notas" para elegir las notas a usar</li>
+          <li>4. Elige UNA SOLA VEZ cuales notas se usaran para TODOS los alumnos</li>
+          <li>5. El promedio se calcula con la misma selección para todos</li>
           <li>6. Si te equivocas, presiona "Deshacer" para volver a editar</li>
         </ul>
       </div>
@@ -655,9 +638,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {displayedEnrollments.map((enrollment, idx) => {
-                    const selectedIndices = selectedGradesForAveraging[enrollment.id]
-                    const partialGrade = selectedIndices && selectedIndices.size > 0 
-                      ? calculatePartialGradeWithSelection(enrollment.id, selectedIndices)
+                    const partialGrade = globalSelectedGradesForAveraging.size > 0
+                      ? calculatePartialGradeWithSelection(enrollment.id, globalSelectedGradesForAveraging)
                       : null
                     const partialStatus = partialGrade ? getPartialStatus(partialGrade) : null
                     const isFinalized = existingFinalizationStatus[enrollment.id]
@@ -760,7 +742,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             {displayedEnrollments.some(e => !existingFinalizationStatus[e.id]) && (
               <button
                 onClick={handleCloseNotes}
-                disabled={closing || !displayedEnrollments.some(e => getDisplayGrade(e.id, 1) !== undefined || getDisplayGrade(e.id, 2) !== undefined)}
+                disabled={closing || !displayedEnrollments.some(e => Array.from({ length: numGrades }, (_, i) => getDisplayGrade(e.id, i + 1)).some(g => g !== undefined))}
                 className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 <Lock size={20} />
@@ -769,45 +751,33 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             )}
           </div>
 
-          {/* Modal de selección de notas para promedio */}
+          {/* Modal de selección de notas para promedio - GLOBAL */}
           {showAveragingSelection && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-96 overflow-y-auto p-6">
-                <h3 className="font-bold text-lg text-gray-900 mb-4">Selecciona las notas para calcular promedio</h3>
-                <p className="text-sm text-gray-600 mb-4">Marca cuáles de estas notas deseas usar para el promedio parcial:</p>
-                
-                <div className="space-y-3 mb-6">
-                  {displayedEnrollments.map(enrollment => (
-                    <div key={enrollment.id} className="border rounded-lg p-3">
-                      <p className="font-semibold text-sm mb-2">{enrollment.student_name}</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {Array.from({ length: numGrades }, (_, i) => {
-                          const gradeNum = i + 1
-                          const gradeValue = getDisplayGrade(enrollment.id, gradeNum)
-                          const label = getGradeLabel(gradeNum)
-                          const isSelected = selectedGradesForAveraging[enrollment.id]?.has(gradeNum) || false
+              <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                <h3 className="font-bold text-lg text-gray-900 mb-2">Selecciona las notas para calcular promedio</h3>
+                <p className="text-sm text-gray-600 mb-6">Elige cuáles de estas notas se usarán para TODOS los alumnos:</p>
 
-                          if (gradeValue === undefined || gradeValue === null) {
-                            return null
-                          }
+                <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
+                  {Array.from({ length: numGrades }, (_, i) => {
+                    const gradeNum = i + 1
+                    const label = getGradeLabel(gradeNum)
+                    const isSelected = globalSelectedGradesForAveraging.has(gradeNum)
 
-                          return (
-                            <label key={`check_${gradeNum}`} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-gray-100 rounded">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleToggleGradeSelection(enrollment.id, gradeNum)}
-                                className="w-4 h-4 rounded"
-                              />
-                              <span className="text-sm">
-                                {label ? `${label}: ${gradeValue}` : `Nota ${gradeNum}: ${gradeValue}`}
-                              </span>
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
+                    return (
+                      <label key={`check_${gradeNum}`} className="flex items-center gap-3 cursor-pointer p-3 hover:bg-white rounded-lg transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleGradeSelection(gradeNum)}
+                          className="w-5 h-5 rounded"
+                        />
+                        <span className="text-sm font-semibold text-gray-900">
+                          {label || `Nota ${gradeNum}`}
+                        </span>
+                      </label>
+                    )
+                  })}
                 </div>
 
                 <div className="flex gap-2">
@@ -819,7 +789,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                   </button>
                   <button
                     onClick={handleCloseNotes}
-                    disabled={!hasAllSelectionsForClosing || closing}
+                    disabled={!hasSelectionsForClosing || closing}
                     className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 text-white font-bold py-2 rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
                   >
                     {closing ? 'Finalizando...' : 'Confirmar y Cerrar Notas'}
@@ -830,7 +800,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           )}
 
           <p className="text-xs text-center text-gray-600 mt-2">
-            Guardar Notas: Registra sin calcular promedio. Cerrar Notas: Selecciona cuáles usar y calcula el promedio final.
+            Guardar Notas: Registra sin calcular promedio. Cerrar Notas: Selecciona cuáles usar para TODOS y calcula el promedio final.
           </p>
         </>
       )}
