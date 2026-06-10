@@ -260,7 +260,18 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   }
 
   const handleGradeChange = (enrollmentId: string, gradeNum: number, value: string) => {
-    const numValue = value === '' ? null : parseFloat(value)
+    if (value === '') {
+      setGrades(prev => ({
+        ...prev,
+        [enrollmentId]: {
+          ...prev[enrollmentId],
+          [`grade_${gradeNum}`]: null,
+        },
+      }))
+      return
+    }
+    const numValue = parseFloat(value)
+    if (isNaN(numValue) || numValue < 0 || numValue > 10) return
     setGrades(prev => ({
       ...prev,
       [enrollmentId]: {
@@ -339,12 +350,22 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         : activeEnrollments
 
       for (const enrollment of enrollmentsToSave) {
+        // Verificar si hay CAMBIOS (incluyendo eliminación a null)
         let hasChanges = false
+        const gradeChanges: Record<string, number | null> = {}
+
         for (let i = 1; i <= numGrades; i++) {
-          const newGrade = grades[enrollment.id]?.[`grade_${i}` as keyof GradeData]
-          if (newGrade !== undefined && newGrade !== null) {
+          const gradeKey = `grade_${i}` as keyof GradeData
+          const newGrade = grades[enrollment.id]?.[gradeKey]
+          const existingGrade = existingGrades[enrollment.id]?.[gradeKey]
+
+          // Si el profesor tocó este campo (existe en el estado grades)
+          if (grades[enrollment.id] && gradeKey in grades[enrollment.id]) {
+            gradeChanges[gradeKey] = newGrade ?? null
             hasChanges = true
-            break
+          } else {
+            // Si no lo tocó, mantener lo existente
+            gradeChanges[gradeKey] = existingGrade ?? null
           }
         }
 
@@ -354,13 +375,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
         const payload: any = {
           enrollment_id: enrollment.id,
-        }
-
-        for (let i = 1; i <= numGrades; i++) {
-          const gradeKey = `grade_${i}` as keyof GradeData
-          const newGrade = grades[enrollment.id]?.[gradeKey]
-          const existingGrade = existingGrades[enrollment.id]?.[gradeKey]
-          payload[gradeKey] = newGrade !== undefined ? newGrade : existingGrade
+          ...gradeChanges,
         }
 
         // Usar etiquetas globales para todos los alumnos
@@ -697,10 +712,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                           return (
                             <td key={`note_${gradeNum}`} className="px-2 py-2 text-center">
                               <input
-                                type="number"
-                                min="0"
-                                max="10"
-                                step="0.1"
+                                type="text"
+                                inputMode="decimal"
                                 value={gradeValue ?? ''}
                                 onChange={e => handleGradeChange(enrollment.id, gradeNum, e.target.value)}
                                 disabled={isFinalized}
