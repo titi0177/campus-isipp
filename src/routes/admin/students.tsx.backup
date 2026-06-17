@@ -4,10 +4,9 @@ import { supabase } from '@/lib/supabase'
 import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { Plus, Pencil, Trash2, Filter, Download } from 'lucide-react'
+import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
 import type { Student, Program } from '@/types'
 import { Link } from '@tanstack/react-router'
-import * as XLSX from 'xlsx'
 
 export const Route = createFileRoute('/admin/students')({
   component: StudentsPage,
@@ -22,7 +21,6 @@ function StudentsPage() {
   const [editing, setEditing] = useState<Partial<Student>>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const { showToast } = useToast()
 
   const [filterYear, setFilterYear] = useState<number | null>(null)
@@ -106,52 +104,6 @@ function StudentsPage() {
     void loadData()
   }
 
-  const handleExportExcel = () => {
-    setExporting(true)
-    try {
-      // Preparar datos para Excel
-      const dataToExport = filteredStudents.map(s => ({
-        'Apellido': s.last_name || '',
-        'Nombre': s.first_name || '',
-        'Legajo': s.legajo || '',
-        'DNI': s.dni || '',
-        'Email': s.email || '',
-        'Carrera': (s as any).program?.name || '-',
-        'Año': s.year || 1,
-        'Estado': s.status || 'active',
-      }))
-
-      // Crear workbook
-      const ws = XLSX.utils.json_to_sheet(dataToExport)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Estudiantes')
-
-      // Ajustar ancho de columnas
-      const colWidths = [
-        { wch: 15 }, // Apellido
-        { wch: 15 }, // Nombre
-        { wch: 12 }, // Legajo
-        { wch: 12 }, // DNI
-        { wch: 25 }, // Email
-        { wch: 25 }, // Carrera
-        { wch: 8 },  // Año
-        { wch: 12 }, // Estado
-      ]
-      ws['!cols'] = colWidths
-
-      // Descargar archivo
-      const fileName = `estudiantes_${new Date().toISOString().split('T')[0]}.xlsx`
-      XLSX.writeFile(wb, fileName)
-
-      showToast(`${filteredStudents.length} estudiantes exportados correctamente.`, 'success')
-    } catch (error) {
-      console.error('Error exporting to Excel:', error)
-      showToast('Error al exportar a Excel.', 'error')
-    } finally {
-      setExporting(false)
-    }
-  }
-
   const columns = [
     { key: 'last_name', label: 'Apellido' },
     { key: 'first_name', label: 'Nombre' },
@@ -170,19 +122,9 @@ function StudentsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Estudiantes</h1>
           <p className="mt-1 text-sm text-gray-500">Gestión del padrón de alumnos ({filteredStudents.length} resultados)</p>
         </div>
-        <div className="flex gap-2">
-          <button 
-            type="button" 
-            onClick={handleExportExcel} 
-            disabled={exporting || filteredStudents.length === 0}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <Download size={16} /> {exporting ? 'Exportando...' : 'Descargar Excel'}
-          </button>
-          <button type="button" onClick={openNew} className="btn-primary flex items-center gap-2">
-            <Plus size={16} /> Nuevo estudiante
-          </button>
-        </div>
+        <button type="button" onClick={openNew} className="btn-primary flex items-center gap-2">
+          <Plus size={16} /> Nuevo estudiante
+        </button>
       </div>
 
       <div className="card p-4 space-y-3">
