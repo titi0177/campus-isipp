@@ -571,6 +571,25 @@ function ProfessorAttendancePage() {
             </table>
           </div>
 
+          {/* Botones de Acción */}
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={saveAttendance}
+              disabled={saving}
+              className="btn-primary flex items-center gap-2 flex-1 md:flex-none"
+            >
+              <Save size={18} />
+              {saving ? 'Guardando...' : 'Guardar Asistencia'}
+            </button>
+            <button
+              onClick={generatePDF}
+              className="btn-secondary flex items-center gap-2 flex-1 md:flex-none"
+            >
+              <Download size={18} />
+              Descargar PDF Acumulado
+            </button>
+          </div>
+
           {/* Resumen Acumulativo */}
           <div className="card p-6 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl">
             <h3 className="font-black text-green-900 mb-4 flex items-center gap-2">
@@ -616,25 +635,6 @@ function ProfessorAttendancePage() {
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Botones de Acción */}
-          <div className="flex gap-3 flex-wrap">
-            <button
-              onClick={saveAttendance}
-              disabled={saving}
-              className="btn-primary flex items-center gap-2 flex-1 md:flex-none"
-            >
-              <Save size={18} />
-              {saving ? 'Guardando...' : 'Guardar Asistencia'}
-            </button>
-            <button
-              onClick={generatePDF}
-              className="btn-secondary flex items-center gap-2 flex-1 md:flex-none"
-            >
-              <Download size={18} />
-              Descargar PDF Acumulado
-            </button>
           </div>
 
           {/* Leyenda */}
