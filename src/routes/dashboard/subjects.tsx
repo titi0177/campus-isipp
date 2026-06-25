@@ -49,6 +49,7 @@ function SubjectsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadData()
@@ -167,6 +168,18 @@ function SubjectsPage() {
     setExpandedId(expandedId === id ? null : id)
   }
 
+  function toggleYearExpanded(year: number) {
+    setExpandedYears(prev => {
+      const updated = new Set(prev)
+      if (updated.has(year)) {
+        updated.delete(year)
+      } else {
+        updated.add(year)
+      }
+      return updated
+    })
+  }
+
   // Función para determinar si es promocionada
   const isPromoted = (e: EnrollmentWithGrades) => {
     const fg = e.grades?.final_grade
@@ -194,6 +207,14 @@ function SubjectsPage() {
       return acc
     }, {} as Record<number, EnrollmentWithGrades[]>)
   ).sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
+
+  // Inicializar años expandidos: expandir el año más alto (actual) por defecto
+  useEffect(() => {
+    if (groupedByYear.length > 0 && expandedYears.size === 0) {
+      const latestYear = parseInt(groupedByYear[groupedByYear.length - 1][0])
+      setExpandedYears(new Set([latestYear]))
+    }
+  }, [groupedByYear, expandedYears.size])
 
   if (loading) {
     return (
@@ -269,267 +290,285 @@ function SubjectsPage() {
         </div>
       ) : (
         <div className="space-y-12">
-          {groupedByYear.map(([year, yearlEnrollments]) => (
-            <div key={year} className="space-y-4">
-              <div className="flex items-center gap-4 px-2">
-                <h2 className="text-3xl font-black text-gray-900">{year}° Año</h2>
-                <div className="flex-1 h-1 bg-gradient-to-r from-indigo-300 to-transparent rounded-full"></div>
-                <span className="text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                  {yearlEnrollments.length} materia{yearlEnrollments.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {yearlEnrollments.map(enr => {
-                  const subject = enr.subject
-                  const professor = enr.professor
-                  const grades = enr.grades
-                  const attendance = enr.attendance
+          {groupedByYear.map(([year, yearlEnrollments]) => {
+            const yearNum = parseInt(year)
+            const isYearExpanded = expandedYears.has(yearNum)
 
-                  const isExpanded = expandedId === enr.id
+            return (
+              <div key={year} className="space-y-4">
+                <button
+                  onClick={() => toggleYearExpanded(yearNum)}
+                  className="w-full flex items-center gap-4 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all border-2 border-indigo-200 hover:border-indigo-400 active:scale-95"
+                >
+                  <div className="flex-1 flex items-center gap-4">
+                    <h2 className="text-3xl font-black text-gray-900">{year}° Año</h2>
+                    <div className="flex-1 h-1 bg-gradient-to-r from-indigo-300 to-transparent rounded-full"></div>
+                    <span className="text-sm font-bold text-gray-600 bg-white px-3 py-1 rounded-full border border-gray-200">
+                      {yearlEnrollments.length} materia{yearlEnrollments.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {isYearExpanded ? (
+                    <ChevronUp className="text-indigo-600 flex-shrink-0" size={28} />
+                  ) : (
+                    <ChevronDown className="text-gray-400 flex-shrink-0" size={28} />
+                  )}
+                </button>
 
-                  const partialGrades = [grades?.grade_1, grades?.grade_2, grades?.grade_3, grades?.grade_4, grades?.grade_5, grades?.grade_6].filter(g => g != null)
-                  const partialGrade = grades?.partial_grade
-                  const finalGrade = grades?.final_grade
-                  const partialStatus = grades?.partial_status
-                  const finalStatus = grades?.final_status
+                {isYearExpanded && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-300">
+                    {yearlEnrollments.map(enr => {
+                      const subject = enr.subject
+                      const professor = enr.professor
+                      const grades = enr.grades
+                      const attendance = enr.attendance
 
-                  // Determinar estado basado en nota
-                  let displayStatus = 'en_curso'
-                  if (finalGrade) {
-                    if (finalGrade >= 8 && subject.allows_promotion) {
-                      displayStatus = 'promocionado'
-                    } else if (finalGrade >= 6) {
-                      displayStatus = 'aprobado'
-                    } else {
-                      displayStatus = 'desaprobado'
-                    }
-                  } else if (partialStatus) {
-                    displayStatus = partialStatus
-                  }
+                      const isExpanded = expandedId === enr.id
 
-                  const getCardStyle = () => {
-                    if (finalGrade && finalGrade >= 8 && subject.allows_promotion) {
-                      return 'border-purple-600 bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50'
-                    }
-                    if (finalGrade && finalGrade >= 6) {
-                      return 'border-emerald-600 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-50'
-                    }
-                    if (finalGrade && finalGrade < 6) {
-                      return 'border-red-600 bg-gradient-to-br from-red-50 via-rose-50 to-red-50'
-                    }
-                    return 'border-indigo-600 bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-50'
-                  }
+                      const partialGrades = [grades?.grade_1, grades?.grade_2, grades?.grade_3, grades?.grade_4, grades?.grade_5, grades?.grade_6].filter(g => g != null)
+                      const partialGrade = grades?.partial_grade
+                      const finalGrade = grades?.final_grade
+                      const partialStatus = grades?.partial_status
+                      const finalStatus = grades?.final_status
 
-                  return (
-                    <div
-                      key={enr.id}
-                      className={`card overflow-hidden rounded-3xl border-2 transition-all duration-300 hover:shadow-2xl hover:scale-105 ${getCardStyle()} ${
-                        isExpanded ? 'ring-2 ring-indigo-400' : ''
-                      }`}
-                    >
-                      <button
-                        onClick={() => toggleExpanded(enr.id)}
-                        className="w-full p-6 text-left hover:bg-black/5 transition-colors"
-                      >
-                        <div className="flex items-start justify-between gap-4 mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                              <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100">
-                                <Book size={24} className="text-indigo-600" />
-                              </div>
+                      // Determinar estado basado en nota
+                      let displayStatus = 'en_curso'
+                      if (finalGrade) {
+                        if (finalGrade >= 8 && subject.allows_promotion) {
+                          displayStatus = 'promocionado'
+                        } else if (finalGrade >= 6) {
+                          displayStatus = 'aprobado'
+                        } else {
+                          displayStatus = 'desaprobado'
+                        }
+                      } else if (partialStatus) {
+                        displayStatus = partialStatus
+                      }
+
+                      const getCardStyle = () => {
+                        if (finalGrade && finalGrade >= 8 && subject.allows_promotion) {
+                          return 'border-purple-600 bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50'
+                        }
+                        if (finalGrade && finalGrade >= 6) {
+                          return 'border-emerald-600 bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-50'
+                        }
+                        if (finalGrade && finalGrade < 6) {
+                          return 'border-red-600 bg-gradient-to-br from-red-50 via-rose-50 to-red-50'
+                        }
+                        return 'border-indigo-600 bg-gradient-to-br from-indigo-50 via-blue-50 to-indigo-50'
+                      }
+
+                      return (
+                        <div
+                          key={enr.id}
+                          className={`card overflow-hidden rounded-3xl border-2 transition-all duration-300 hover:shadow-2xl hover:scale-105 ${getCardStyle()} ${
+                            isExpanded ? 'ring-2 ring-indigo-400' : ''
+                          }`}
+                        >
+                          <button
+                            onClick={() => toggleExpanded(enr.id)}
+                            className="w-full p-6 text-left hover:bg-black/5 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-4 mb-4">
                               <div className="flex-1">
-                                <h3 className="text-lg font-black text-gray-900">{subject.name}</h3>
-                                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                  <p className="text-sm font-bold text-indigo-600 font-mono">{subject.code}</p>
-                                  <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
-                                    {subject.year}° año
-                                  </span>
-                                  {subject.division && (
-                                    <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">
-                                      Div. {subject.division}
-                                    </span>
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100">
+                                    <Book size={24} className="text-indigo-600" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h3 className="text-lg font-black text-gray-900">{subject.name}</h3>
+                                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                      <p className="text-sm font-bold text-indigo-600 font-mono">{subject.code}</p>
+                                      <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                                        {subject.year}° año
+                                      </span>
+                                      {subject.division && (
+                                        <span className="text-xs bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full">
+                                          Div. {subject.division}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {isExpanded ? (
+                                <ChevronUp className="text-indigo-600" size={28} />
+                              ) : (
+                                <ChevronDown className="text-gray-400" size={28} />
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="p-4 rounded-2xl bg-white/60 border-2 border-blue-200 hover:border-blue-400 transition-colors">
+                                <p className="text-xs text-blue-600 font-black mb-2 uppercase tracking-wide">PARCIAL</p>
+                                <div className="flex items-center justify-between">
+                                  <p className="text-3xl font-black text-blue-900">{partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '—'}</p>
+                                  {partialGrade && partialGrade >= 6 && (
+                                    <CheckCircle2 size={24} className="text-emerald-600" />
                                   )}
                                 </div>
                               </div>
+
+                              <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
+                                finalGrade && finalGrade >= 8 ? 'border-purple-400 hover:border-purple-600' :
+                                finalGrade && finalGrade >= 6 ? 'border-emerald-400 hover:border-emerald-600' :
+                                finalGrade ? 'border-red-400 hover:border-red-600' :
+                                'border-gray-300 hover:border-gray-500'
+                              }`}>
+                                <p className={`text-xs font-black mb-2 uppercase tracking-wide ${
+                                  finalGrade && finalGrade >= 8 ? 'text-purple-600' :
+                                  finalGrade && finalGrade >= 6 ? 'text-emerald-600' :
+                                  finalGrade ? 'text-red-600' :
+                                  'text-gray-600'
+                                }`}>FINAL</p>
+                                <p className={`text-3xl font-black ${
+                                  finalGrade && finalGrade >= 8 ? 'text-purple-900' :
+                                  finalGrade && finalGrade >= 6 ? 'text-emerald-900' :
+                                  finalGrade ? 'text-red-900' :
+                                  'text-gray-600'
+                                }`}>{finalGrade !== null && finalGrade !== undefined ? finalGrade.toFixed(1) : '—'}</p>
+                              </div>
+
+                              <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
+                                attendance && attendance >= 60 ? 'border-green-400 hover:border-green-600' :
+                                'border-orange-400 hover:border-orange-600'
+                              }`}>
+                                <p className={`text-xs font-black mb-2 uppercase tracking-wide ${
+                                  attendance && attendance >= 60 ? 'text-green-600' :
+                                  'text-orange-600'
+                                }`}>ASIST.</p>
+                                <p className={`text-3xl font-black ${
+                                  attendance && attendance >= 60 ? 'text-green-900' :
+                                  'text-orange-900'
+                                }`}>{attendance ? `${Math.round(attendance)}%` : '—'}</p>
+                              </div>
                             </div>
-                          </div>
+                          </button>
 
-                          {isExpanded ? (
-                            <ChevronUp className="text-indigo-600" size={28} />
-                          ) : (
-                            <ChevronDown className="text-gray-400" size={28} />
-                          )}
-                        </div>
+                          {isExpanded && (
+                            <div className="border-t-2 border-gray-200 p-6 space-y-6 bg-white/50 backdrop-blur-sm">
+                              <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/60 border-2 border-gray-100">
+                                <div className="p-3 rounded-xl bg-gradient-to-br from-orange-100 to-yellow-100">
+                                  <User size={20} className="text-orange-600" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-xs text-gray-600 font-bold uppercase">Profesor</p>
+                                  <p className="text-lg font-bold text-gray-900">{professor?.name || '—'}</p>
+                                </div>
+                              </div>
 
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="p-4 rounded-2xl bg-white/60 border-2 border-blue-200 hover:border-blue-400 transition-colors">
-                            <p className="text-xs text-blue-600 font-black mb-2 uppercase tracking-wide">PARCIAL</p>
-                            <div className="flex items-center justify-between">
-                              <p className="text-3xl font-black text-blue-900">{partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '—'}</p>
-                              {partialGrade && partialGrade >= 6 && (
-                                <CheckCircle2 size={24} className="text-emerald-600" />
+                              {partialGrades.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-black text-gray-900 mb-3 flex items-center gap-2">
+                                    <BarChart3 size={18} className="text-indigo-600" />
+                                    NOTAS PARCIALES CARGADAS
+                                  </h4>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    {partialGrades.map((grade, idx) => {
+                                      const gradeNum = idx + 1
+                                      const gradeLabelsObj = grades?.grade_labels ? (typeof grades.grade_labels === 'string' ? JSON.parse(grades.grade_labels) : grades.grade_labels) : {}
+                                      const label = gradeLabelsObj[`grade_${gradeNum}`] || `Nota ${gradeNum}`
+                                      
+                                      return (
+                                        <div key={idx} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center">
+                                          <p className="text-xs text-blue-600 font-black mb-1 uppercase">{label}</p>
+                                          <p className="text-2xl font-black text-blue-900">{grade !== null && grade !== undefined ? grade.toFixed(1) : '-'}</p>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
                               )}
-                            </div>
-                          </div>
 
-                          <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
-                            finalGrade && finalGrade >= 8 ? 'border-purple-400 hover:border-purple-600' :
-                            finalGrade && finalGrade >= 6 ? 'border-emerald-400 hover:border-emerald-600' :
-                            finalGrade ? 'border-red-400 hover:border-red-600' :
-                            'border-gray-300 hover:border-gray-500'
-                          }`}>
-                            <p className={`text-xs font-black mb-2 uppercase tracking-wide ${
-                              finalGrade && finalGrade >= 8 ? 'text-purple-600' :
-                              finalGrade && finalGrade >= 6 ? 'text-emerald-600' :
-                              finalGrade ? 'text-red-600' :
-                              'text-gray-600'
-                            }`}>FINAL</p>
-                            <p className={`text-3xl font-black ${
-                              finalGrade && finalGrade >= 8 ? 'text-purple-900' :
-                              finalGrade && finalGrade >= 6 ? 'text-emerald-900' :
-                              finalGrade ? 'text-red-900' :
-                              'text-gray-600'
-                            }`}>{finalGrade !== null && finalGrade !== undefined ? finalGrade.toFixed(1) : '—'}</p>
-                          </div>
+                              <div className="border-t-2 border-gray-200 pt-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
+                                    <p className="text-xs text-gray-600 font-bold uppercase">Créditos</p>
+                                    <p className="text-2xl font-black text-gray-900">{subject.credits || '—'}</p>
+                                  </div>
+                                  <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
+                                    <p className="text-xs text-gray-600 font-bold uppercase">Promoción</p>
+                                    <p className="text-lg font-black text-gray-900">
+                                      {subject.allows_promotion ? '✓ Sí' : '✗ No'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
 
-                          <div className={`p-4 rounded-2xl bg-white/60 border-2 transition-colors ${
-                            attendance && attendance >= 60 ? 'border-green-400 hover:border-green-600' :
-                            'border-orange-400 hover:border-orange-600'
-                          }`}>
-                            <p className={`text-xs font-black mb-2 uppercase tracking-wide ${
-                              attendance && attendance >= 60 ? 'text-green-600' :
-                              'text-orange-600'
-                            }`}>ASIST.</p>
-                            <p className={`text-3xl font-black ${
-                              attendance && attendance >= 60 ? 'text-green-900' :
-                              'text-orange-900'
-                            }`}>{attendance ? `${Math.round(attendance)}%` : '—'}</p>
-                          </div>
-                        </div>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="border-t-2 border-gray-200 p-6 space-y-6 bg-white/50 backdrop-blur-sm">
-                          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/60 border-2 border-gray-100">
-                            <div className="p-3 rounded-xl bg-gradient-to-br from-orange-100 to-yellow-100">
-                              <User size={20} className="text-orange-600" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-gray-600 font-bold uppercase">Profesor</p>
-                              <p className="text-lg font-bold text-gray-900">{professor?.name || '—'}</p>
-                            </div>
-                          </div>
-
-                          {partialGrades.length > 0 && (
-                            <div>
-                              <h4 className="text-sm font-black text-gray-900 mb-3 flex items-center gap-2">
-                                <BarChart3 size={18} className="text-indigo-600" />
-                                NOTAS PARCIALES CARGADAS
-                              </h4>
-                              <div className="grid grid-cols-3 gap-2">
-                                {partialGrades.map((grade, idx) => {
-                                  const gradeNum = idx + 1
-                                  const gradeLabelsObj = grades?.grade_labels ? (typeof grades.grade_labels === 'string' ? JSON.parse(grades.grade_labels) : grades.grade_labels) : {}
-                                  const label = gradeLabelsObj[`grade_${gradeNum}`] || `Nota ${gradeNum}`
-                                  
-                                  return (
-                                    <div key={idx} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center">
-                                      <p className="text-xs text-blue-600 font-black mb-1 uppercase">{label}</p>
-                                      <p className="text-2xl font-black text-blue-900">{grade !== null && grade !== undefined ? grade.toFixed(1) : '-'}</p>
-                                    </div>
-                                  )
-                                })}
+                              <div className={`rounded-2xl p-6 border-2 ${
+                                finalGrade && finalGrade >= 8 && subject.allows_promotion 
+                                  ? 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-400' :
+                                finalGrade && finalGrade >= 6
+                                  ? 'bg-gradient-to-r from-emerald-100 to-teal-100 border-emerald-400' :
+                                finalGrade
+                                  ? 'bg-gradient-to-r from-red-100 to-rose-100 border-red-400' :
+                                partialStatus === 'regular'
+                                  ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-yellow-400' :
+                                partialStatus === 'promocionado'
+                                  ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-green-400' :
+                                partialStatus === 'desaprobado'
+                                  ? 'bg-gradient-to-r from-red-100 to-rose-100 border-red-400' :
+                                  'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-400'
+                              }`}>
+                                <p className={`text-xs font-black mb-3 uppercase tracking-wide ${
+                                  finalGrade && finalGrade >= 8 && subject.allows_promotion 
+                                    ? 'text-purple-700' :
+                                  finalGrade && finalGrade >= 6
+                                    ? 'text-emerald-700' :
+                                  finalGrade
+                                    ? 'text-red-700' :
+                                  partialStatus === 'regular'
+                                    ? 'text-yellow-700' :
+                                  partialStatus === 'promocionado'
+                                    ? 'text-green-700' :
+                                  partialStatus === 'desaprobado'
+                                    ? 'text-red-700' :
+                                    'text-blue-700'
+                                }`}>ESTADO ACTUAL</p>
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="font-black text-gray-900">
+                                      {displayStatus === 'promocionado' ? 'PROMOCIONADO' :
+                                       displayStatus === 'aprobado' ? 'APROBADO' :
+                                       displayStatus === 'desaprobado' ? 'DESAPROBADO' :
+                                       displayStatus === 'regular' ? 'REGULAR' :
+                                       'EN CURSO'}
+                                    </p>
+                                    {partialGrade && !finalGrade && (
+                                      <p className="text-xs text-gray-600 mt-1">Parcial: {partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '-'} - Pendiente final</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    {finalGrade && finalGrade >= 8 && subject.allows_promotion ? (
+                                      <div className="flex items-center gap-1 text-purple-700">
+                                        <Award size={28} />
+                                      </div>
+                                    ) : finalGrade && finalGrade >= 6 ? (
+                                      <div className="flex items-center gap-1 text-emerald-700">
+                                        <CheckCircle2 size={28} />
+                                      </div>
+                                    ) : finalGrade ? (
+                                      <div className="flex items-center gap-1 text-red-700">
+                                        <AlertCircle size={28} />
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1 text-blue-700">
+                                        <Zap size={28} />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
-
-                          <div className="border-t-2 border-gray-200 pt-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
-                                <p className="text-xs text-gray-600 font-bold uppercase">Créditos</p>
-                                <p className="text-2xl font-black text-gray-900">{subject.credits || '—'}</p>
-                              </div>
-                              <div className="p-3 rounded-xl bg-white/60 border-2 border-gray-100">
-                                <p className="text-xs text-gray-600 font-bold uppercase">Promoción</p>
-                                <p className="text-lg font-black text-gray-900">
-                                  {subject.allows_promotion ? '✓ Sí' : '✗ No'}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={`rounded-2xl p-6 border-2 ${
-                            finalGrade && finalGrade >= 8 && subject.allows_promotion 
-                              ? 'bg-gradient-to-r from-purple-100 to-pink-100 border-purple-400' :
-                            finalGrade && finalGrade >= 6
-                              ? 'bg-gradient-to-r from-emerald-100 to-teal-100 border-emerald-400' :
-                            finalGrade
-                              ? 'bg-gradient-to-r from-red-100 to-rose-100 border-red-400' :
-                            partialStatus === 'regular'
-                              ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-yellow-400' :
-                            partialStatus === 'promocionado'
-                              ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-green-400' :
-                            partialStatus === 'desaprobado'
-                              ? 'bg-gradient-to-r from-red-100 to-rose-100 border-red-400' :
-                              'bg-gradient-to-r from-blue-100 to-indigo-100 border-blue-400'
-                          }`}>
-                            <p className={`text-xs font-black mb-3 uppercase tracking-wide ${
-                              finalGrade && finalGrade >= 8 && subject.allows_promotion 
-                                ? 'text-purple-700' :
-                              finalGrade && finalGrade >= 6
-                                ? 'text-emerald-700' :
-                              finalGrade
-                                ? 'text-red-700' :
-                              partialStatus === 'regular'
-                                ? 'text-yellow-700' :
-                              partialStatus === 'promocionado'
-                                ? 'text-green-700' :
-                              partialStatus === 'desaprobado'
-                                ? 'text-red-700' :
-                                'text-blue-700'
-                            }`}>ESTADO ACTUAL</p>
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-black text-gray-900">
-                                  {displayStatus === 'promocionado' ? 'PROMOCIONADO' :
-                                   displayStatus === 'aprobado' ? 'APROBADO' :
-                                   displayStatus === 'desaprobado' ? 'DESAPROBADO' :
-                                   displayStatus === 'regular' ? 'REGULAR' :
-                                   'EN CURSO'}
-                                </p>
-                                {partialGrade && !finalGrade && (
-                                  <p className="text-xs text-gray-600 mt-1">Parcial: {partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '-'} - Pendiente final</p>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                {finalGrade && finalGrade >= 8 && subject.allows_promotion ? (
-                                  <div className="flex items-center gap-1 text-purple-700">
-                                    <Award size={28} />
-                                  </div>
-                                ) : finalGrade && finalGrade >= 6 ? (
-                                  <div className="flex items-center gap-1 text-emerald-700">
-                                    <CheckCircle2 size={28} />
-                                  </div>
-                                ) : finalGrade ? (
-                                  <div className="flex items-center gap-1 text-red-700">
-                                    <AlertCircle size={28} />
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-blue-700">
-                                    <Zap size={28} />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
