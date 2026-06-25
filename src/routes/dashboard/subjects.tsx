@@ -39,6 +39,7 @@ type EnrollmentWithGrades = {
     final_grade?: number
     partial_status?: string
     final_status?: string
+    grade_labels?: Record<string, string | null> | string
   } | null
   attendance: number | null
 }
@@ -116,7 +117,7 @@ function SubjectsPage() {
       const [gradesRes, attendanceRes, professorsRes] = await Promise.all([
         supabase
           .from('enrollment_grades')
-          .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, final_grade, partial_status, final_status')
+          .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, final_grade, partial_status, final_status, grade_labels')
           .in('enrollment_id', enrollmentIds),
         supabase
           .from('attendance')
@@ -426,12 +427,18 @@ function SubjectsPage() {
                                 NOTAS PARCIALES CARGADAS
                               </h4>
                               <div className="grid grid-cols-3 gap-2">
-                                {partialGrades.map((grade, idx) => (
-                                  <div key={idx} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center">
-                                    <p className="text-xs text-blue-600 font-black mb-1 uppercase">Nota {idx + 1}</p>
-                                    <p className="text-2xl font-black text-blue-900">{grade !== null && grade !== undefined ? grade.toFixed(1) : '-'}</p>
-                                  </div>
-                                ))}
+                                {partialGrades.map((grade, idx) => {
+                                  const gradeNum = idx + 1
+                                  const gradeLabelsObj = grades?.grade_labels ? (typeof grades.grade_labels === 'string' ? JSON.parse(grades.grade_labels) : grades.grade_labels) : {}
+                                  const label = gradeLabelsObj[`grade_${gradeNum}`] || `Nota ${gradeNum}`
+                                  
+                                  return (
+                                    <div key={idx} className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 border-2 border-blue-200 text-center">
+                                      <p className="text-xs text-blue-600 font-black mb-1 uppercase">{label}</p>
+                                      <p className="text-2xl font-black text-blue-900">{grade !== null && grade !== undefined ? grade.toFixed(1) : '-'}</p>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             </div>
                           )}
