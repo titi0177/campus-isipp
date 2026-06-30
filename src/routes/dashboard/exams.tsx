@@ -53,8 +53,9 @@ function ExamsPage() {
         .from('final_exams')
         .select(`
           *,
-          subject:subjects(id, name, professor_id)
+          subject:subjects(id, name, professor_id, program_id)
         `)
+        .eq('subject.program_id', studentData.program_id)
         .order('exam_date', { ascending: true })
 
       console.log('[EXAMS] Query result:', { examsData, examsError })
