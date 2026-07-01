@@ -26,8 +26,6 @@ function ComplianceReportPage() {
   const [loading, setLoading] = useState(false)
   const [programs, setPrograms] = useState<any[]>([])
   const [subjects, setSubjects] = useState<any[]>([])
-
-  // Filtros
   const [selectedProgram, setSelectedProgram] = useState('')
   const [selectedYear, setSelectedYear] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('')
@@ -64,7 +62,6 @@ function ComplianceReportPage() {
     try {
       const issues: ComplianceIssue[] = []
 
-      // Obtener todos los alumnos
       let query = supabase
         .from('students')
         .select('id, first_name, last_name, program_id, year, program:programs(name)')
@@ -90,16 +87,13 @@ function ComplianceReportPage() {
         return
       }
 
-      // Para cada alumno, verificar incumplimientos
       for (const student of students) {
-        // Obtener inscripciones del alumno
         const { data: enrollments, error: enrollmentsError } = await supabase
           .from('enrollments')
           .select('id, subject_id, subject:subjects(id, name, program_id, year), attendance(percentage), enrollment_grades(partial_grade, partial_status)')
           .eq('student_id', student.id)
 
         if (enrollmentsError) continue
-
         if (!enrollments) continue
 
         for (const enrollment of enrollments) {
@@ -111,12 +105,9 @@ function ComplianceReportPage() {
             ? enrollment.enrollment_grades[0]
             : enrollment.enrollment_grades
           const partialGrade = gradeRecord?.partial_grade
-          const partialStatus = gradeRecord?.partial_status
 
-          // Filtrar por materia si está seleccionada
           if (selectedSubject && subject.id !== selectedSubject) continue
 
-          // 1. Verificar asistencia
           if (!selectedIssueType || selectedIssueType === 'asistencia') {
             if (!attendance || attendance < 60) {
               issues.push({
@@ -134,7 +125,6 @@ function ComplianceReportPage() {
             }
           }
 
-          // 2. Verificar regularidad (parcial)
           if (!selectedIssueType || selectedIssueType === 'regularidad') {
             if (!partialGrade || partialGrade < 6) {
               issues.push({
@@ -152,11 +142,10 @@ function ComplianceReportPage() {
             }
           }
 
-          // 3. Verificar correlativas
           if (!selectedIssueType || selectedIssueType === 'correlativa') {
             const { data: correlatives } = await supabase
               .from('subject_correlatives')
-              .select('requires_subject_id, required_status, requires_subject:requires_subject_id(name)')
+              .select('requires_subject_id, required_status')
               .eq('subject_id', subject.id)
 
             if (correlatives && correlatives.length > 0) {
@@ -270,7 +259,6 @@ function ComplianceReportPage() {
         <p className="text-slate-600 mt-2">Alumnos que no cumplen requisitos de asistencia, regularidad o correlativas</p>
       </div>
 
-      {/* Filtros */}
       <div className="card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
         <div className="flex items-center gap-2 mb-4">
           <Filter size={20} className="text-blue-600" />
@@ -350,7 +338,6 @@ function ComplianceReportPage() {
         </div>
       </div>
 
-      {/* Resultados */}
       {issues.length === 0 && !loading ? (
         <div className="card p-8 text-center bg-green-50 border-2 border-green-200">
           <p className="text-green-800 font-semibold">No se encontraron incumplimientos con los filtros seleccionados</p>
