@@ -60,6 +60,7 @@ import { Route as AdminCalendarRouteImport } from './routes/admin/calendar'
 import { Route as AdminAttendanceRouteImport } from './routes/admin/attendance'
 import { Route as AdminAnnouncementsRouteImport } from './routes/admin/announcements'
 import { Route as AdminStudentRecordIdRouteImport } from './routes/admin/student-record.$id'
+import { Route as AdminComplianceReportRouteImport } from './routes/admin/compliance-report'
 
 const TreasurerRoute = TreasurerRouteImport.update({
   id: '/treasurer',
@@ -316,6 +317,11 @@ const AdminStudentRecordIdRoute = AdminStudentRecordIdRouteImport.update({
   path: '/student-record/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminComplianceReportRoute = AdminComplianceReportRouteImport.update({
+  id: '/compliance-report',
+  path: '/compliance-report',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -340,6 +346,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/subjects': typeof AdminSubjectsRoute
+  '/admin/compliance-report': typeof AdminComplianceReportRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -389,6 +396,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/subjects': typeof AdminSubjectsRoute
+  '/admin/compliance-report': typeof AdminComplianceReportRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -443,6 +451,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/students': typeof AdminStudentsRoute
   '/admin/subjects': typeof AdminSubjectsRoute
+  '/admin/compliance-report': typeof AdminComplianceReportRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -498,6 +507,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/students'
     | '/admin/subjects'
+    | '/admin/compliance-report'
     | '/dashboard/announcements'
     | '/dashboard/attendance'
     | '/dashboard/certificates'
@@ -547,6 +557,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/students'
     | '/admin/subjects'
+    | '/admin/compliance-report'
     | '/dashboard/announcements'
     | '/dashboard/attendance'
     | '/dashboard/certificates'
@@ -600,6 +611,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/students'
     | '/admin/subjects'
+    | '/admin/compliance-report'
     | '/dashboard/announcements'
     | '/dashboard/attendance'
     | '/dashboard/certificates'
@@ -993,6 +1005,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnnouncementsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/compliance-report': {
+      id: '/admin/compliance-report'
+      path: '/compliance-report'
+      fullPath: '/admin/compliance-report'
+      preLoaderRoute: typeof AdminComplianceReportRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/student-record/$id': {
       id: '/admin/student-record/$id'
       path: '/student-record/$id'
@@ -1021,6 +1040,7 @@ interface AdminRouteChildren {
   AdminSubjectsRoute: typeof AdminSubjectsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminStudentRecordIdRoute: typeof AdminStudentRecordIdRoute
+  AdminComplianceReportRoute: typeof AdminComplianceReportRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1041,6 +1061,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminSubjectsRoute: AdminSubjectsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminStudentRecordIdRoute: AdminStudentRecordIdRoute,
+  AdminComplianceReportRoute: AdminComplianceReportRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
