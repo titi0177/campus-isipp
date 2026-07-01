@@ -121,50 +121,36 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
   })
 
   const generatePDF = () => {
-    const STUDENTS_PER_ACTA = 27
-    const chunks: ApprovedStudent[][] = []
-    
-    // Dividir alumnos en chunks de 27
-    for (let i = 0; i < filteredStudents.length; i += STUDENTS_PER_ACTA) {
-      chunks.push(filteredStudents.slice(i, i + STUDENTS_PER_ACTA))
-    }
+    const doc = new jsPDF('p')
+    const currentDate = new Date().toLocaleDateString('es-AR')
 
-    // Generar un PDF por cada chunk (acta)
-    chunks.forEach((chunk, actaIndex) => {
-      const doc = new jsPDF('p')
-      const currentDate = new Date().toLocaleDateString('es-AR')
-      const actaNumber = actaIndex + 1
-      const totalActas = chunks.length
+    doc.setFontSize(16)
+    doc.text('HISTORIAL DE CALIFICACIONES', 105, 15, { align: 'center' })
 
-      doc.setFontSize(16)
-      doc.text('ACTA DE CALIFICACIONES', 105, 15, { align: 'center' })
+    doc.setFontSize(11)
+    doc.text(`Materia: ${subjectName}`, 14, 25)
+    doc.text(`Generado: ${currentDate}`, 14, 31)
 
-      doc.setFontSize(11)
-      doc.text(`Materia: ${subjectName}`, 14, 25)
-      doc.text(`Acta: ${actaNumber}/${totalActas}`, 14, 31)
-      doc.text(`Generado: ${currentDate}`, 14, 37)
+    const tableData = filteredStudents.map(s => [
+      s.legajo,
+      s.student_name,
+      s.partial_grade !== null && s.partial_grade !== undefined ? Number(s.partial_grade).toFixed(1) : '-',
+      s.partial_status || '-',
+      s.final_grade !== null && s.final_grade !== undefined ? Number(s.final_grade).toFixed(1) : '-',
+      s.final_status ? getStatusLabel(s.final_status) : (s.partial_status ? getStatusLabel(s.partial_status) : '-'),
+    ])
 
-      const tableData = chunk.map(s => [
-        s.legajo,
-        s.student_name,
-        s.partial_grade !== null && s.partial_grade !== undefined ? Number(s.partial_grade).toFixed(1) : '-',
-        s.partial_status || '-',
-        s.final_grade !== null && s.final_grade !== undefined ? Number(s.final_grade).toFixed(1) : '-',
-        s.final_status ? getStatusLabel(s.final_status) : (s.partial_status ? getStatusLabel(s.partial_status) : '-'),
-      ])
-
-      autoTable(doc, {
-        head: [['Legajo', 'Alumno', 'Prom. Parcial', 'Est. Parcial', 'Nota Final', 'Estado Final']],
-        body: tableData,
-        startY: 45,
-        margin: 10,
-        headStyles: { fillColor: [51, 65, 85], fontSize: 10 },
-        bodyStyles: { fontSize: 9 },
-        alternateRowStyles: { fillColor: [240, 240, 240] },
-      })
-
-      doc.save(`acta_calificaciones_${subjectName.replace(/\s+/g, '_')}_${actaNumber}.pdf`)
+    autoTable(doc, {
+      head: [['Legajo', 'Alumno', 'Prom. Parcial', 'Est. Parcial', 'Nota Final', 'Estado Final']],
+      body: tableData,
+      startY: 40,
+      margin: 10,
+      headStyles: { fillColor: [51, 65, 85], fontSize: 10 },
+      bodyStyles: { fontSize: 9 },
+      alternateRowStyles: { fillColor: [240, 240, 240] },
     })
+
+    doc.save(`historial_calificaciones_${subjectName.replace(/\s+/g, '_')}.pdf`)
   }
 
   if (loading) {
@@ -280,7 +266,7 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
         className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
       >
         <Download size={20} />
-        Descargar Actas en PDF (divididas por 27 alumnos)
+        Descargar Historial en PDF
       </button>
     </div>
   )
