@@ -195,14 +195,11 @@ function ComplianceReportPage() {
           const finalStatus = gradeRecord?.final_status
           const partialStatus = gradeRecord?.partial_status
 
-          // ✅ FILTRO: Saltar si está aprobado
+          // ✅ FILTRO: Saltar si está aprobado O en curso
           if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
             return
           }
-          
-          // ✅ FILTRO: Saltar en_curso SOLO si es del año actual del alumno
-          // Mostrar en_curso de años anteriores (para ver qué debe regularizar)
-          if (partialStatus === 'en_curso' && subject.year === student.year) {
+          if (partialStatus === 'en_curso') {
             return
           }
 
@@ -251,7 +248,7 @@ function ComplianceReportPage() {
             summary.subjects.push({
               id: subject.id,
               name: subject.name,
-              status: partialStatus || finalStatus || 'en_curso',
+              status: partialStatus || finalStatus || 'sin_cursar',
               attendance: attendance,
               partial_grade: partialGrade,
               issues: issuesList
