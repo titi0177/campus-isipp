@@ -1,0 +1,351 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/Toast'
+import { Trophy, Filter, Download } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+
+export const Route = createFileRoute('/admin/ranking')({
+  component: RankingPage,
+})
+
+type StudentRanking = {
+  student_id: string
+  student_name: string
+  dni: string
+  legajo: string
+  program_id: string
+  program_name: string
+  year: number
+  average: number
+  subject_count: number
+  position: number
+}
+
+type RankingByCareerYear = {
+  [careerYear: string]: StudentRanking[]
+}
+
+function RankingPage() {
+  const [rankings, setRankings] = useState<RankingByCareerYear>({})
+  const [programs, setPrograms] = useState<any[]>([])
+  const [selectedProgram, setSelectedProgram] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const { showToast } = useToast()
+
+  useEffect(() => {
+    loadPrograms()
+  }, [])
+
+  async function loadPrograms() {
+    try {
+      const { data } = await supabase
+        .from('programs')
+        .select('id, name')
+        .order('name')
+      setPrograms(data || [])
+    } catch (err) {
+      console.error('Error loading programs:', err)
+      showToast('Error al cargar carreras', 'error')
+    }
+  }
+
+  async function loadRanking() {
+    setLoading(true)
+    try {
+      // Query: Traer estudiantes con sus calificaciones finales
+      let query = supabase
+        .from('students')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          dni,
+          legajo,
+          program_id,
+          year,
+          program:programs(name),
+          enrollments(
+            id,
+            enrollment_grades(final_grade)
+          )
+        `)
+
+      if (selectedProgram) {
+        query = query.eq('program_id', selectedProgram)
+      }
+      if (selectedYear) {
+        query = query.eq('year', parseInt(selectedYear))
+      }
+
+      const { data: students, error } = await query
+
+      if (error) {
+        showToast('Error al cargar estudiantes', 'error')
+        setLoading(false)
+        return
+      }
+
+      if (!students || students.length === 0) {
+        showToast('No hay estudiantes con los filtros seleccionados', 'info')
+        setRankings({})
+        setLoading(false)
+        return
+      }
+
+      // Procesar en memoria: calcular promedios y agrupar
+      const rankingMap: RankingByCareerYear = {}
+
+      students.forEach((student: any) => {
+        const enrollments = student.enrollments || []
+        
+        // Obtener todas las notas finales
+        const finalGrades: number[] = []
+        enrollments.forEach((enrollment: any) => {
+          const gradeRecord = Array.isArray(enrollment.enrollment_grades)
+            ? enrollment.enrollment_grades[0]
+            : enrollment.enrollment_grades
+          
+          if (gradeRecord?.final_grade !== null && gradeRecord?.final_grade !== undefined) {
+            finalGrades.push(gradeRecord.final_grade)
+          }
+        })
+
+        // Si tiene al menos 1 nota final, incluir en ranking
+        if (finalGrades.length > 0) {
+          const average = finalGrades.reduce((a, b) => a + b, 0) / finalGrades.length
+          const key = `${student.program_id}-${student.year}`
+
+          if (!rankingMap[key]) {
+            rankingMap[key] = []
+          }
+
+          rankingMap[key].push({
+            student_id: student.id,
+            student_name: `${student.last_name}, ${student.first_name}`,
+            dni: student.dni || 'S/N',
+            legajo: student.legajo || 'S/N',
+            program_id: student.program_id,
+            program_name: student.program?.name || '',
+            year: student.year,
+            average: Math.round(average * 100) / 100,
+            subject_count: finalGrades.length,
+            position: 0, // Se asigna después de ordenar
+          })
+        }
+      })
+
+      // Ordenar cada grupo por promedio (descendente) y asignar posición
+      Object.keys(rankingMap).forEach(key => {
+        rankingMap[key].sort((a, b) => b.average - a.average)
+        rankingMap[key].forEach((student, idx) => {
+          student.position = idx + 1
+        })
+      })
+
+      setRankings(rankingMap)
+      showToast('Ranking generado correctamente', 'info')
+    } catch (err) {
+      console.error('Error loading ranking:', err)
+      showToast('Error al generar ranking', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generatePDF = () => {
+    const doc = new jsPDF('p')
+    const currentDate = new Date().toLocaleDateString('es-AR')
+    let yPosition = 15
+
+    doc.setFontSize(16)
+    doc.text('RANKING DE PROMEDIO POR CARRERA Y AÑO', 105, yPosition, { align: 'center' })
+    yPosition += 10
+
+    doc.setFontSize(10)
+    doc.text(`Generado: ${currentDate}`, 14, yPosition)
+    yPosition += 10
+
+    Object.keys(rankings)
+      .sort()
+      .forEach((key: string) => {
+        const students = rankings[key]
+        if (students.length === 0) return
+
+        const careerYear = students[0]
+        const title = `${careerYear.program_name} - ${careerYear.year}° Año`
+
+        if (yPosition > 240) {
+          doc.addPage()
+          yPosition = 15
+        }
+
+        doc.setFontSize(12)
+        doc.text(title, 14, yPosition)
+        yPosition += 8
+
+        const tableData = students.map(s => [
+          s.position.toString(),
+          s.legajo,
+          s.student_name,
+          s.average.toFixed(2),
+          s.subject_count.toString(),
+        ])
+
+        autoTable(doc, {
+          head: [['Pos.', 'Legajo', 'Alumno', 'Promedio', 'Materias']],
+          body: tableData,
+          startY: yPosition,
+          margin: 10,
+          pageBreak: 'auto',
+          headStyles: { fillColor: [51, 65, 85], fontSize: 9 },
+          bodyStyles: { fontSize: 8 },
+          alternateRowStyles: { fillColor: [240, 240, 240] },
+        })
+
+        yPosition = (doc as any).lastAutoTable?.finalY + 10 || yPosition + 50
+      })
+
+    doc.save(`ranking_estudiantes_${new Date().toISOString().split('T')[0]}.pdf`)
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-4xl font-bold text-slate-900">Ranking de Estudiantes</h1>
+        <p className="text-slate-600 mt-2">Mejores promedios por carrera y año académico</p>
+      </div>
+
+      <div className="card p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter size={20} className="text-amber-600" />
+          <h2 className="font-bold text-lg text-amber-900">Filtros</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Carrera</label>
+            <select
+              value={selectedProgram}
+              onChange={(e) => setSelectedProgram(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="">Todas</option>
+              {programs.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Año</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="">Todos</option>
+              <option value="1">1ro</option>
+              <option value="2">2do</option>
+              <option value="3">3ro</option>
+            </select>
+          </div>
+
+          <div className="flex items-end gap-2">
+            <button
+              onClick={loadRanking}
+              disabled={loading}
+              className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:shadow-lg text-white font-bold py-2 rounded-lg transition-all disabled:opacity-50"
+            >
+              {loading ? 'Generando...' : 'Generar Ranking'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {Object.keys(rankings).length > 0 && (
+        <>
+          {Object.keys(rankings)
+            .sort()
+            .map(key => {
+              const students = rankings[key]
+              if (students.length === 0) return null
+
+              const careerYear = students[0]
+              const title = `${careerYear.program_name} - ${careerYear.year}° Año`
+
+              return (
+                <div key={key} className="space-y-4">
+                  <div className="card p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200">
+                    <h3 className="font-bold text-lg text-indigo-900">{title}</h3>
+                    <p className="text-sm text-indigo-700 mt-1">{students.length} estudiante{students.length !== 1 ? 's' : ''}</p>
+                  </div>
+
+                  <div className="card p-0 overflow-hidden rounded-2xl border-2 border-indigo-200">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gradient-to-r from-amber-600 to-orange-600 text-white">
+                            <th className="px-4 py-3 text-center font-bold w-12">Pos.</th>
+                            <th className="px-4 py-3 text-left font-bold">Legajo</th>
+                            <th className="px-4 py-3 text-left font-bold">Alumno</th>
+                            <th className="px-4 py-3 text-center font-bold">DNI</th>
+                            <th className="px-4 py-3 text-center font-bold">Promedio</th>
+                            <th className="px-4 py-3 text-center font-bold">Materias</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {students.map((student, idx) => (
+                            <tr key={student.student_id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
+                              <td className="px-4 py-3 text-center font-bold">
+                                {student.position === 1 ? (
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-400 text-yellow-900 font-black">🥇</span>
+                                ) : student.position === 2 ? (
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-400 text-gray-900 font-black">🥈</span>
+                                ) : student.position === 3 ? (
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-orange-400 text-orange-900 font-black">🥉</span>
+                                ) : (
+                                  <span className="text-gray-700 font-bold">{student.position}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-gray-900">{student.legajo}</td>
+                              <td className="px-4 py-3 font-medium text-gray-900">{student.student_name}</td>
+                              <td className="px-4 py-3 text-center text-gray-600">{student.dni}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="inline-flex px-3 py-1 rounded-full text-sm font-bold bg-gradient-to-r from-amber-100 to-orange-100 text-amber-900">
+                                  {student.average.toFixed(2)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center font-semibold text-gray-700">{student.subject_count}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+
+          <button
+            onClick={generatePDF}
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
+          >
+            <Download size={20} />
+            Descargar Ranking en PDF
+          </button>
+        </>
+      )}
+
+      {Object.keys(rankings).length === 0 && !loading && (
+        <div className="card p-8 text-center bg-blue-50 border-2 border-blue-200">
+          <Trophy size={48} className="mx-auto text-blue-400 mb-4" />
+          <p className="text-blue-800 font-semibold">Selecciona filtros y genera el ranking</p>
+        </div>
+      )}
+    </div>
+  )
+}

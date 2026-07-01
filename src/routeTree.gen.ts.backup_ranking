@@ -61,7 +61,6 @@ import { Route as AdminAttendanceRouteImport } from './routes/admin/attendance'
 import { Route as AdminAnnouncementsRouteImport } from './routes/admin/announcements'
 import { Route as AdminStudentRecordIdRouteImport } from './routes/admin/student-record.$id'
 import { Route as AdminComplianceReportRouteImport } from './routes/admin/compliance-report'
-import { Route as AdminRankingRouteImport } from './routes/admin/ranking'
 
 const TreasurerRoute = TreasurerRouteImport.update({
   id: '/treasurer',
@@ -323,11 +322,6 @@ const AdminComplianceReportRoute = AdminComplianceReportRouteImport.update({
   path: '/compliance-report',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminRankingRoute = AdminRankingRouteImport.update({
-  id: '/ranking',
-  path: '/ranking',
-  getParentRoute: () => AdminRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -353,7 +347,6 @@ export interface FileRoutesByFullPath {
   '/admin/students': typeof AdminStudentsRoute
   '/admin/subjects': typeof AdminSubjectsRoute
   '/admin/compliance-report': typeof AdminComplianceReportRoute
-  '/admin/ranking': typeof AdminRankingRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -404,7 +397,6 @@ export interface FileRoutesByTo {
   '/admin/students': typeof AdminStudentsRoute
   '/admin/subjects': typeof AdminSubjectsRoute
   '/admin/compliance-report': typeof AdminComplianceReportRoute
-  '/admin/ranking': typeof AdminRankingRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -460,7 +452,6 @@ export interface FileRoutesById {
   '/admin/students': typeof AdminStudentsRoute
   '/admin/subjects': typeof AdminSubjectsRoute
   '/admin/compliance-report': typeof AdminComplianceReportRoute
-  '/admin/ranking': typeof AdminRankingRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -1050,7 +1041,6 @@ interface AdminRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminStudentRecordIdRoute: typeof AdminStudentRecordIdRoute
   AdminComplianceReportRoute: typeof AdminComplianceReportRoute
-  AdminRankingRoute: typeof AdminRankingRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1072,7 +1062,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminStudentRecordIdRoute: AdminStudentRecordIdRoute,
   AdminComplianceReportRoute: AdminComplianceReportRoute,
-  AdminRankingRoute: AdminRankingRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
