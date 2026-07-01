@@ -171,8 +171,13 @@ function ExamsPage() {
         : gradeData?.enrollment_grades
       
       const partialGrade = gradeRecord?.partial_grade
+      const partialStatus = gradeRecord?.partial_status
 
-      if (!partialGrade || partialGrade < 6) {
+      // 2.5. Verificar si ya está aprobada
+      if (partialStatus && ['aprobado', 'promocionado'].includes(partialStatus)) {
+        reasons.push(`Materia ya aprobada — no requiere examen`)
+        eligible = false
+      } else if (!partialGrade || partialGrade < 6) {
         reasons.push(`Nota parcial insuficiente (actual: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, mínimo: 6)`)
         eligible = false
       }
