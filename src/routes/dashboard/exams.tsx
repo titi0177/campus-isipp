@@ -161,7 +161,7 @@ function ExamsPage() {
       // 2. Verificar nota parcial (>= 6)
       const { data: gradeData } = await supabase
         .from('enrollments')
-        .select('enrollment_grades(partial_grade, partial_status)')
+        .select('enrollment_grades(partial_grade, partial_status, final_status)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
         .single()
@@ -171,10 +171,10 @@ function ExamsPage() {
         : gradeData?.enrollment_grades
       
       const partialGrade = gradeRecord?.partial_grade
-      const partialStatus = gradeRecord?.partial_status
+      const finalStatus = gradeRecord?.final_status
 
       // 2.5. Verificar si ya está aprobada
-      if (partialStatus && ['aprobado', 'promocionado'].includes(partialStatus)) {
+      if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
         reasons.push(`Materia ya aprobada — no requiere examen`)
         eligible = false
       } else if (!partialGrade || partialGrade < 6) {
