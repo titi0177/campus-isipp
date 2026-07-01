@@ -285,9 +285,12 @@ function ComplianceReportPage() {
         })
       })
 
+      // Filtrar solo alumnos que tienen al menos 1 materia adeudada
+      const filteredSummaries = Array.from(studentSummariesMap.values()).filter(s => s.subjects.length > 0)
+
       setIssues(issues)
-      setStudentSummaries(Array.from(studentSummariesMap.values()))
-      showToast(`${studentSummariesMap.size} alumnos con incumplimientos`, 'info')
+      setStudentSummaries(filteredSummaries)
+      showToast(`${filteredSummaries.length} alumnos con incumplimientos`, 'info')
     } catch (err) {
       console.error('Error loading report:', err)
       showToast('Error al generar reporte', 'error')
