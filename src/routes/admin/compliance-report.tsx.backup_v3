@@ -1,0 +1,432 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useToast } from '@/components/Toast'
+import { Filter } from 'lucide-react'
+
+export const Route = createFileRoute('/admin/compliance-report')({
+  component: ComplianceReportPage,
+})
+
+type ComplianceIssue = {
+  id: string
+  student_id: string
+  student_name: string
+  program_id: string
+  program_name: string
+  year: number
+  subject_id: string
+  subject_name: string
+  issue_type: 'asistencia' | 'regularidad' | 'correlativa'
+  details: string
+}
+
+function ComplianceReportPage() {
+  const [issues, setIssues] = useState<ComplianceIssue[]>([])
+  const [loading, setLoading] = useState(false)
+  const [programs, setPrograms] = useState<any[]>([])
+  const [subjects, setSubjects] = useState<any[]>([])
+  const [selectedProgram, setSelectedProgram] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
+  const [selectedSubject, setSelectedSubject] = useState('')
+  const [selectedIssueType, setSelectedIssueType] = useState('')
+
+  const { showToast } = useToast()
+
+  useEffect(() => {
+    loadFilters()
+  }, [])
+
+  async function loadFilters() {
+    try {
+      const { data: programsData } = await supabase
+        .from('programs')
+        .select('id, name')
+        .order('name')
+
+      const { data: subjectsData } = await supabase
+        .from('subjects')
+        .select('id, name, program_id')
+        .order('name')
+
+      setPrograms(programsData || [])
+      setSubjects(subjectsData || [])
+    } catch (err) {
+      console.error('Error loading filters:', err)
+      showToast('Error al cargar filtros', 'error')
+    }
+  }
+
+  async function loadReport() {
+    setLoading(true)
+    try {
+      const issues: ComplianceIssue[] = []
+
+      // Query 1: Traer estudiantes con todos sus datos en un JOIN
+      let query = supabase
+        .from('students')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          program_id,
+          year,
+          program:programs(name),
+          enrollments(
+            id,
+            subject_id,
+            subject:subjects(id, name, program_id, year),
+            attendance(percentage),
+            enrollment_grades(partial_grade, partial_status, final_status)
+          )
+        `)
+
+      if (selectedProgram) {
+        query = query.eq('program_id', selectedProgram)
+      }
+      if (selectedYear) {
+        query = query.eq('year', parseInt(selectedYear))
+      }
+
+      const { data: students, error: studentsError } = await query
+
+      if (studentsError) {
+        showToast('Error al cargar alumnos', 'error')
+        setLoading(false)
+        return
+      }
+
+      if (!students || students.length === 0) {
+        showToast('No hay alumnos con los filtros seleccionados', 'info')
+        setLoading(false)
+        return
+      }
+
+      // Query 2: Traer TODAS las correlativas de una sola vez
+      const { data: allCorrelatives, error: corrError } = await supabase
+        .from('subject_correlatives')
+        .select('subject_id, requires_subject_id, required_status')
+
+      if (corrError) {
+        showToast('Error al cargar correlativas', 'error')
+        setLoading(false)
+        return
+      }
+
+      // Crear mapa de correlativas para búsqueda rápida O(1)
+      const correlativesMap = new Map<string, any[]>()
+      allCorrelatives?.forEach(corr => {
+        const key = corr.subject_id
+        if (!correlativesMap.has(key)) {
+          correlativesMap.set(key, [])
+        }
+        correlativesMap.get(key)!.push(corr)
+      })
+
+      // Query 3: Traer TODOS los enrollments de ALL estudiantes (para validar correlativas)
+      const studentIds = students.map(s => s.id)
+      const { data: allEnrollments, error: enrollError } = await supabase
+        .from('enrollments')
+        .select('student_id, subject_id, enrollment_grades(final_status)')
+        .in('student_id', studentIds)
+
+      if (enrollError) {
+        showToast('Error al cargar enrollments', 'error')
+        setLoading(false)
+        return
+      }
+
+      // Crear índice: student_id -> { subject_id -> final_status }
+      const studentEnrollmentsMap = new Map<string, Map<string, string | null>>()
+      allEnrollments?.forEach(enr => {
+        if (!studentEnrollmentsMap.has(enr.student_id)) {
+          studentEnrollmentsMap.set(enr.student_id, new Map())
+        }
+        const finalStatus = Array.isArray(enr.enrollment_grades)
+          ? enr.enrollment_grades[0]?.final_status
+          : enr.enrollment_grades?.final_status
+        studentEnrollmentsMap.get(enr.student_id)!.set(enr.subject_id, finalStatus || null)
+      })
+
+      // Procesar todo en memoria (sin queries adicionales)
+      students.forEach(student => {
+        const enrollments = student.enrollments || []
+
+        enrollments.forEach((enrollment: any) => {
+          const subject = enrollment.subject
+          const gradeRecord = Array.isArray(enrollment.enrollment_grades)
+            ? enrollment.enrollment_grades[0]
+            : enrollment.enrollment_grades
+          const finalStatus = gradeRecord?.final_status
+
+          // ✅ FILTRO CRÍTICO: Si ya está aprobado/promocionado, SALTAR esta materia
+          if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
+            return
+          }
+
+          const attendance = Array.isArray(enrollment.attendance)
+            ? enrollment.attendance[0]?.percentage
+            : enrollment.attendance?.percentage
+          const partialGrade = gradeRecord?.partial_grade
+
+          // Aplicar filtro de materia
+          if (selectedSubject && subject.id !== selectedSubject) return
+
+          // ASISTENCIA
+          if (!selectedIssueType || selectedIssueType === 'asistencia') {
+            if (!attendance || attendance < 60) {
+              issues.push({
+                id: `${student.id}-${subject.id}-asistencia`,
+                student_id: student.id,
+                student_name: `${student.last_name}, ${student.first_name}`,
+                program_id: student.program_id,
+                program_name: (student.program as any)?.name || '',
+                year: student.year,
+                subject_id: subject.id,
+                subject_name: subject.name,
+                issue_type: 'asistencia',
+                details: `Asistencia: ${attendance ?? 0}% (mínimo: 60%)`,
+              })
+            }
+          }
+
+          // REGULARIDAD
+          if (!selectedIssueType || selectedIssueType === 'regularidad') {
+            if (!partialGrade || partialGrade < 6) {
+              issues.push({
+                id: `${student.id}-${subject.id}-regularidad`,
+                student_id: student.id,
+                student_name: `${student.last_name}, ${student.first_name}`,
+                program_id: student.program_id,
+                program_name: (student.program as any)?.name || '',
+                year: student.year,
+                subject_id: subject.id,
+                subject_name: subject.name,
+                issue_type: 'regularidad',
+                details: `Nota Parcial: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'} (mínimo: 6)`,
+              })
+            }
+          }
+
+          // CORRELATIVAS
+          if (!selectedIssueType || selectedIssueType === 'correlativa') {
+            const correlatives = correlativesMap.get(subject.id) || []
+
+            correlatives.forEach(corr => {
+              const requiredStatus = corr.required_status || 'aprobado'
+              const studentSubjectEnrollments = studentEnrollmentsMap.get(student.id)
+              const corrFinalStatus = studentSubjectEnrollments?.get(corr.requires_subject_id) || null
+
+              if (requiredStatus === 'aprobado') {
+                if (!corrFinalStatus || !['aprobado', 'promocionado'].includes(corrFinalStatus)) {
+                  const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
+
+                  issues.push({
+                    id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
+                    student_id: student.id,
+                    student_name: `${student.last_name}, ${student.first_name}`,
+                    program_id: student.program_id,
+                    program_name: (student.program as any)?.name || '',
+                    year: student.year,
+                    subject_id: subject.id,
+                    subject_name: subject.name,
+                    issue_type: 'correlativa',
+                    details: `Requiere APROBADA: ${corrSubject?.name || 'N/A'} (Estado: ${corrFinalStatus || 'Sin cursar'})`,
+                  })
+                }
+              } else if (requiredStatus === 'regular') {
+                if (!corrFinalStatus || !['aprobado', 'promocionado', 'regular'].includes(corrFinalStatus)) {
+                  const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
+
+                  issues.push({
+                    id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
+                    student_id: student.id,
+                    student_name: `${student.last_name}, ${student.first_name}`,
+                    program_id: student.program_id,
+                    program_name: (student.program as any)?.name || '',
+                    year: student.year,
+                    subject_id: subject.id,
+                    subject_name: subject.name,
+                    issue_type: 'correlativa',
+                    details: `Requiere REGULARIZADA: ${corrSubject?.name || 'N/A'} (Estado: ${corrFinalStatus || 'Sin cursar'})`,
+                  })
+                }
+              }
+            })
+          }
+        })
+      })
+
+      setIssues(issues)
+      showToast(`Se encontraron ${issues.length} incumplimientos`, 'info')
+    } catch (err) {
+      console.error('Error loading report:', err)
+      showToast('Error al generar reporte', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredSubjects = selectedProgram
+    ? subjects.filter(s => s.program_id === selectedProgram)
+    : subjects
+
+  const getIssueColor = (type: string) => {
+    switch (type) {
+      case 'asistencia':
+        return 'bg-red-100 text-red-700 border-red-300'
+      case 'regularidad':
+        return 'bg-orange-100 text-orange-700 border-orange-300'
+      case 'correlativa':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-300'
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-300'
+    }
+  }
+
+  const getIssueLabel = (type: string) => {
+    switch (type) {
+      case 'asistencia':
+        return 'Asistencia'
+      case 'regularidad':
+        return 'Regularidad'
+      case 'correlativa':
+        return 'Correlativa'
+      default:
+        return type
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-4xl font-bold text-slate-900">Reporte de Incumplimientos</h1>
+        <p className="text-slate-600 mt-2">Materias sin aprobar: falta cargar regularidades, asistencia baja, o correlativas no cumplidas</p>
+      </div>
+
+      <div className="card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter size={20} className="text-blue-600" />
+          <h2 className="font-bold text-lg text-blue-900">Filtros</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Carrera</label>
+            <select
+              value={selectedProgram}
+              onChange={(e) => {
+                setSelectedProgram(e.target.value)
+                setSelectedSubject('')
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas</option>
+              {programs.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Año</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              <option value="1">1ro</option>
+              <option value="2">2do</option>
+              <option value="3">3ro</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Materia</label>
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              disabled={!selectedProgram && filteredSubjects.length === 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            >
+              <option value="">Todas</option>
+              {filteredSubjects.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo Incumplimiento</label>
+            <select
+              value={selectedIssueType}
+              onChange={(e) => setSelectedIssueType(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todos</option>
+              <option value="asistencia">Asistencia</option>
+              <option value="regularidad">Regularidad</option>
+              <option value="correlativa">Correlativa</option>
+            </select>
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={loadReport}
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-lg text-white font-bold py-2 rounded-lg transition-all disabled:opacity-50"
+            >
+              {loading ? 'Generando...' : 'Generar Reporte'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {issues.length === 0 && !loading ? (
+        <div className="card p-8 text-center bg-green-50 border-2 border-green-200">
+          <p className="text-green-800 font-semibold">No se encontraron incumplimientos. ¡Todos al día!</p>
+        </div>
+      ) : (
+        <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gradient-to-r from-slate-700 to-slate-900 text-white">
+                  <th className="px-4 py-3 text-left font-bold">Alumno</th>
+                  <th className="px-4 py-3 text-left font-bold">Carrera</th>
+                  <th className="px-4 py-3 text-center font-bold">Año</th>
+                  <th className="px-4 py-3 text-left font-bold">Materia</th>
+                  <th className="px-4 py-3 text-left font-bold">Tipo</th>
+                  <th className="px-4 py-3 text-left font-bold">Detalle</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {issues.map((issue, idx) => (
+                  <tr key={issue.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
+                    <td className="px-4 py-3 font-medium text-gray-900">{issue.student_name}</td>
+                    <td className="px-4 py-3 text-gray-700">{issue.program_name}</td>
+                    <td className="px-4 py-3 text-center text-gray-700 font-semibold">{issue.year}ro</td>
+                    <td className="px-4 py-3 text-gray-700">{issue.subject_name}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold border ${getIssueColor(issue.issue_type)}`}>
+                        {getIssueLabel(issue.issue_type)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 text-xs">{issue.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="p-4 bg-slate-50 border-t border-gray-200">
+            <p className="text-sm font-semibold text-slate-700">
+              Total de incumplimientos: <span className="text-indigo-600">{issues.length}</span>
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

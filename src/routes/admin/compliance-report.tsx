@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Filter } from 'lucide-react'
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/compliance-report')({
   component: ComplianceReportPage,
@@ -21,8 +21,25 @@ type ComplianceIssue = {
   details: string
 }
 
+type StudentSummary = {
+  id: string
+  name: string
+  year: number
+  program_name: string
+  program_id: string
+  subjects: {
+    id: string
+    name: string
+    status: string
+    attendance: number | null
+    partial_grade: number | null
+    issues: string[]
+  }[]
+}
+
 function ComplianceReportPage() {
   const [issues, setIssues] = useState<ComplianceIssue[]>([])
+  const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>([])
   const [loading, setLoading] = useState(false)
   const [programs, setPrograms] = useState<any[]>([])
   const [subjects, setSubjects] = useState<any[]>([])
@@ -30,6 +47,8 @@ function ComplianceReportPage() {
   const [selectedYear, setSelectedYear] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('')
   const [selectedIssueType, setSelectedIssueType] = useState('')
+  const [expandedStudent, setExpandedStudent] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'summary' | 'details'>('summary')
 
   const { showToast } = useToast()
 
@@ -61,6 +80,7 @@ function ComplianceReportPage() {
     setLoading(true)
     try {
       const issues: ComplianceIssue[] = []
+      const studentSummariesMap = new Map<string, StudentSummary>()
 
       // Query 1: Traer estudiantes con todos sus datos en un JOIN
       let query = supabase
@@ -148,9 +168,24 @@ function ComplianceReportPage() {
         studentEnrollmentsMap.get(enr.student_id)!.set(enr.subject_id, finalStatus || null)
       })
 
-      // Procesar todo en memoria (sin queries adicionales)
+      // Procesar todo en memoria
       students.forEach(student => {
         const enrollments = student.enrollments || []
+        const studentKey = student.id
+        
+        // Inicializar resumen del estudiante
+        if (!studentSummariesMap.has(studentKey)) {
+          studentSummariesMap.set(studentKey, {
+            id: student.id,
+            name: `${student.last_name}, ${student.first_name}`,
+            year: student.year,
+            program_name: (student.program as any)?.name || '',
+            program_id: student.program_id,
+            subjects: []
+          })
+        }
+
+        const summary = studentSummariesMap.get(studentKey)!
 
         enrollments.forEach((enrollment: any) => {
           const subject = enrollment.subject
@@ -158,9 +193,13 @@ function ComplianceReportPage() {
             ? enrollment.enrollment_grades[0]
             : enrollment.enrollment_grades
           const finalStatus = gradeRecord?.final_status
+          const partialStatus = gradeRecord?.partial_status
 
-          // ✅ FILTRO CRÍTICO: Si ya está aprobado/promocionado, SALTAR esta materia
+          // ✅ FILTRO: Saltar si está aprobado O en curso
           if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
+            return
+          }
+          if (partialStatus === 'en_curso') {
             return
           }
 
@@ -172,93 +211,79 @@ function ComplianceReportPage() {
           // Aplicar filtro de materia
           if (selectedSubject && subject.id !== selectedSubject) return
 
+          // Recolectar incumplimientos para esta inscripción
+          const issuesList: string[] = []
+
           // ASISTENCIA
-          if (!selectedIssueType || selectedIssueType === 'asistencia') {
-            if (!attendance || attendance < 60) {
-              issues.push({
-                id: `${student.id}-${subject.id}-asistencia`,
-                student_id: student.id,
-                student_name: `${student.last_name}, ${student.first_name}`,
-                program_id: student.program_id,
-                program_name: (student.program as any)?.name || '',
-                year: student.year,
-                subject_id: subject.id,
-                subject_name: subject.name,
-                issue_type: 'asistencia',
-                details: `Asistencia: ${attendance ?? 0}% (mínimo: 60%)`,
-              })
-            }
+          if (!attendance || attendance < 60) {
+            issuesList.push(`Asistencia: ${attendance ?? 0}%`)
           }
 
           // REGULARIDAD
-          if (!selectedIssueType || selectedIssueType === 'regularidad') {
-            if (!partialGrade || partialGrade < 6) {
-              issues.push({
-                id: `${student.id}-${subject.id}-regularidad`,
-                student_id: student.id,
-                student_name: `${student.last_name}, ${student.first_name}`,
-                program_id: student.program_id,
-                program_name: (student.program as any)?.name || '',
-                year: student.year,
-                subject_id: subject.id,
-                subject_name: subject.name,
-                issue_type: 'regularidad',
-                details: `Nota Parcial: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'} (mínimo: 6)`,
-              })
-            }
+          if (!partialGrade || partialGrade < 6) {
+            issuesList.push(`Nota Parcial: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}`)
           }
 
           // CORRELATIVAS
-          if (!selectedIssueType || selectedIssueType === 'correlativa') {
-            const correlatives = correlativesMap.get(subject.id) || []
+          const correlatives = correlativesMap.get(subject.id) || []
+          correlatives.forEach(corr => {
+            const requiredStatus = corr.required_status || 'aprobado'
+            const studentSubjectEnrollments = studentEnrollmentsMap.get(student.id)
+            const corrFinalStatus = studentSubjectEnrollments?.get(corr.requires_subject_id) || null
+            const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
 
-            correlatives.forEach(corr => {
-              const requiredStatus = corr.required_status || 'aprobado'
-              const studentSubjectEnrollments = studentEnrollmentsMap.get(student.id)
-              const corrFinalStatus = studentSubjectEnrollments?.get(corr.requires_subject_id) || null
-
-              if (requiredStatus === 'aprobado') {
-                if (!corrFinalStatus || !['aprobado', 'promocionado'].includes(corrFinalStatus)) {
-                  const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
-
-                  issues.push({
-                    id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
-                    student_id: student.id,
-                    student_name: `${student.last_name}, ${student.first_name}`,
-                    program_id: student.program_id,
-                    program_name: (student.program as any)?.name || '',
-                    year: student.year,
-                    subject_id: subject.id,
-                    subject_name: subject.name,
-                    issue_type: 'correlativa',
-                    details: `Requiere APROBADA: ${corrSubject?.name || 'N/A'} (Estado: ${corrFinalStatus || 'Sin cursar'})`,
-                  })
-                }
-              } else if (requiredStatus === 'regular') {
-                if (!corrFinalStatus || !['aprobado', 'promocionado', 'regular'].includes(corrFinalStatus)) {
-                  const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
-
-                  issues.push({
-                    id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
-                    student_id: student.id,
-                    student_name: `${student.last_name}, ${student.first_name}`,
-                    program_id: student.program_id,
-                    program_name: (student.program as any)?.name || '',
-                    year: student.year,
-                    subject_id: subject.id,
-                    subject_name: subject.name,
-                    issue_type: 'correlativa',
-                    details: `Requiere REGULARIZADA: ${corrSubject?.name || 'N/A'} (Estado: ${corrFinalStatus || 'Sin cursar'})`,
-                  })
-                }
+            if (requiredStatus === 'aprobado') {
+              if (!corrFinalStatus || !['aprobado', 'promocionado'].includes(corrFinalStatus)) {
+                issuesList.push(`Correlativa: ${corrSubject?.name || 'N/A'} no aprobada`)
               }
+            } else if (requiredStatus === 'regular') {
+              if (!corrFinalStatus || !['aprobado', 'promocionado', 'regular'].includes(corrFinalStatus)) {
+                issuesList.push(`Correlativa: ${corrSubject?.name || 'N/A'} no regularizada`)
+              }
+            }
+          })
+
+          // Si hay incumplimientos, agregar a resumen
+          if (issuesList.length > 0) {
+            summary.subjects.push({
+              id: subject.id,
+              name: subject.name,
+              status: partialStatus || finalStatus || 'sin_cursar',
+              attendance: attendance,
+              partial_grade: partialGrade,
+              issues: issuesList
             })
+
+            // También agregar a tabla de detalles (para vista detallada)
+            if (!selectedIssueType || selectedIssueType === 'asistencia' || selectedIssueType === 'regularidad' || selectedIssueType === 'correlativa') {
+              issuesList.forEach(issueDetail => {
+                let issueType: 'asistencia' | 'regularidad' | 'correlativa' = 'regularidad'
+                if (issueDetail.includes('Asistencia')) issueType = 'asistencia'
+                if (issueDetail.includes('Correlativa')) issueType = 'correlativa'
+
+                if (!selectedIssueType || selectedIssueType === issueType) {
+                  issues.push({
+                    id: `${student.id}-${subject.id}-${issueType}`,
+                    student_id: student.id,
+                    student_name: `${student.last_name}, ${student.first_name}`,
+                    program_id: student.program_id,
+                    program_name: (student.program as any)?.name || '',
+                    year: student.year,
+                    subject_id: subject.id,
+                    subject_name: subject.name,
+                    issue_type: issueType,
+                    details: issueDetail,
+                  })
+                }
+              })
+            }
           }
         })
       })
 
       setIssues(issues)
-      showToast(`Se encontraron ${issues.length} incumplimientos`, 'info')
+      setStudentSummaries(Array.from(studentSummariesMap.values()))
+      showToast(`${studentSummariesMap.size} alumnos con incumplimientos`, 'info')
     } catch (err) {
       console.error('Error loading report:', err)
       showToast('Error al generar reporte', 'error')
@@ -270,6 +295,32 @@ function ComplianceReportPage() {
   const filteredSubjects = selectedProgram
     ? subjects.filter(s => s.program_id === selectedProgram)
     : subjects
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'regular':
+        return 'bg-blue-100 text-blue-700 border-blue-300'
+      case 'desaprobado':
+        return 'bg-red-100 text-red-700 border-red-300'
+      case 'en_curso':
+        return 'bg-purple-100 text-purple-700 border-purple-300'
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-300'
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'regular':
+        return 'Regular'
+      case 'desaprobado':
+        return 'Desaprobado'
+      case 'en_curso':
+        return 'En Curso'
+      default:
+        return status
+    }
+  }
 
   const getIssueColor = (type: string) => {
     switch (type) {
@@ -301,7 +352,7 @@ function ComplianceReportPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-slate-900">Reporte de Incumplimientos</h1>
-        <p className="text-slate-600 mt-2">Materias sin aprobar: falta cargar regularidades, asistencia baja, o correlativas no cumplidas</p>
+        <p className="text-slate-600 mt-2">Alumnos adeudados: materias sin aprobar con regularidades faltantes, asistencia baja o correlativas pendientes</p>
       </div>
 
       <div className="card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
@@ -383,48 +434,142 @@ function ComplianceReportPage() {
         </div>
       </div>
 
-      {issues.length === 0 && !loading ? (
-        <div className="card p-8 text-center bg-green-50 border-2 border-green-200">
-          <p className="text-green-800 font-semibold">No se encontraron incumplimientos. ¡Todos al día!</p>
-        </div>
-      ) : (
-        <div className="card p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gradient-to-r from-slate-700 to-slate-900 text-white">
-                  <th className="px-4 py-3 text-left font-bold">Alumno</th>
-                  <th className="px-4 py-3 text-left font-bold">Carrera</th>
-                  <th className="px-4 py-3 text-center font-bold">Año</th>
-                  <th className="px-4 py-3 text-left font-bold">Materia</th>
-                  <th className="px-4 py-3 text-left font-bold">Tipo</th>
-                  <th className="px-4 py-3 text-left font-bold">Detalle</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {issues.map((issue, idx) => (
-                  <tr key={issue.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
-                    <td className="px-4 py-3 font-medium text-gray-900">{issue.student_name}</td>
-                    <td className="px-4 py-3 text-gray-700">{issue.program_name}</td>
-                    <td className="px-4 py-3 text-center text-gray-700 font-semibold">{issue.year}ro</td>
-                    <td className="px-4 py-3 text-gray-700">{issue.subject_name}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold border ${getIssueColor(issue.issue_type)}`}>
-                        {getIssueLabel(issue.issue_type)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 text-xs">{issue.details}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Vista Resumen */}
+      {studentSummaries.length > 0 && (
+        <div className="card p-4">
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setViewMode('summary')}
+              className={`px-4 py-2 rounded font-semibold transition ${
+                viewMode === 'summary'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Resumen por Alumno
+            </button>
+            <button
+              onClick={() => setViewMode('details')}
+              className={`px-4 py-2 rounded font-semibold transition ${
+                viewMode === 'details'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Tabla Detallada
+            </button>
           </div>
 
-          <div className="p-4 bg-slate-50 border-t border-gray-200">
+          {viewMode === 'summary' && (
+            <div className="space-y-3">
+              {studentSummaries.map(student => (
+                <div key={student.id} className="border border-gray-300 rounded-lg overflow-hidden bg-white">
+                  <button
+                    onClick={() => setExpandedStudent(expandedStudent === student.id ? null : student.id)}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 flex items-center justify-between font-semibold text-gray-900 transition"
+                  >
+                    <div className="flex items-center gap-3 flex-1 text-left">
+                      {expandedStudent === student.id ? (
+                        <ChevronUp size={20} className="text-blue-600" />
+                      ) : (
+                        <ChevronDown size={20} className="text-gray-600" />
+                      )}
+                      <div>
+                        <span>{student.name}</span>
+                        <span className="text-sm text-gray-600 ml-4">
+                          {student.year}° año • {student.program_name} • {student.subjects.length} materia(s) adeudada(s)
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+
+                  {expandedStudent === student.id && (
+                    <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 space-y-3">
+                      {student.subjects.map(subject => (
+                        <div key={subject.id} className="bg-white p-3 rounded border border-gray-200">
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                              <p className="font-semibold text-gray-900">{subject.name}</p>
+                              <span className={`inline-block mt-1 px-2 py-1 rounded text-xs font-bold border ${getStatusColor(subject.status)}`}>
+                                {getStatusLabel(subject.status)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-700 space-y-1 mb-2">
+                            {subject.attendance !== null && (
+                              <p>Asistencia: <span className={subject.attendance < 60 ? 'text-red-600 font-bold' : 'text-green-600'}>{subject.attendance}%</span></p>
+                            )}
+                            {subject.partial_grade !== null && (
+                              <p>Nota Parcial: <span className={subject.partial_grade < 6 ? 'text-red-600 font-bold' : 'text-green-600'}>{Math.round(subject.partial_grade * 100) / 100}</span></p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {subject.issues.map((issue, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700 border border-red-300"
+                              >
+                                ⚠ {issue}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {viewMode === 'details' && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gradient-to-r from-slate-700 to-slate-900 text-white">
+                    <th className="px-4 py-3 text-left font-bold">Alumno</th>
+                    <th className="px-4 py-3 text-left font-bold">Carrera</th>
+                    <th className="px-4 py-3 text-center font-bold">Año</th>
+                    <th className="px-4 py-3 text-left font-bold">Materia</th>
+                    <th className="px-4 py-3 text-left font-bold">Tipo</th>
+                    <th className="px-4 py-3 text-left font-bold">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {issues.map((issue, idx) => (
+                    <tr key={issue.id} className={idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}>
+                      <td className="px-4 py-3 font-medium text-gray-900">{issue.student_name}</td>
+                      <td className="px-4 py-3 text-gray-700">{issue.program_name}</td>
+                      <td className="px-4 py-3 text-center text-gray-700 font-semibold">{issue.year}°</td>
+                      <td className="px-4 py-3 text-gray-700">{issue.subject_name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold border ${getIssueColor(issue.issue_type)}`}>
+                          {getIssueLabel(issue.issue_type)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 text-xs">{issue.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="p-4 bg-slate-50 border-t border-gray-200 mt-4">
             <p className="text-sm font-semibold text-slate-700">
-              Total de incumplimientos: <span className="text-indigo-600">{issues.length}</span>
+              {viewMode === 'summary' ? (
+                <>Alumnos adeudados: <span className="text-indigo-600">{studentSummaries.length}</span></>
+              ) : (
+                <>Total de incumplimientos: <span className="text-indigo-600">{issues.length}</span></>
+              )}
             </p>
           </div>
+        </div>
+      )}
+
+      {studentSummaries.length === 0 && !loading && (
+        <div className="card p-8 text-center bg-green-50 border-2 border-green-200">
+          <p className="text-green-800 font-semibold">No se encontraron alumnos adeudados. ¡Todos al día!</p>
         </div>
       )}
     </div>
