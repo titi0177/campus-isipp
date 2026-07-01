@@ -136,26 +136,46 @@ function ExamsPage() {
         const reasons: string[] = []
         let eligible = true
 
-        // 1. Verificar asistencia y parcial en una sola query
+        // 0. PRIMERO: Verificar si ya está aprobado o promocionado
         const { data: enrollmentData } = await supabase
+          .from('enrollments')
+          .select('enrollment_grades(final_status)')
+          .eq('student_id', studentData.id)
+          .eq('subject_id', subjectId)
+          .single()
+
+        const finalStatus = Array.isArray(enrollmentData?.enrollment_grades)
+          ? enrollmentData?.enrollment_grades[0]?.final_status
+          : enrollmentData?.enrollment_grades?.final_status
+
+        if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
+          console.log('[ELIGIBILITY] Subject already approved:', subjectId)
+          reasons.push(`Ya está aprobado - no requiere inscripción`)
+          eligible = false
+          eligMap.set(exam.id, { eligible, reasons })
+          return
+        }
+
+        // 1. Verificar asistencia y parcial en una sola query
+        const { data: attendanceGradeData } = await supabase
           .from('enrollments')
           .select('attendance(percentage), enrollment_grades(partial_grade)')
           .eq('student_id', studentData.id)
           .eq('subject_id', subjectId)
           .single()
 
-        const attendance = Array.isArray(enrollmentData?.attendance) 
-          ? enrollmentData?.attendance[0]?.percentage 
-          : enrollmentData?.attendance?.percentage
+        const attendance = Array.isArray(attendanceGradeData?.attendance) 
+          ? attendanceGradeData?.attendance[0]?.percentage 
+          : attendanceGradeData?.attendance?.percentage
 
         if (!attendance || attendance < 60) {
           reasons.push(`Asistencia insuficiente (actual: ${attendance ?? 0}%, mínimo: 60%)`)
           eligible = false
         }
 
-        const gradeRecord = Array.isArray(enrollmentData?.enrollment_grades) 
-          ? enrollmentData?.enrollment_grades[0] 
-          : enrollmentData?.enrollment_grades
+        const gradeRecord = Array.isArray(attendanceGradeData?.enrollment_grades) 
+          ? attendanceGradeData?.enrollment_grades[0] 
+          : attendanceGradeData?.enrollment_grades
         
         const partialGrade = gradeRecord?.partial_grade
 
