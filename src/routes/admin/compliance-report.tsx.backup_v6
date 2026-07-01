@@ -149,7 +149,6 @@ function ComplianceReportPage() {
         .from('enrollments')
         .select('student_id, subject_id, enrollment_grades(final_status)')
         .in('student_id', studentIds)
-        .not('enrollment_grades', 'is', null)
 
       if (enrollError) {
         showToast('Error al cargar enrollments', 'error')
