@@ -53,9 +53,8 @@ function ExamsPage() {
         .from('final_exams')
         .select(`
           *,
-          subject:subjects(id, name, professor_id, program_id)
+          subject:subjects(id, name, professor_id)
         `)
-        .eq('subject.program_id', studentData.program_id)
         .order('exam_date', { ascending: true })
 
       console.log('[EXAMS] Query result:', { examsData, examsError })
@@ -161,7 +160,7 @@ function ExamsPage() {
       // 2. Verificar nota parcial (>= 6)
       const { data: gradeData } = await supabase
         .from('enrollments')
-        .select('enrollment_grades(partial_grade, partial_status, final_status)')
+        .select('enrollment_grades(partial_grade, partial_status)')
         .eq('student_id', studentData.id)
         .eq('subject_id', subjectId)
         .single()
@@ -171,13 +170,8 @@ function ExamsPage() {
         : gradeData?.enrollment_grades
       
       const partialGrade = gradeRecord?.partial_grade
-      const finalStatus = gradeRecord?.final_status
 
-      // 2.5. Verificar si ya está aprobada
-      if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
-        reasons.push(`Materia ya aprobada — no requiere examen`)
-        eligible = false
-      } else if (!partialGrade || partialGrade < 6) {
+      if (!partialGrade || partialGrade < 6) {
         reasons.push(`Nota parcial insuficiente (actual: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, mínimo: 6)`)
         eligible = false
       }
