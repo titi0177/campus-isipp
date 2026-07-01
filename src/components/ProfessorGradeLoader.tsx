@@ -474,7 +474,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           selected_grades_for_averaging: Array.from(globalSelectedGradesForAveraging),
         }
 
-        if (partialStatus === 'desaprobado' || partialStatus === 'promocionado') {
+        if (partialStatus === 'desaprobado') {
           payload.final_grade = partialGrade
           payload.final_status = partialStatus
         }
