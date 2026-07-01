@@ -19,6 +19,7 @@ function ExamsPage() {
   const [registrations, setRegistrations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [eligibility, setEligibility] = useState<Map<string, { eligible: boolean; reasons: string[] }>>(new Map())
+  const [paymentsCache, setPaymentsCache] = useState<any[]>([])
 
   const { showToast } = useToast()
 
@@ -49,13 +50,24 @@ function ExamsPage() {
 
       setStudent(studentData)
 
-      const { data: examsData, error: examsError } = await supabase
-        .from('final_exams')
-        .select(`
-          *,
-          subject:subjects(id, name, professor_id)
-        `)
-        .order('exam_date', { ascending: true })
+      // Cargar mesas, profesor y correlativas en paralelo
+      const [examsResult, paymentsResult] = await Promise.all([
+        supabase
+          .from('final_exams')
+          .select(`
+            *,
+            subject:subjects(id, name, professor_id, program_id, professor:professors(name))
+          `)
+          .eq('subject.program_id', studentData.program_id)
+          .order('exam_date', { ascending: true }),
+        supabase
+          .from('payments')
+          .select('*')
+          .eq('student_id', studentData.id)
+          .eq('status', 'deudor')
+      ])
+
+      const { data: examsData, error: examsError } = examsResult
 
       console.log('[EXAMS] Query result:', { examsData, examsError })
 
@@ -65,41 +77,16 @@ function ExamsPage() {
         setExams([])
       } else {
         console.log('[EXAMS] examsData count:', examsData?.length)
-        console.log('[EXAMS] examsData:', examsData)
-        // Cargar profesor de la materia para cada examen
-        const enrichedExams = await Promise.all(
-          (examsData || []).map(async (exam) => {
-            console.log('[EXAMS] Processing exam:', exam.id, 'subject:', exam.subject?.id, 'subject_professor_id:', exam.subject?.professor_id)
-            if (exam.subject?.professor_id) {
-              console.log('[EXAMS] Loading professor for subject:', exam.subject.professor_id)
-              const { data: profData } = await supabase
-                .from('professors')
-                .select('name')
-                .eq('id', exam.subject.professor_id)
-                .single()
-              console.log('[EXAMS] Loaded professor:', profData)
-              return {
-                ...exam,
-                professor: profData
-              }
-            }
-            return exam
-          })
-        )
-        console.log('[EXAMS] enrichedExams count:', enrichedExams?.length)
-        console.log('[EXAMS] enrichedExams:', enrichedExams)
-        // Mostrar mesas PRIMERO, independientemente de elegibilidad
-        setExams(enrichedExams)
+        setExams(examsData || [])
+        setPaymentsCache(paymentsResult.data || [])
         
         // Verificar elegibilidad en background (no bloquea mesas)
         try {
           console.log('[EXAMS] Starting eligibility check')
-          await checkEligibility(studentData, enrichedExams)
+          await checkEligibility(studentData, examsData || [], paymentsResult.data || [])
           console.log('[EXAMS] Eligibility check completed')
         } catch (eligError) {
           console.error('[EXAMS] Error verificando elegibilidad:', eligError)
-          // Las mesas ya están visibles, solo falla elegibilidad
-          // Los botones mostrarán requisitos no cumplidos
         }
       }
 
@@ -125,140 +112,126 @@ function ExamsPage() {
 
   }
 
-  async function checkEligibility(studentData: any, examsData: any[]) {
+  async function checkEligibility(studentData: any, examsData: any[], paymentsData: any[]) {
     console.log('[ELIGIBILITY] Starting with exams count:', examsData?.length)
     const eligMap = new Map()
 
-    for (const exam of examsData) {
-      const subjectId = exam.subject?.id
-      console.log('[ELIGIBILITY] Checking exam:', exam.id, 'subject:', subjectId)
-      
-      const reasons: string[] = []
-      let eligible = true
+    // Validar todas las mesas en paralelo
+    await Promise.all(
+      examsData.map(async (exam) => {
+        const subjectId = exam.subject?.id
+        console.log('[ELIGIBILITY] Checking exam:', exam.id, 'subject:', subjectId)
+        
+        const reasons: string[] = []
+        let eligible = true
 
-      // 1. Verificar asistencia (> 60%)
-      const { data: attendanceData, error: attendanceError } = await supabase
-        .from('enrollments')
-        .select('attendance(percentage)')
-        .eq('student_id', studentData.id)
-        .eq('subject_id', subjectId)
-        .single()
-
-      if (attendanceError) {
-        console.log('[ELIGIBILITY] Attendance error:', attendanceError.message)
-      }
-
-      const attendance = Array.isArray(attendanceData?.attendance) 
-        ? attendanceData?.attendance[0]?.percentage 
-        : attendanceData?.attendance?.percentage
-
-      if (!attendance || attendance < 60) {
-        reasons.push(`Asistencia insuficiente (actual: ${attendance ?? 0}%, mínimo: 60%)`)
-        eligible = false
-      }
-
-      // 2. Verificar nota parcial (>= 6)
-      const { data: gradeData } = await supabase
-        .from('enrollments')
-        .select('enrollment_grades(partial_grade, partial_status)')
-        .eq('student_id', studentData.id)
-        .eq('subject_id', subjectId)
-        .single()
-
-      const gradeRecord = Array.isArray(gradeData?.enrollment_grades) 
-        ? gradeData?.enrollment_grades[0] 
-        : gradeData?.enrollment_grades
-      
-      const partialGrade = gradeRecord?.partial_grade
-
-      if (!partialGrade || partialGrade < 6) {
-        reasons.push(`Nota parcial insuficiente (actual: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, mínimo: 6)`)
-        eligible = false
-      }
-
-      // 3. Verificar correlativas (con required_status)
-      const { data: correlativesData } = await supabase
-        .from('subject_correlatives')
-        .select('requires_subject_id, required_status')
-        .eq('subject_id', subjectId)
-
-      if (correlativesData && correlativesData.length > 0) {
-        // Para EXAMEN FINAL: validar correlativas según required_status
-        for (const corr of correlativesData) {
-          const requiredStatus = corr.required_status || 'aprobado'
-          
-          // Obtener estado del alumno en esta correlativa
-          const { data: enrollmentData } = await supabase
-            .from('enrollments')
-            .select('enrollment_grades(final_status)')
-            .eq('student_id', studentData.id)
-            .eq('subject_id', corr.requires_subject_id)
-            .single()
-
-          const finalStatus = Array.isArray(enrollmentData?.enrollment_grades)
-            ? enrollmentData?.enrollment_grades[0]?.final_status
-            : enrollmentData?.enrollment_grades?.final_status
-
-          // Validar según required_status
-          if (requiredStatus === 'aprobado') {
-            // Para examen: solo aprobado o promocionado
-            if (!finalStatus || !['aprobado', 'promocionado'].includes(finalStatus)) {
-              const { data: subjectName } = await supabase
-                .from('subjects')
-                .select('name')
-                .eq('id', corr.requires_subject_id)
-                .single()
-              reasons.push(`Requiere APROBADA: ${subjectName?.name} (actual: ${finalStatus || 'Sin cursar'})`)
-              eligible = false
-            }
-          } else if (requiredStatus === 'regular') {
-            // Para examen: también regular sirve
-            if (!finalStatus || !['aprobado', 'promocionado', 'regular'].includes(finalStatus)) {
-              const { data: subjectName } = await supabase
-                .from('subjects')
-                .select('name')
-                .eq('id', corr.requires_subject_id)
-                .single()
-              reasons.push(`Requiere REGULARIZADA: ${subjectName?.name} (actual: ${finalStatus || 'Sin cursar'})`)
-              eligible = false
-            }
-          }
-          // si required_status === 'any': no validar
-        }
-      }
-
-      // 4. Verificar pagos (deuda con vencimiento <= mes del examen)
-      if (exam.exam_date) {
-        const examDate = new Date(exam.exam_date)
-        const examMonth = examDate.getMonth() + 1
-        const examYear = examDate.getFullYear()
-
-        const { data: paymentsData } = await supabase
-          .from('payments')
-          .select('*')
+        // 1. Verificar asistencia y parcial en una sola query
+        const { data: enrollmentData } = await supabase
+          .from('enrollments')
+          .select('attendance(percentage), enrollment_grades(partial_grade)')
           .eq('student_id', studentData.id)
-          .eq('status', 'deudor')
+          .eq('subject_id', subjectId)
+          .single()
 
-        const debtWithinDeadline = paymentsData?.filter((p: any) => {
-          const paymentDueDate = new Date(p.due_date)
-          const paymentMonth = paymentDueDate.getMonth() + 1
-          const paymentYear = paymentDueDate.getFullYear()
-          
-          // Deuda con vencimiento <= mes/año del examen
-          if (paymentYear < examYear) return true
-          if (paymentYear === examYear && paymentMonth <= examMonth) return true
-          return false
-        }) || []
+        const attendance = Array.isArray(enrollmentData?.attendance) 
+          ? enrollmentData?.attendance[0]?.percentage 
+          : enrollmentData?.attendance?.percentage
 
-        if (debtWithinDeadline.length > 0) {
-          const debtAmount = debtWithinDeadline.reduce((sum: number, p: any) => sum + p.amount, 0)
-          reasons.push(`Tienes deuda de $${debtAmount !== null && debtAmount !== undefined ? debtAmount.toFixed(2) : '0.00'} con vencimiento antes de este examen`)
+        if (!attendance || attendance < 60) {
+          reasons.push(`Asistencia insuficiente (actual: ${attendance ?? 0}%, mínimo: 60%)`)
           eligible = false
         }
-      }
 
-      eligMap.set(exam.id, { eligible, reasons })
-    }
+        const gradeRecord = Array.isArray(enrollmentData?.enrollment_grades) 
+          ? enrollmentData?.enrollment_grades[0] 
+          : enrollmentData?.enrollment_grades
+        
+        const partialGrade = gradeRecord?.partial_grade
+
+        if (!partialGrade || partialGrade < 6) {
+          reasons.push(`Nota parcial insuficiente (actual: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, mínimo: 6)`)
+          eligible = false
+        }
+
+        // 2. Verificar correlativas
+        const { data: correlativesData } = await supabase
+          .from('subject_correlatives')
+          .select('requires_subject_id, required_status')
+          .eq('subject_id', subjectId)
+
+        if (correlativesData && correlativesData.length > 0) {
+          // Obtener estado de todas las correlativas en paralelo
+          const correlativeStatuses = await Promise.all(
+            correlativesData.map(async (corr) => {
+              const { data: corrEnrollmentData } = await supabase
+                .from('enrollments')
+                .select('enrollment_grades(final_status)')
+                .eq('student_id', studentData.id)
+                .eq('subject_id', corr.requires_subject_id)
+                .single()
+
+              const finalStatus = Array.isArray(corrEnrollmentData?.enrollment_grades)
+                ? corrEnrollmentData?.enrollment_grades[0]?.final_status
+                : corrEnrollmentData?.enrollment_grades?.final_status
+
+              return { corr, finalStatus }
+            })
+          )
+
+          // Validar según required_status
+          for (const { corr, finalStatus } of correlativeStatuses) {
+            const requiredStatus = corr.required_status || 'aprobado'
+            
+            if (requiredStatus === 'aprobado') {
+              if (!finalStatus || !['aprobado', 'promocionado'].includes(finalStatus)) {
+                const { data: subjectName } = await supabase
+                  .from('subjects')
+                  .select('name')
+                  .eq('id', corr.requires_subject_id)
+                  .single()
+                reasons.push(`Requiere APROBADA: ${subjectName?.name} (actual: ${finalStatus || 'Sin cursar'})`)
+                eligible = false
+              }
+            } else if (requiredStatus === 'regular') {
+              if (!finalStatus || !['aprobado', 'promocionado', 'regular'].includes(finalStatus)) {
+                const { data: subjectName } = await supabase
+                  .from('subjects')
+                  .select('name')
+                  .eq('id', corr.requires_subject_id)
+                  .single()
+                reasons.push(`Requiere REGULARIZADA: ${subjectName?.name} (actual: ${finalStatus || 'Sin cursar'})`)
+                eligible = false
+              }
+            }
+          }
+        }
+
+        // 3. Verificar pagos (usando cache)
+        if (exam.exam_date) {
+          const examDate = new Date(exam.exam_date)
+          const examMonth = examDate.getMonth() + 1
+          const examYear = examDate.getFullYear()
+
+          const debtWithinDeadline = paymentsData.filter((p: any) => {
+            const paymentDueDate = new Date(p.due_date)
+            const paymentMonth = paymentDueDate.getMonth() + 1
+            const paymentYear = paymentDueDate.getFullYear()
+            
+            if (paymentYear < examYear) return true
+            if (paymentYear === examYear && paymentMonth <= examMonth) return true
+            return false
+          })
+
+          if (debtWithinDeadline.length > 0) {
+            const debtAmount = debtWithinDeadline.reduce((sum: number, p: any) => sum + p.amount, 0)
+            reasons.push(`Tienes deuda de $${debtAmount !== null && debtAmount !== undefined ? debtAmount.toFixed(2) : '0.00'} con vencimiento antes de este examen`)
+            eligible = false
+          }
+        }
+
+        eligMap.set(exam.id, { eligible, reasons })
+      })
+    )
 
     setEligibility(eligMap)
   }
@@ -419,7 +392,7 @@ function ExamsPage() {
 
                   <p className="text-sm text-gray-500 flex items-center gap-1">
                     <User size={14} />
-                    {exam.professor?.name || '—'}
+                    {exam.subject?.professor?.name || '—'}
                   </p>
 
                 </div>
