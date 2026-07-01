@@ -202,8 +202,7 @@ function ComplianceReportPage() {
           
           // ✅ FILTRO: Saltar en_curso SOLO si es del año actual del alumno
           // Mostrar en_curso de años anteriores (para ver qué debe regularizar)
-          // Verifica: si no tiene final_status Y no tiene partial_status Y es del año actual = inscripto sin notas
-          if (!finalStatus && !partialStatus && subject.year === student.year) {
+          if (partialStatus === 'en_curso' && subject.year === student.year) {
             return
           }
 
@@ -247,7 +246,7 @@ function ComplianceReportPage() {
             }
           })
 
-          // Solo agregar si hay incumplimientos O si está regularizado/desaprobado de años anteriores
+          // Si hay incumplimientos, agregar a resumen
           if (issuesList.length > 0) {
             summary.subjects.push({
               id: subject.id,
