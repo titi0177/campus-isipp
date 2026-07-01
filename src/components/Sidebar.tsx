@@ -44,6 +44,7 @@ const adminNav: NavItem[] = [
   { label: 'Mesas de exámenes', href: '/admin/final-exams', icon: <BookMarked size={18} /> },
   { label: 'Actas de examen', href: '/admin/exam-records', icon: <FileText size={18} /> },
   { label: 'Reporte de incumplimientos', href: '/admin/compliance-report', icon: <BarChart3 size={18} /> },
+  { label: 'Ranking de estudiantes', href: '/admin/ranking', icon: <Award size={18} /> },
   { label: 'Novedades', href: '/admin/announcements', icon: <Bell size={18} /> },
   { label: 'Reportes y estadísticas', href: '/admin/reports', icon: <BarChart3 size={18} /> },
   { label: 'Tesorera', href: '/treasurer', icon: <DollarSign size={18} /> },
