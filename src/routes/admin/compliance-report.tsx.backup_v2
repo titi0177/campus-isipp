@@ -154,19 +154,12 @@ function ComplianceReportPage() {
 
         enrollments.forEach((enrollment: any) => {
           const subject = enrollment.subject
-          const gradeRecord = Array.isArray(enrollment.enrollment_grades)
-            ? enrollment.enrollment_grades[0]
-            : enrollment.enrollment_grades
-          const finalStatus = gradeRecord?.final_status
-
-          // ✅ FILTRO CRÍTICO: Si ya está aprobado/promocionado, SALTAR esta materia
-          if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
-            return
-          }
-
           const attendance = Array.isArray(enrollment.attendance)
             ? enrollment.attendance[0]?.percentage
             : enrollment.attendance?.percentage
+          const gradeRecord = Array.isArray(enrollment.enrollment_grades)
+            ? enrollment.enrollment_grades[0]
+            : enrollment.enrollment_grades
           const partialGrade = gradeRecord?.partial_grade
 
           // Aplicar filtro de materia
@@ -215,10 +208,11 @@ function ComplianceReportPage() {
             correlatives.forEach(corr => {
               const requiredStatus = corr.required_status || 'aprobado'
               const studentSubjectEnrollments = studentEnrollmentsMap.get(student.id)
-              const corrFinalStatus = studentSubjectEnrollments?.get(corr.requires_subject_id) || null
+              const finalStatus = studentSubjectEnrollments?.get(corr.requires_subject_id) || null
 
               if (requiredStatus === 'aprobado') {
-                if (!corrFinalStatus || !['aprobado', 'promocionado'].includes(corrFinalStatus)) {
+                if (!finalStatus || !['aprobado', 'promocionado'].includes(finalStatus)) {
+                  // Encontrar el nombre de la materia requerida (buscar en subjects)
                   const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
 
                   issues.push({
@@ -231,11 +225,11 @@ function ComplianceReportPage() {
                     subject_id: subject.id,
                     subject_name: subject.name,
                     issue_type: 'correlativa',
-                    details: `Requiere APROBADA: ${corrSubject?.name || 'N/A'} (Estado: ${corrFinalStatus || 'Sin cursar'})`,
+                    details: `Requiere APROBADA: ${corrSubject?.name || 'N/A'} (Estado: ${finalStatus || 'Sin cursar'})`,
                   })
                 }
               } else if (requiredStatus === 'regular') {
-                if (!corrFinalStatus || !['aprobado', 'promocionado', 'regular'].includes(corrFinalStatus)) {
+                if (!finalStatus || !['aprobado', 'promocionado', 'regular'].includes(finalStatus)) {
                   const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
 
                   issues.push({
@@ -248,7 +242,7 @@ function ComplianceReportPage() {
                     subject_id: subject.id,
                     subject_name: subject.name,
                     issue_type: 'correlativa',
-                    details: `Requiere REGULARIZADA: ${corrSubject?.name || 'N/A'} (Estado: ${corrFinalStatus || 'Sin cursar'})`,
+                    details: `Requiere REGULARIZADA: ${corrSubject?.name || 'N/A'} (Estado: ${finalStatus || 'Sin cursar'})`,
                   })
                 }
               }
@@ -301,7 +295,7 @@ function ComplianceReportPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-slate-900">Reporte de Incumplimientos</h1>
-        <p className="text-slate-600 mt-2">Materias sin aprobar: falta cargar regularidades, asistencia baja, o correlativas no cumplidas</p>
+        <p className="text-slate-600 mt-2">Alumnos que no cumplen requisitos de asistencia, regularidad o correlativas</p>
       </div>
 
       <div className="card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200">
@@ -385,7 +379,7 @@ function ComplianceReportPage() {
 
       {issues.length === 0 && !loading ? (
         <div className="card p-8 text-center bg-green-50 border-2 border-green-200">
-          <p className="text-green-800 font-semibold">No se encontraron incumplimientos. ¡Todos al día!</p>
+          <p className="text-green-800 font-semibold">No se encontraron incumplimientos con los filtros seleccionados</p>
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
