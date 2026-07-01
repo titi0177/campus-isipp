@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Filter } from 'lucide-react'
+import { AlertCircle, Filter } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/compliance-report')({
   component: ComplianceReportPage,
@@ -62,24 +62,9 @@ function ComplianceReportPage() {
     try {
       const issues: ComplianceIssue[] = []
 
-      // Query 1: Traer estudiantes con todos sus datos en un JOIN
       let query = supabase
         .from('students')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          program_id,
-          year,
-          program:programs(name),
-          enrollments(
-            id,
-            subject_id,
-            subject:subjects(id, name, program_id, year),
-            attendance(percentage),
-            enrollment_grades(partial_grade, partial_status, final_status)
-          )
-        `)
+        .select('id, first_name, last_name, program_id, year, program:programs(name)')
 
       if (selectedProgram) {
         query = query.eq('program_id', selectedProgram)
@@ -102,58 +87,17 @@ function ComplianceReportPage() {
         return
       }
 
-      // Query 2: Traer TODAS las correlativas de una sola vez
-      const { data: allCorrelatives, error: corrError } = await supabase
-        .from('subject_correlatives')
-        .select('subject_id, requires_subject_id, required_status')
+      for (const student of students) {
+        const { data: enrollments, error: enrollmentsError } = await supabase
+          .from('enrollments')
+          .select('id, subject_id, subject:subjects(id, name, program_id, year), attendance(percentage), enrollment_grades(partial_grade, partial_status)')
+          .eq('student_id', student.id)
 
-      if (corrError) {
-        showToast('Error al cargar correlativas', 'error')
-        setLoading(false)
-        return
-      }
+        if (enrollmentsError) continue
+        if (!enrollments) continue
 
-      // Crear mapa de correlativas para búsqueda rápida O(1)
-      const correlativesMap = new Map<string, any[]>()
-      allCorrelatives?.forEach(corr => {
-        const key = corr.subject_id
-        if (!correlativesMap.has(key)) {
-          correlativesMap.set(key, [])
-        }
-        correlativesMap.get(key)!.push(corr)
-      })
-
-      // Query 3: Traer TODOS los enrollments de ALL estudiantes (para validar correlativas)
-      const studentIds = students.map(s => s.id)
-      const { data: allEnrollments, error: enrollError } = await supabase
-        .from('enrollments')
-        .select('student_id, subject_id, enrollment_grades(final_status)')
-        .in('student_id', studentIds)
-
-      if (enrollError) {
-        showToast('Error al cargar enrollments', 'error')
-        setLoading(false)
-        return
-      }
-
-      // Crear índice: student_id -> { subject_id -> final_status }
-      const studentEnrollmentsMap = new Map<string, Map<string, string | null>>()
-      allEnrollments?.forEach(enr => {
-        if (!studentEnrollmentsMap.has(enr.student_id)) {
-          studentEnrollmentsMap.set(enr.student_id, new Map())
-        }
-        const finalStatus = Array.isArray(enr.enrollment_grades)
-          ? enr.enrollment_grades[0]?.final_status
-          : enr.enrollment_grades?.final_status
-        studentEnrollmentsMap.get(enr.student_id)!.set(enr.subject_id, finalStatus || null)
-      })
-
-      // Procesar todo en memoria (sin queries adicionales)
-      students.forEach(student => {
-        const enrollments = student.enrollments || []
-
-        enrollments.forEach((enrollment: any) => {
-          const subject = enrollment.subject
+        for (const enrollment of enrollments) {
+          const subject = enrollment.subject as any
           const attendance = Array.isArray(enrollment.attendance)
             ? enrollment.attendance[0]?.percentage
             : enrollment.attendance?.percentage
@@ -162,10 +106,8 @@ function ComplianceReportPage() {
             : enrollment.enrollment_grades
           const partialGrade = gradeRecord?.partial_grade
 
-          // Aplicar filtro de materia
-          if (selectedSubject && subject.id !== selectedSubject) return
+          if (selectedSubject && subject.id !== selectedSubject) continue
 
-          // ASISTENCIA
           if (!selectedIssueType || selectedIssueType === 'asistencia') {
             if (!attendance || attendance < 60) {
               issues.push({
@@ -183,7 +125,6 @@ function ComplianceReportPage() {
             }
           }
 
-          // REGULARIDAD
           if (!selectedIssueType || selectedIssueType === 'regularidad') {
             if (!partialGrade || partialGrade < 6) {
               issues.push({
@@ -201,55 +142,75 @@ function ComplianceReportPage() {
             }
           }
 
-          // CORRELATIVAS
           if (!selectedIssueType || selectedIssueType === 'correlativa') {
-            const correlatives = correlativesMap.get(subject.id) || []
+            const { data: correlatives } = await supabase
+              .from('subject_correlatives')
+              .select('requires_subject_id, required_status')
+              .eq('subject_id', subject.id)
 
-            correlatives.forEach(corr => {
-              const requiredStatus = corr.required_status || 'aprobado'
-              const studentSubjectEnrollments = studentEnrollmentsMap.get(student.id)
-              const finalStatus = studentSubjectEnrollments?.get(corr.requires_subject_id) || null
+            if (correlatives && correlatives.length > 0) {
+              for (const corr of correlatives) {
+                const requiredStatus = corr.required_status || 'aprobado'
 
-              if (requiredStatus === 'aprobado') {
-                if (!finalStatus || !['aprobado', 'promocionado'].includes(finalStatus)) {
-                  // Encontrar el nombre de la materia requerida (buscar en subjects)
-                  const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
+                const { data: corrEnrollment } = await supabase
+                  .from('enrollments')
+                  .select('enrollment_grades(final_status)')
+                  .eq('student_id', student.id)
+                  .eq('subject_id', corr.requires_subject_id)
+                  .single()
 
-                  issues.push({
-                    id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
-                    student_id: student.id,
-                    student_name: `${student.last_name}, ${student.first_name}`,
-                    program_id: student.program_id,
-                    program_name: (student.program as any)?.name || '',
-                    year: student.year,
-                    subject_id: subject.id,
-                    subject_name: subject.name,
-                    issue_type: 'correlativa',
-                    details: `Requiere APROBADA: ${corrSubject?.name || 'N/A'} (Estado: ${finalStatus || 'Sin cursar'})`,
-                  })
-                }
-              } else if (requiredStatus === 'regular') {
-                if (!finalStatus || !['aprobado', 'promocionado', 'regular'].includes(finalStatus)) {
-                  const corrSubject = subjects.find(s => s.id === corr.requires_subject_id)
+                const finalStatus = Array.isArray(corrEnrollment?.enrollment_grades)
+                  ? corrEnrollment?.enrollment_grades[0]?.final_status
+                  : corrEnrollment?.enrollment_grades?.final_status
 
-                  issues.push({
-                    id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
-                    student_id: student.id,
-                    student_name: `${student.last_name}, ${student.first_name}`,
-                    program_id: student.program_id,
-                    program_name: (student.program as any)?.name || '',
-                    year: student.year,
-                    subject_id: subject.id,
-                    subject_name: subject.name,
-                    issue_type: 'correlativa',
-                    details: `Requiere REGULARIZADA: ${corrSubject?.name || 'N/A'} (Estado: ${finalStatus || 'Sin cursar'})`,
-                  })
+                if (requiredStatus === 'aprobado') {
+                  if (!finalStatus || !['aprobado', 'promocionado'].includes(finalStatus)) {
+                    const { data: corrSubject } = await supabase
+                      .from('subjects')
+                      .select('name')
+                      .eq('id', corr.requires_subject_id)
+                      .single()
+
+                    issues.push({
+                      id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
+                      student_id: student.id,
+                      student_name: `${student.last_name}, ${student.first_name}`,
+                      program_id: student.program_id,
+                      program_name: (student.program as any)?.name || '',
+                      year: student.year,
+                      subject_id: subject.id,
+                      subject_name: subject.name,
+                      issue_type: 'correlativa',
+                      details: `Requiere APROBADA: ${corrSubject?.name || 'N/A'} (Estado: ${finalStatus || 'Sin cursar'})`,
+                    })
+                  }
+                } else if (requiredStatus === 'regular') {
+                  if (!finalStatus || !['aprobado', 'promocionado', 'regular'].includes(finalStatus)) {
+                    const { data: corrSubject } = await supabase
+                      .from('subjects')
+                      .select('name')
+                      .eq('id', corr.requires_subject_id)
+                      .single()
+
+                    issues.push({
+                      id: `${student.id}-${subject.id}-corr-${corr.requires_subject_id}`,
+                      student_id: student.id,
+                      student_name: `${student.last_name}, ${student.first_name}`,
+                      program_id: student.program_id,
+                      program_name: (student.program as any)?.name || '',
+                      year: student.year,
+                      subject_id: subject.id,
+                      subject_name: subject.name,
+                      issue_type: 'correlativa',
+                      details: `Requiere REGULARIZADA: ${corrSubject?.name || 'N/A'} (Estado: ${finalStatus || 'Sin cursar'})`,
+                    })
+                  }
                 }
               }
-            })
+            }
           }
-        })
-      })
+        }
+      }
 
       setIssues(issues)
       showToast(`Se encontraron ${issues.length} incumplimientos`, 'info')
