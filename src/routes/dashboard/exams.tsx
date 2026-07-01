@@ -1,11 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Calendar, MapPin, User, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, MapPin, User, AlertCircle } from 'lucide-react'
 import { useToast } from '@/components/Toast'
 
 function examDateString(exam: { exam_date?: string; date?: string }) {
   return exam.exam_date ?? exam.date ?? ''
+}
+
+function formatExamDate(exam: any) {
+  const dateStr = exam.exam_date ?? exam.date ?? ''
+  if (!dateStr) return ''
+  
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('es-AR')
 }
 
 export const Route = createFileRoute('/dashboard/exams')({
@@ -77,13 +85,16 @@ function ExamsPage() {
         setExams([])
       } else {
         console.log('[EXAMS] examsData count:', examsData?.length)
-        setExams(examsData || [])
+        // Filtrar solo mesas que corresponden a la carrera del alumno
+        const validExams = (examsData || []).filter(exam => exam.subject?.id && exam.subject?.name)
+        console.log('[EXAMS] validExams count:', validExams?.length)
+        setExams(validExams)
         setPaymentsCache(paymentsResult.data || [])
         
         // Verificar elegibilidad en background (no bloquea mesas)
         try {
           console.log('[EXAMS] Starting eligibility check')
-          await checkEligibility(studentData, examsData || [], paymentsResult.data || [])
+          await checkEligibility(studentData, validExams, paymentsResult.data || [])
           console.log('[EXAMS] Eligibility check completed')
         } catch (eligError) {
           console.error('[EXAMS] Error verificando elegibilidad:', eligError)
@@ -380,7 +391,12 @@ function ExamsPage() {
 
                     <span className="flex items-center gap-1">
                       <Calendar size={14} />
-                      {when || '—'}
+                      {formatExamDate(exam) || '—'}
+                    </span>
+
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} />
+                      {exam.exam_time || '—'}
                     </span>
 
                     <span className="flex items-center gap-1">
