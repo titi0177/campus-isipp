@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Filter, AlertCircle, X } from 'lucide-react'
+import { Filter, AlertCircle } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/advanced-pending')({
   component: AdvancedPendingPage,
@@ -18,7 +18,6 @@ type AdvancedStudent = {
   subject_id: string
   subject_name: string
   subject_year: number
-  enrollment_id: string
   attendance_percentage: number | null
   partial_grade: number | null
   issues: string[]
@@ -30,10 +29,6 @@ function AdvancedPendingPage() {
   const [programs, setPrograms] = useState<any[]>([])
   const [selectedProgram, setSelectedProgram] = useState('')
   const [selectedYear, setSelectedYear] = useState('')
-  const [modalOpen, setModalOpen] = useState(false)
-  const [selectedStudent, setSelectedStudent] = useState<AdvancedStudent | null>(null)
-  const [formData, setFormData] = useState({ attendance: '', regularidad: '' })
-  const [saving, setSaving] = useState(false)
 
   const { showToast } = useToast()
 
@@ -149,7 +144,6 @@ function AdvancedPendingPage() {
                 subject_id: subject.id,
                 subject_name: subject.name,
                 subject_year: subject.year,
-                enrollment_id: enrollment.id,
                 attendance_percentage: attendance,
                 partial_grade: partialGrade,
                 issues: issues,
@@ -166,84 +160,6 @@ function AdvancedPendingPage() {
       showToast('Error al generar reporte', 'error')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const openModal = (student: AdvancedStudent) => {
-    setSelectedStudent(student)
-    setFormData({
-      attendance: student.attendance_percentage?.toString() || '',
-      regularidad: student.partial_grade?.toString() || '',
-    })
-    setModalOpen(true)
-  }
-
-  const closeModal = () => {
-    setModalOpen(false)
-    setSelectedStudent(null)
-    setFormData({ attendance: '', regularidad: '' })
-  }
-
-  const handleSave = async () => {
-    if (!selectedStudent) return
-
-    const attendance = formData.attendance ? parseFloat(formData.attendance) : null
-    const regularidad = formData.regularidad ? parseFloat(formData.regularidad) : null
-
-    // Validaciones
-    if (attendance !== null && (attendance < 0 || attendance > 100)) {
-      showToast('Asistencia debe estar entre 0 y 100', 'error')
-      return
-    }
-    if (regularidad !== null && (regularidad < 0 || regularidad > 10)) {
-      showToast('Regularidad debe estar entre 0 y 10', 'error')
-      return
-    }
-
-    setSaving(true)
-    try {
-      // Actualizar attendance
-      if (attendance !== null) {
-        const { error: attendanceError } = await supabase
-          .from('attendance')
-          .upsert(
-            {
-              enrollment_id: selectedStudent.enrollment_id,
-              percentage: attendance,
-            },
-            { onConflict: 'enrollment_id' }
-          )
-
-        if (attendanceError) {
-          showToast('Error al guardar asistencia', 'error')
-          setSaving(false)
-          return
-        }
-      }
-
-      // Actualizar regularidad (partial_grade)
-      if (regularidad !== null) {
-        const { error: gradeError } = await supabase
-          .from('enrollment_grades')
-          .update({ partial_grade: regularidad })
-          .eq('enrollment_id', selectedStudent.enrollment_id)
-
-        if (gradeError) {
-          showToast('Error al guardar regularidad', 'error')
-          setSaving(false)
-          return
-        }
-      }
-
-      showToast('Datos guardados correctamente', 'info')
-      closeModal()
-      // Recargar el reporte
-      await loadAdvancedPending()
-    } catch (err) {
-      console.error('Error saving:', err)
-      showToast('Error al guardar datos', 'error')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -314,7 +230,6 @@ function AdvancedPendingPage() {
                   <th className="px-4 py-3 text-center font-bold">Asistencia</th>
                   <th className="px-4 py-3 text-center font-bold">Regularidad</th>
                   <th className="px-4 py-3 text-left font-bold">Pendiente</th>
-                  <th className="px-4 py-3 text-center font-bold">Acción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -352,14 +267,6 @@ function AdvancedPendingPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => openModal(student)}
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded text-xs transition"
-                      >
-                        Cargar
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -378,80 +285,6 @@ function AdvancedPendingPage() {
           <p className="text-green-800 font-semibold">No hay alumnos avanzados con asistencia/regularidad pendiente</p>
         </div>
       ) : null}
-
-      {/* Modal */}
-      {modalOpen && selectedStudent && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Cargar Datos</h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600 transition"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-gray-700"><strong>Alumno:</strong> {selectedStudent.student_name}</p>
-              <p className="text-sm text-gray-700"><strong>Materia:</strong> {selectedStudent.subject_name}</p>
-              <p className="text-sm text-gray-700"><strong>Año Materia:</strong> {selectedStudent.subject_year}°</p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Asistencia (%) <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={formData.attendance}
-                  onChange={(e) => setFormData({ ...formData, attendance: e.target.value })}
-                  placeholder="Ej: 75"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Regularidad (0-10) <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  step="0.1"
-                  value={formData.regularidad}
-                  onChange={(e) => setFormData({ ...formData, regularidad: e.target.value })}
-                  placeholder="Ej: 7.5"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={closeModal}
-                disabled={saving}
-                className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold rounded-lg transition disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:shadow-lg text-white font-semibold rounded-lg transition disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
