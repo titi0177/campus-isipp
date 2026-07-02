@@ -57,6 +57,7 @@ function AdvancedPendingPage() {
   async function loadAdvancedPending() {
     setLoading(true)
     try {
+      // Traer estudiantes avanzados (año > 1)
       let query = supabase
         .from('students')
         .select(`
@@ -74,7 +75,7 @@ function AdvancedPendingPage() {
             enrollment_grades(partial_grade, partial_status, final_status)
           )
         `)
-        .gt('year', 1)
+        .gt('year', 1) // Solo año 2 y 3
 
       if (selectedProgram) {
         query = query.eq('program_id', selectedProgram)
@@ -98,6 +99,7 @@ function AdvancedPendingPage() {
         return
       }
 
+      // Procesar: buscar materias de años anteriores con asistencia/regularidad pendiente
       const pendingList: AdvancedStudent[] = []
 
       studentsData.forEach((student: any) => {
@@ -112,7 +114,9 @@ function AdvancedPendingPage() {
           const partialStatus = gradeRecord?.partial_status
           const finalStatus = gradeRecord?.final_status
 
+          // Solo materias de años anteriores
           if (subject.year < student.year) {
+            // ✅ FILTRO: Saltar si ya tiene final aprobado/promocionado
             if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
               return
             }
@@ -123,14 +127,17 @@ function AdvancedPendingPage() {
 
             const issues: string[] = []
 
+            // Detectar asistencia faltante
             if (!attendance || attendance < 60) {
               issues.push(`Asistencia: ${attendance ?? 0}%`)
             }
 
+            // Detectar regularidad faltante
             if (!partialGrade || partialGrade < 6) {
               issues.push(`Regularidad: ${partialGrade ? Math.round(partialGrade * 100) / 100 : 'Falta'}`)
             }
 
+            // Solo agregar si hay algún incumplimiento
             if (issues.length > 0) {
               pendingList.push({
                 id: `${student.id}-${subject.id}`,
@@ -183,6 +190,7 @@ function AdvancedPendingPage() {
     const attendance = formData.attendance ? parseFloat(formData.attendance) : null
     const regularidad = formData.regularidad ? parseFloat(formData.regularidad) : null
 
+    // Validaciones
     if (attendance !== null && (attendance < 0 || attendance > 100)) {
       showToast('Asistencia debe estar entre 0 y 100', 'error')
       return
@@ -194,7 +202,7 @@ function AdvancedPendingPage() {
 
     setSaving(true)
     try {
-      // Guardar asistencia con UPSERT
+      // Actualizar attendance
       if (attendance !== null) {
         const { error: attendanceError } = await supabase
           .from('attendance')
@@ -213,54 +221,23 @@ function AdvancedPendingPage() {
         }
       }
 
-      // Guardar regularidad - verificar si existe registro en enrollment_grades
+      // Actualizar regularidad (partial_grade)
       if (regularidad !== null) {
-        const { data: existingGrade, error: selectError } = await supabase
+        const { error: gradeError } = await supabase
           .from('enrollment_grades')
-          .select('id')
+          .update({ partial_grade: regularidad })
           .eq('enrollment_id', selectedStudent.enrollment_id)
-          .single()
 
-        if (selectError && selectError.code !== 'PGRST116') {
-          showToast('Error al verificar regularidad', 'error')
+        if (gradeError) {
+          showToast('Error al guardar regularidad', 'error')
           setSaving(false)
           return
-        }
-
-        const partialStatus = regularidad >= 6 ? 'regular' : 'desaprobado'
-
-        if (existingGrade?.id) {
-          // UPDATE existente
-          const { error: updateError } = await supabase
-            .from('enrollment_grades')
-            .update({ partial_grade: regularidad, partial_status: partialStatus })
-            .eq('id', existingGrade.id)
-
-          if (updateError) {
-            showToast('Error al guardar regularidad', 'error')
-            setSaving(false)
-            return
-          }
-        } else {
-          // INSERT nuevo
-          const { error: insertError } = await supabase
-            .from('enrollment_grades')
-            .insert({
-              enrollment_id: selectedStudent.enrollment_id,
-              partial_grade: regularidad,
-              partial_status: partialStatus,
-            })
-
-          if (insertError) {
-            showToast('Error al guardar regularidad', 'error')
-            setSaving(false)
-            return
-          }
         }
       }
 
       showToast('Datos guardados correctamente', 'info')
       closeModal()
+      // Recargar el reporte
       await loadAdvancedPending()
     } catch (err) {
       console.error('Error saving:', err)
@@ -402,6 +379,7 @@ function AdvancedPendingPage() {
         </div>
       ) : null}
 
+      {/* Modal */}
       {modalOpen && selectedStudent && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
