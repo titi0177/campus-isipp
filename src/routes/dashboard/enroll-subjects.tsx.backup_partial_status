@@ -141,10 +141,7 @@ function EnrollSubjectsPage() {
         (allEnrollments ?? [])
           .filter(e => {
             const g = Array.isArray(e.enrollment_grades) ? e.enrollment_grades[0] : e.enrollment_grades
-            return g && (
-              ['aprobado', 'promocionado'].includes(g.final_status) || 
-              g.partial_status === 'regular'
-            )
+            return g && ['aprobado', 'promocionado', 'regular'].includes(g.final_status)
           })
           .map(e => e.subject_id)
       )

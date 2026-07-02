@@ -227,13 +227,12 @@ function AdvancedPendingPage() {
           return
         }
 
-        const partialStatus = regularidad >= 6 ? 'regular' : 'desaprobado'
-
+        // NO incluir partial_status - el trigger lo calcula automáticamente basándose en partial_grade
         if (existingGrade?.id) {
           // UPDATE existente
           const { error: updateError } = await supabase
             .from('enrollment_grades')
-            .update({ partial_grade: regularidad, partial_status: partialStatus })
+            .update({ partial_grade: regularidad })
             .eq('id', existingGrade.id)
 
           if (updateError) {
@@ -248,7 +247,6 @@ function AdvancedPendingPage() {
             .insert({
               enrollment_id: selectedStudent.enrollment_id,
               partial_grade: regularidad,
-              partial_status: partialStatus,
             })
 
           if (insertError) {
