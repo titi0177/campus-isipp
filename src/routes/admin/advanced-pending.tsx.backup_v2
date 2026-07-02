@@ -67,7 +67,7 @@ function AdvancedPendingPage() {
             subject_id,
             subject:subjects(id, name, year),
             attendance(percentage),
-            enrollment_grades(partial_grade, partial_status, final_status)
+            enrollment_grades(partial_grade, partial_status)
           )
         `)
         .gt('year', 1) // Solo año 2 y 3
@@ -107,15 +107,9 @@ function AdvancedPendingPage() {
             : enrollment.enrollment_grades
           const partialGrade = gradeRecord?.partial_grade
           const partialStatus = gradeRecord?.partial_status
-          const finalStatus = gradeRecord?.final_status
 
           // Solo materias de años anteriores
           if (subject.year < student.year) {
-            // ✅ FILTRO: Saltar si ya tiene final aprobado/promocionado
-            if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
-              return
-            }
-
             const attendance = Array.isArray(enrollment.attendance)
               ? enrollment.attendance[0]?.percentage
               : enrollment.attendance?.percentage
@@ -167,7 +161,7 @@ function AdvancedPendingPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-4xl font-bold text-slate-900">Alumnos Avanzados - Asistencia/Regularidad Pendiente</h1>
-        <p className="text-slate-600 mt-2">Estudiantes de años superiores con deuda en asistencia o regularidad de materias de años anteriores (sin final aprobado)</p>
+        <p className="text-slate-600 mt-2">Estudiantes de años superiores con deuda en asistencia o regularidad de materias de años anteriores</p>
       </div>
 
       <div className="card p-6 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200">
