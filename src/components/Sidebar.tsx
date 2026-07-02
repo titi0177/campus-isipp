@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, UserCheck,
   ClipboardList, Star, Calendar, FileText, Bell, Settings,
   ChevronRight, LogOut, BookMarked, BarChart3, ClipboardCheck,
-  Link2, MessageCircle, DollarSign, Award
+  Link2, MessageCircle, DollarSign, Award, AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
@@ -44,6 +44,7 @@ const adminNav: NavItem[] = [
   { label: 'Mesas de exámenes', href: '/admin/final-exams', icon: <BookMarked size={18} /> },
   { label: 'Actas de examen', href: '/admin/exam-records', icon: <FileText size={18} /> },
   { label: 'Reporte de incumplimientos', href: '/admin/compliance-report', icon: <BarChart3 size={18} /> },
+  { label: 'Alumnos avanzados - Pendiente', href: '/admin/advanced-pending', icon: <AlertCircle size={18} /> },
   { label: 'Ranking de estudiantes', href: '/admin/ranking', icon: <Award size={18} /> },
   { label: 'Novedades', href: '/admin/announcements', icon: <Bell size={18} /> },
   { label: 'Reportes y estadísticas', href: '/admin/reports', icon: <BarChart3 size={18} /> },

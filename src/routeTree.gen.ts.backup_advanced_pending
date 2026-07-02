@@ -62,7 +62,6 @@ import { Route as AdminAnnouncementsRouteImport } from './routes/admin/announcem
 import { Route as AdminStudentRecordIdRouteImport } from './routes/admin/student-record.$id'
 import { Route as AdminComplianceReportRouteImport } from './routes/admin/compliance-report'
 import { Route as AdminRankingRouteImport } from './routes/admin/ranking'
-import { Route as AdminAdvancedPendingRouteImport } from './routes/admin/advanced-pending'
 
 const TreasurerRoute = TreasurerRouteImport.update({
   id: '/treasurer',
@@ -329,11 +328,6 @@ const AdminRankingRoute = AdminRankingRouteImport.update({
   path: '/ranking',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminAdvancedPendingRoute = AdminAdvancedPendingRouteImport.update({
-  id: '/advanced-pending',
-  path: '/advanced-pending',
-  getParentRoute: () => AdminRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -360,7 +354,6 @@ export interface FileRoutesByFullPath {
   '/admin/subjects': typeof AdminSubjectsRoute
   '/admin/compliance-report': typeof AdminComplianceReportRoute
   '/admin/ranking': typeof AdminRankingRoute
-  '/admin/advanced-pending': typeof AdminAdvancedPendingRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -412,7 +405,6 @@ export interface FileRoutesByTo {
   '/admin/subjects': typeof AdminSubjectsRoute
   '/admin/compliance-report': typeof AdminComplianceReportRoute
   '/admin/ranking': typeof AdminRankingRoute
-  '/admin/advanced-pending': typeof AdminAdvancedPendingRoute
   '/dashboard/announcements': typeof DashboardAnnouncementsRoute
   '/dashboard/attendance': typeof DashboardAttendanceRoute
   '/dashboard/certificates': typeof DashboardCertificatesRoute
@@ -1059,7 +1051,6 @@ interface AdminRouteChildren {
   AdminStudentRecordIdRoute: typeof AdminStudentRecordIdRoute
   AdminComplianceReportRoute: typeof AdminComplianceReportRoute
   AdminRankingRoute: typeof AdminRankingRoute
-  AdminAdvancedPendingRoute: typeof AdminAdvancedPendingRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -1082,7 +1073,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminStudentRecordIdRoute: AdminStudentRecordIdRoute,
   AdminComplianceReportRoute: AdminComplianceReportRoute,
   AdminRankingRoute: AdminRankingRoute,
-  AdminAdvancedPendingRoute: AdminAdvancedPendingRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
