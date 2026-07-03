@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
+import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 
 const LOGO_SRC = '/logo-isipp.png'
 const LOGO_ALT = 'Instituto Superior de Informática Puerto Piray'
@@ -83,7 +84,28 @@ export function Sidebar({ role }: SidebarProps) {
   const router = useRouterState()
   const currentPath = router.location.pathname
   const unreadMessages = useUnreadMessages()
+  const [student, setStudent] = useState<any>(null)
+  const unreadNotifications = useUnreadNotifications(student?.id || '')
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768)
+
+  useEffect(() => {
+    const loadStudent = async () => {
+      if (role === 'student') {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: studentData } = await supabase
+            .from('students')
+            .select('id')
+            .eq('user_id', user.id)
+            .single()
+          if (studentData) {
+            setStudent(studentData)
+          }
+        }
+      }
+    }
+    loadStudent()
+  }, [role])
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768)
@@ -113,6 +135,10 @@ export function Sidebar({ role }: SidebarProps) {
     const messagesIdx = navItems.findIndex(item => item.href === '/dashboard/messages')
     if (messagesIdx !== -1 && unreadMessages > 0) {
       navItems[messagesIdx] = { ...navItems[messagesIdx], badge: unreadMessages }
+    }
+    const notificationsIdx = navItems.findIndex(item => item.href === '/dashboard/announcements')
+    if (notificationsIdx !== -1 && unreadNotifications > 0) {
+      navItems[notificationsIdx] = { ...navItems[notificationsIdx], badge: unreadNotifications }
     }
   }
 
