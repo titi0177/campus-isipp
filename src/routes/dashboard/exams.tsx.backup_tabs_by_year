@@ -28,7 +28,6 @@ function ExamsPage() {
   const [loading, setLoading] = useState(true)
   const [eligibility, setEligibility] = useState<Map<string, { eligible: boolean; reasons: string[] }>>(new Map())
   const [paymentsCache, setPaymentsCache] = useState<any[]>([])
-  const [selectedYear, setSelectedYear] = useState<number | null>(null)
 
   const { showToast } = useToast()
 
@@ -65,7 +64,7 @@ function ExamsPage() {
           .from('final_exams')
           .select(`
             *,
-            subject:subjects(id, name, professor_id, program_id, year, professor:professors(name))
+            subject:subjects(id, name, professor_id, program_id, professor:professors(name))
           `)
           .eq('subject.program_id', studentData.program_id)
           .order('exam_date', { ascending: true }),
@@ -91,14 +90,6 @@ function ExamsPage() {
         console.log('[EXAMS] validExams count:', validExams?.length)
         setExams(validExams)
         setPaymentsCache(paymentsResult.data || [])
-        
-        // Establecer año seleccionado por defecto
-        if (validExams.length > 0) {
-          const years = [...new Set(validExams.map(e => e.subject?.year))].sort()
-          if (years.length > 0 && years[0]) {
-            setSelectedYear(years[0])
-          }
-        }
         
         // Verificar elegibilidad en background (no bloquea mesas)
         try {
@@ -380,20 +371,6 @@ function ExamsPage() {
     return <p>Cargando mesas...</p>
   }
 
-  // Agrupar mesas por año
-  const examsByYear = exams.reduce((acc: Record<number, any[]>, exam: any) => {
-    const year = exam.subject?.year || 0
-    if (!acc[year]) acc[year] = []
-    acc[year].push(exam)
-    return acc
-  }, {})
-
-  const yearsAvailable = Object.keys(examsByYear)
-    .map(Number)
-    .sort((a, b) => a - b)
-
-  const examsForSelectedYear = selectedYear ? examsByYear[selectedYear] || [] : []
-
   return (
 
     <div className="space-y-6">
@@ -406,139 +383,112 @@ function ExamsPage() {
         <p>No hay mesas disponibles</p>
       )}
 
-      {yearsAvailable.length > 0 && (
-        <>
-          {/* Tabs por año */}
-          <div className="flex gap-2 border-b border-gray-200 flex-wrap">
-            {yearsAvailable.map(year => {
-              const yearExamsCount = examsByYear[year]?.length || 0
-              return (
-                <button
-                  key={year}
-                  onClick={() => setSelectedYear(year)}
-                  className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
-                    selectedYear === year
-                      ? 'border-b-indigo-600 text-indigo-600'
-                      : 'border-b-transparent text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Año {year} <span className="text-xs ml-2 px-2 py-0.5 rounded-full bg-gray-200">({yearExamsCount})</span>
-                </button>
-              )
-            })}
-          </div>
+      <div className="space-y-4">
 
-          {/* Mesas del año seleccionado */}
-          <div className="space-y-4">
-            {examsForSelectedYear.length === 0 ? (
-              <p className="text-gray-600 text-center py-8">No hay mesas disponibles para este año</p>
-            ) : (
-              examsForSelectedYear.map(exam => {
+        {exams.map(exam => {
 
-                const registered = isRegistered(exam.id)
-                const when = examDateString(exam)
-                const closed = examClosed(when)
-                const examEligibility = eligibility.get(exam.id)
-                const canRegister = !registered && !closed && examEligibility?.eligible
+          const registered = isRegistered(exam.id)
+          const when = examDateString(exam)
+          const closed = examClosed(when)
+          const examEligibility = eligibility.get(exam.id)
+          const canRegister = !registered && !closed && examEligibility?.eligible
 
-                return (
+          return (
 
-                  <div
-                    key={exam.id}
-                    className="bg-white rounded-lg shadow p-6 space-y-3"
-                  >
+            <div
+              key={exam.id}
+              className="bg-white rounded-lg shadow p-6 space-y-3"
+            >
 
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-2 flex-1">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2 flex-1">
 
-                        <p className="font-semibold text-lg">
-                          {exam.subject?.name}
-                        </p>
+                  <p className="font-semibold text-lg">
+                    {exam.subject?.name}
+                  </p>
 
-                        <div className="text-sm text-gray-500 flex gap-4">
+                  <div className="text-sm text-gray-500 flex gap-4">
 
-                          <span className="flex items-center gap-1">
-                            <Calendar size={14} />
-                            {formatExamDate(exam) || '—'}
-                          </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar size={14} />
+                      {formatExamDate(exam) || '—'}
+                    </span>
 
-                          <span className="flex items-center gap-1">
-                            <Clock size={14} />
-                            {exam.exam_time || '—'}
-                          </span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={14} />
+                      {exam.exam_time || '—'}
+                    </span>
 
-                          <span className="flex items-center gap-1">
-                            <MapPin size={14} />
-                            {exam.location}
-                          </span>
-
-                        </div>
-
-                        <p className="text-sm text-gray-500 flex items-center gap-1">
-                          <User size={14} />
-                          {exam.subject?.professor?.name || '—'}
-                        </p>
-
-                      </div>
-
-                      {registered ? (
-
-                        <button
-                          type="button"
-                          onClick={() => cancelRegistration(exam.id)}
-                          className="btn-secondary px-4 py-2 text-slate-700 whitespace-nowrap"
-                        >
-                          Cancelar inscripción
-                        </button>
-
-                      ) : closed ? (
-
-                        <span className="text-red-600 font-semibold whitespace-nowrap">
-                          Inscripción cerrada
-                        </span>
-
-                      ) : (
-
-                        <button
-                          type="button"
-                          onClick={() => registerExam(exam)}
-                          disabled={!canRegister}
-                          className={`px-4 py-2 whitespace-nowrap ${
-                            canRegister
-                              ? 'btn-primary'
-                              : 'bg-gray-300 text-gray-600 cursor-not-allowed rounded'
-                          }`}
-                        >
-                          Inscribirse
-                        </button>
-
-                      )}
-                    </div>
-
-                    {/* Mostrar requisitos no cumplidos */}
-                    {!registered && !closed && !examEligibility?.eligible && (
-                      <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700 space-y-1">
-                        <div className="flex items-center gap-2 font-semibold">
-                          <AlertCircle size={16} />
-                          Requisitos no cumplidos:
-                        </div>
-                        <ul className="ml-6 space-y-0.5">
-                          {examEligibility?.reasons?.map((reason, idx) => (
-                            <li key={idx}>• {reason}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    <span className="flex items-center gap-1">
+                      <MapPin size={14} />
+                      {exam.location}
+                    </span>
 
                   </div>
 
-                )
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <User size={14} />
+                    {exam.subject?.professor?.name || '—'}
+                  </p>
 
-              })
-            )}
-          </div>
-        </>
-      )}
+                </div>
+
+                {registered ? (
+
+                  <button
+                    type="button"
+                    onClick={() => cancelRegistration(exam.id)}
+                    className="btn-secondary px-4 py-2 text-slate-700 whitespace-nowrap"
+                  >
+                    Cancelar inscripción
+                  </button>
+
+                ) : closed ? (
+
+                  <span className="text-red-600 font-semibold whitespace-nowrap">
+                    Inscripción cerrada
+                  </span>
+
+                ) : (
+
+                  <button
+                    type="button"
+                    onClick={() => registerExam(exam)}
+                    disabled={!canRegister}
+                    className={`px-4 py-2 whitespace-nowrap ${
+                      canRegister
+                        ? 'btn-primary'
+                        : 'bg-gray-300 text-gray-600 cursor-not-allowed rounded'
+                    }`}
+                  >
+                    Inscribirse
+                  </button>
+
+                )}
+              </div>
+
+              {/* Mostrar requisitos no cumplidos */}
+              {!registered && !closed && !examEligibility?.eligible && (
+                <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700 space-y-1">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <AlertCircle size={16} />
+                    Requisitos no cumplidos:
+                  </div>
+                  <ul className="ml-6 space-y-0.5">
+                    {examEligibility?.reasons?.map((reason, idx) => (
+                      <li key={idx}>• {reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+            </div>
+
+          )
+
+        })}
+
+      </div>
 
     </div>
 
