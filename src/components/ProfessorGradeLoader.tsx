@@ -225,33 +225,55 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         else if (labelActual.includes('TP1')) parcialCorrespondiente = 'TP 1'
         else if (labelActual.includes('TP2')) parcialCorrespondiente = 'TP 2'
 
-          // Encontrar el índice del Parcial correspondiente
-          const parcialIndex = Array.from({ length: numGrades }, (_, idx) => idx + 1).find(
+        // Calcular índice esperado del Parcial: TP1 vs Recuperatorio TP1 = índice 1 vs índice 3
+        // La regla es: si Rec está en posición par (como índice 3), Parcial está en 3-2 = 1
+        let expectedParcialIndex = 0
+        if (labelActual.includes('P1')) expectedParcialIndex = 1
+        else if (labelActual.includes('P2')) expectedParcialIndex = 2
+        else if (labelActual.includes('P3')) expectedParcialIndex = 3
+        else if (labelActual.includes('P4')) expectedParcialIndex = 4
+        else if (labelActual.includes('TP1')) expectedParcialIndex = Array.from({ length: numGrades }, (_, idx) => idx + 1).findIndex(n => getGradeLabel(n)?.includes('TP')) + 1 || 5
+        else if (labelActual.includes('TP2')) expectedParcialIndex = Array.from({ length: numGrades }, (_, idx) => idx + 1).findIndex(n => getGradeLabel(n)?.includes('TP') && !getGradeLabel(n)?.includes('Rec')) + 1 || 6
+
+        // Buscar el Parcial en su posición esperada primero, sino buscar por label
+        let parcialIndex = expectedParcialIndex <= numGrades ? expectedParcialIndex : undefined
+        if (!parcialIndex || !getGradeLabel(parcialIndex) || !getGradeLabel(parcialIndex)?.startsWith('Parcial') && !getGradeLabel(parcialIndex)?.startsWith('TP')) {
+          // Si no está en posición esperada, buscar por label
+          let parcialCorrespondiente: string = ''
+          if (labelActual.includes('P1')) parcialCorrespondiente = 'Parcial 1'
+          else if (labelActual.includes('P2')) parcialCorrespondiente = 'Parcial 2'
+          else if (labelActual.includes('P3')) parcialCorrespondiente = 'Parcial 3'
+          else if (labelActual.includes('P4')) parcialCorrespondiente = 'Parcial 4'
+          else if (labelActual.includes('TP1')) parcialCorrespondiente = 'TP 1'
+          else if (labelActual.includes('TP2')) parcialCorrespondiente = 'TP 2'
+
+          parcialIndex = Array.from({ length: numGrades }, (_, idx) => idx + 1).find(
             n => getGradeLabel(n) === parcialCorrespondiente
           )
+        }
 
-          if (parcialIndex) {
-            const parcialRaw = getDisplayGrade(enrollmentId, parcialIndex)
-            const parcial = typeof parcialRaw === 'string' ? parseFloat(parcialRaw) : parcialRaw
-            const recRaw = getDisplayGrade(enrollmentId, i)
-            const rec = typeof recRaw === 'string' ? parseFloat(recRaw) : recRaw
+        if (parcialIndex) {
+          const parcialRaw = getDisplayGrade(enrollmentId, parcialIndex)
+          const parcial = typeof parcialRaw === 'string' ? parseFloat(parcialRaw) : parcialRaw
+          const recRaw = getDisplayGrade(enrollmentId, i)
+          const rec = typeof recRaw === 'string' ? parseFloat(recRaw) : recRaw
 
-            // Si NO existe Recuperatorio, usar Parcial
-            if (rec === undefined || rec === null) {
-              if (parcial !== undefined && parcial !== null) {
-                notasAUsar.push(parcial)
-              }
+          // Si NO existe Recuperatorio, usar Parcial
+          if (rec === undefined || rec === null) {
+            if (parcial !== undefined && parcial !== null) {
+              notasAUsar.push(parcial)
+            }
+          } else {
+            // Existe Recuperatorio, comparar
+            if (parcial !== undefined && parcial !== null && parcial >= 6) {
+              notasAUsar.push(parcial)
+            } else if (rec < 6) {
+              return rec as any
             } else {
-              // Existe Recuperatorio, comparar
-              if (parcial !== undefined && parcial !== null && parcial >= 6) {
-                notasAUsar.push(parcial)
-              } else if (rec < 6) {
-                return rec as any
-              } else {
-                notasAUsar.push(rec)
-              }
+              notasAUsar.push(rec)
             }
           }
+        }
       } else {
         // Es un Parcial directo (sin Recuperatorio en la selección)
         const parcialRaw = getDisplayGrade(enrollmentId, i)
