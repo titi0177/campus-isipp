@@ -225,9 +225,9 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         else if (labelActual.includes('TP1')) parcialCorrespondiente = 'TP 1'
         else if (labelActual.includes('TP2')) parcialCorrespondiente = 'TP 2'
 
-        // Buscar el Parcial SOLO por label exacto
+        // Buscar el Parcial SOLO por label, siendo flexible con espacios
         const parcialIndex = Array.from({ length: numGrades }, (_, idx) => idx + 1).find(
-          n => getGradeLabel(n) === parcialCorrespondiente
+          n => (getGradeLabel(n) || '').trim() === parcialCorrespondiente.trim()
         )
 
         if (parcialIndex) {
