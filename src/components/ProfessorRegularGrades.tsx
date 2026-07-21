@@ -6,7 +6,9 @@ type RegularEnrollment = {
   id: string
   enrollment_id: string
   student_name: string
+  student_year: number
   partial_grade: number
+  partial_status: string
 }
 
 type Props = {
@@ -20,6 +22,8 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [allowsPromotion, setAllowsPromotion] = useState(false)
+  const [availableYears, setAvailableYears] = useState<number[]>([])
+  const [selectedYear, setSelectedYear] = useState<number | null>(null)
 
   useEffect(() => {
     loadData()
@@ -38,27 +42,28 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
         setAllowsPromotion(settings.allows_promotion || false)
       }
 
-      // Obtener regulares (solo aquellos con partial_status = 'regular' y sin final_grade)
+      // Obtener regulares y promocionados (con partial_status 'regular' o 'promocionado' y sin final_grade)
       const { data: regularData, error: err } = await supabase
         .from('enrollment_grades')
         .select(`
           id,
           enrollment_id,
           partial_grade,
+          partial_status,
           final_grade,
           enrollments!inner(
             id,
-            student:students(first_name, last_name),
+            student:students(first_name, last_name, year),
             subject_id
           )
         `)
         .eq('enrollments.subject_id', subjectId)
-        .eq('partial_status', 'regular')
+        .in('partial_status', ['regular', 'promocionado'])
         .is('final_grade', null)
 
       if (err) {
         console.error('Error loading regulars:', err)
-        setError('Error al cargar regulares')
+        setError('Error al cargar regulares y promocionados')
         setLoading(false)
         return
       }
@@ -68,9 +73,19 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
           id: r.id,
           enrollment_id: r.enrollment_id,
           student_name: `${r.enrollments.student.last_name}, ${r.enrollments.student.first_name}`,
+          student_year: r.enrollments.student.year || 1,
           partial_grade: r.partial_grade,
+          partial_status: r.partial_status,
         }))
         setRegulars(formatted)
+        
+        // Extraer años únicos
+        const years = [...new Set(formatted.map(s => s.student_year))].sort((a, b) => a - b)
+        setAvailableYears(years)
+        // Seleccionar primer año por defecto
+        if (years.length > 0 && selectedYear === null) {
+          setSelectedYear(years[0])
+        }
       }
 
       setLoading(false)
@@ -124,14 +139,19 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
     }
   }
 
+  // Filtrar regulares por año seleccionado
+  const filteredRegulars = selectedYear
+    ? regulars.filter(r => r.student_year === selectedYear)
+    : regulars
+
   if (loading) {
-    return <div className="card p-6 text-center">Cargando regulares...</div>
+    return <div className="card p-6 text-center">Cargando regulares y promocionados...</div>
   }
 
   if (regulars.length === 0) {
     return (
       <div className="card p-6 text-center bg-blue-50 border border-blue-200">
-        <p className="text-gray-600 font-medium">No hay estudiantes en condición Regular pendientes de calificación final</p>
+        <p className="text-gray-600 font-medium">No hay estudiantes en condición Regular o Promocionado pendientes de calificación final</p>
       </div>
     )
   }
@@ -141,9 +161,31 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
       <div className="card p-6 bg-amber-50 border border-amber-200">
         <h3 className="font-bold text-gray-900 mb-2">Carga de Notas Finales</h3>
         <p className="text-sm text-gray-700">
-          Aquí puedes cargar las notas finales de los estudiantes en condición Regular ({regulars.length})
+          Aquí puedes cargar las notas finales de los estudiantes en condición Regular o Promocionado ({regulars.length} total)
         </p>
       </div>
+
+      {/* Filtro por año */}
+      {availableYears.length > 1 && (
+        <div className="card p-4 bg-purple-50 border border-purple-200">
+          <label className="block text-sm font-semibold text-purple-900 mb-3">Filtrar por año:</label>
+          <div className="flex gap-2 flex-wrap">
+            {availableYears.map(year => (
+              <button
+                key={year}
+                onClick={() => setSelectedYear(year)}
+                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
+                  selectedYear === year
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-white text-purple-700 border border-purple-300 hover:bg-purple-50'
+                }`}
+              >
+                Año {year} <span className="text-xs ml-2">({regulars.filter(r => r.student_year === year).length})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex gap-2">
@@ -152,93 +194,111 @@ export function ProfessorRegularGrades({ subjectId }: Props) {
         </div>
       )}
 
-      <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gradient-to-r from-amber-600 to-orange-600 text-white">
-                <th className="px-4 py-3 text-left text-sm font-bold">Estudiante</th>
-                <th className="px-4 py-3 text-center text-sm font-bold">Promedio Parcial</th>
-                <th className="px-4 py-3 text-center text-sm font-bold">Nota Final</th>
-                <th className="px-4 py-3 text-center text-sm font-bold">Estado Final</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {regulars.map((regular, idx) => {
-                const finalGrade = finalGrades[regular.enrollment_id]
-                const finalStatus = finalGrade ? getFinalStatus(finalGrade) : null
-
-                return (
-                  <tr key={regular.enrollment_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-4 py-3 font-medium text-gray-900">{regular.student_name}</td>
-                    <td className="px-4 py-3 text-center font-bold text-gray-700">
-                      {regular.partial_grade !== undefined && regular.partial_grade !== null ? Number(regular.partial_grade).toFixed(1) : '-'}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.1"
-                        value={finalGrade ?? ''}
-                        onChange={e => {
-                          const value = e.target.value
-                          if (value === '') {
-                            setFinalGrades(prev => {
-                              const newGrades = { ...prev }
-                              delete newGrades[regular.enrollment_id]
-                              return newGrades
-                            })
-                          } else {
-                            setFinalGrades(prev => ({
-                              ...prev,
-                              [regular.enrollment_id]: parseFloat(value),
-                            }))
-                          }
-                        }}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm"
-                        placeholder="-"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {finalStatus && (
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
-                            finalStatus === 'promocionado'
-                              ? 'bg-green-100 text-green-700'
-                              : finalStatus === 'aprobado'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {finalStatus === 'promocionado' || finalStatus === 'aprobado' ? (
-                            <Check size={14} />
-                          ) : (
-                            <X size={14} />
-                          )}
-                          {finalStatus === 'promocionado'
-                            ? 'Prom.'
-                            : finalStatus === 'aprobado'
-                              ? 'Aprob.'
-                              : 'Desapr.'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {filteredRegulars.length === 0 ? (
+        <div className="card p-6 text-center bg-blue-50 border border-blue-200">
+          <p className="text-gray-600 font-medium">No hay estudiantes en este año</p>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="card p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-amber-600 to-orange-600 text-white">
+                    <th className="px-4 py-3 text-left text-sm font-bold">Estudiante</th>
+                    <th className="px-4 py-3 text-center text-sm font-bold">Condición</th>
+                    <th className="px-4 py-3 text-center text-sm font-bold">Promedio Parcial</th>
+                    <th className="px-4 py-3 text-center text-sm font-bold">Nota Final</th>
+                    <th className="px-4 py-3 text-center text-sm font-bold">Estado Final</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {filteredRegulars.map((regular, idx) => {
+                    const finalGrade = finalGrades[regular.enrollment_id]
+                    const finalStatus = finalGrade ? getFinalStatus(finalGrade) : null
 
-      <button
-        onClick={handleSaveFinalGrades}
-        disabled={saving || Object.keys(finalGrades).length === 0}
-        className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50"
-      >
-        {saving ? 'Guardando...' : 'Guardar Notas Finales'}
-      </button>
+                    return (
+                      <tr key={regular.enrollment_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-4 py-3 font-medium text-gray-900">{regular.student_name}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
+                            regular.partial_status === 'promocionado'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {regular.partial_status === 'promocionado' ? 'Prom.' : 'Regular'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-gray-700">
+                          {regular.partial_grade !== undefined && regular.partial_grade !== null ? Number(regular.partial_grade).toFixed(1) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            step="0.1"
+                            value={finalGrade ?? ''}
+                            onChange={e => {
+                              const value = e.target.value
+                              if (value === '') {
+                                setFinalGrades(prev => {
+                                  const newGrades = { ...prev }
+                                  delete newGrades[regular.enrollment_id]
+                                  return newGrades
+                                })
+                              } else {
+                                setFinalGrades(prev => ({
+                                  ...prev,
+                                  [regular.enrollment_id]: parseFloat(value),
+                                }))
+                              }
+                            }}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm"
+                            placeholder="-"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {finalStatus && (
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${
+                                finalStatus === 'promocionado'
+                                  ? 'bg-green-100 text-green-700'
+                                  : finalStatus === 'aprobado'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-red-100 text-red-700'
+                              }`}
+                            >
+                              {finalStatus === 'promocionado' || finalStatus === 'aprobado' ? (
+                                <Check size={14} />
+                              ) : (
+                                <X size={14} />
+                              )}
+                              {finalStatus === 'promocionado'
+                                ? 'Prom.'
+                                : finalStatus === 'aprobado'
+                                  ? 'Aprob.'
+                                  : 'Desapr.'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSaveFinalGrades}
+            disabled={saving || Object.keys(finalGrades).length === 0}
+            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all disabled:opacity-50"
+          >
+            {saving ? 'Guardando...' : 'Guardar Notas Finales'}
+          </button>
+        </>
+      )}
     </div>
   )
 }
