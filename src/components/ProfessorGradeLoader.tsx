@@ -116,7 +116,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       const finalizationStatusMap: Record<string, boolean> = {}
       const completedEnrollmentIds = new Set<string>()
       const globalLabelsFromDB: Record<number, GradeLabel> = {}
-      let maxGradesFromDB = 3 // Default fallback
+      let maxGradesFromDB = 3
 
       if (gradesData && gradesData.length > 0) {
         gradesData.forEach(g => {
@@ -133,7 +133,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           existingIdsMap[g.enrollment_id] = g.id
           finalizationStatusMap[g.enrollment_id] = g.partial_finalized || false
 
-          // Leer num_grades desde BD (es la fuente de verdad)
           if (g.num_grades !== null && g.num_grades !== undefined) {
             maxGradesFromDB = Math.max(maxGradesFromDB, g.num_grades)
           }
@@ -152,7 +151,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                 }
               })
               existingLabelsMap[g.enrollment_id] = labelsMap
-              // Actualizar el máximo número de notas encontrado
               maxGradesFromDB = Math.max(maxGradesFromDB, maxGradeNumInThisRecord)
             } catch (e) {
               console.error('Error parsing grade labels:', e)
@@ -170,7 +168,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       setExistingLabels(existingLabelsMap)
       setExistingIds(existingIdsMap)
       setExistingFinalizationStatus(finalizationStatusMap)
-      // Actualizar numGrades basado en lo encontrado en BD
       setNumGrades(maxGradesFromDB)
       if (Object.keys(globalLabelsFromDB).length > 0) {
         setGlobalGradeLabels(globalLabelsFromDB)
@@ -188,11 +185,9 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
   const getDisplayGrade = (enrollmentId: string, gradeNum: number): string | number | undefined => {
     const gradeKey = `grade_${gradeNum}` as keyof GradeData
-    // Si el profesor tocó este campo (existe en grades), mostrar lo que escribió (incluso null/vacío)
     if (grades[enrollmentId] && gradeKey in grades[enrollmentId]) {
       return grades[enrollmentId]?.[gradeKey]
     }
-    // Si no lo tocó, mostrar lo existente
     return existingGrades[enrollmentId]?.[gradeKey]
   }
 
@@ -201,76 +196,82 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   }
 
   const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): number | null => {
-    // Nueva lógica: para cada par (Parcial, Recuperatorio)
-    // - Si Parcial >= 6: usa Parcial
-    // - Si Parcial < 6 y existe Rec: usa Rec
-    //   - Si Rec < 6: RETORNA Rec directamente como promedio final
-    // - Si todo >= 6: promediar normalmente
-
     const notasAUsar: number[] = []
 
     selectedIndices.forEach(i => {
-      const labelActual = getGradeLabel(i)
+      const labelActual = globalGradeLabels[i]
       
-      // Detectar si es un Recuperatorio o Parcial
       const esRecuperatorio = labelActual && labelActual.startsWith('Recuperatorio')
       
       if (esRecuperatorio) {
-        // Este es un Recuperatorio, buscar su Parcial correspondiente
-        let parcialCorrespondiente: string = ''
-        if (labelActual.includes('P1')) parcialCorrespondiente = 'Parcial 1'
-        else if (labelActual.includes('P2')) parcialCorrespondiente = 'Parcial 2'
-        else if (labelActual.includes('P3')) parcialCorrespondiente = 'Parcial 3'
-        else if (labelActual.includes('P4')) parcialCorrespondiente = 'Parcial 4'
-        else if (labelActual.includes('TP1')) parcialCorrespondiente = 'TP 1'
-        else if (labelActual.includes('TP2')) parcialCorrespondiente = 'TP 2'
+        // Determinar qué tipo de base buscar (TP 1, TP 2, Parcial 1, etc)
+        let baseName = ''
+        if (labelActual.includes('P1')) baseName = 'Parcial 1'
+        else if (labelActual.includes('P2')) baseName = 'Parcial 2'
+        else if (labelActual.includes('P3')) baseName = 'Parcial 3'
+        else if (labelActual.includes('P4')) baseName = 'Parcial 4'
+        else if (labelActual.includes('TP1')) baseName = 'TP 1'
+        else if (labelActual.includes('TP2')) baseName = 'TP 2'
 
-        // Buscar el Parcial SOLO por label, siendo flexible con espacios
-        const parcialIndex = Array.from({ length: numGrades }, (_, idx) => idx + 1).find(
-          n => (getGradeLabel(n) || '').trim() === parcialCorrespondiente.trim()
-        )
+        // Buscar el índice del Parcial/TP base en globalGradeLabels
+        const baseIndex = Object.entries(globalGradeLabels).find(
+          ([_, label]) => (label || '').trim() === baseName.trim()
+        )?.[0]
 
-        if (parcialIndex) {
-          const parcialRaw = getDisplayGrade(enrollmentId, parcialIndex)
+        if (baseIndex) {
+          const baseIdx = parseInt(baseIndex)
+          const parcialRaw = getDisplayGrade(enrollmentId, baseIdx)
           const parcial = typeof parcialRaw === 'string' ? parseFloat(parcialRaw) : parcialRaw
           const recRaw = getDisplayGrade(enrollmentId, i)
           const rec = typeof recRaw === 'string' ? parseFloat(recRaw) : recRaw
 
-          // Si NO existe Recuperatorio, usar Parcial
+          console.log(`[DEBUG] Recuperatorio ${i} (${labelActual}): Busca base="${baseName}" en índice ${baseIdx}. Base=${parcial}, Rec=${rec}`)
+
+          // Si NO existe Recuperatorio, usar Parcial/TP
           if (rec === undefined || rec === null) {
             if (parcial !== undefined && parcial !== null) {
+              console.log(`[DEBUG] Push parcial: ${parcial}`)
               notasAUsar.push(parcial)
             }
           } else {
             // Existe Recuperatorio, comparar
             if (parcial !== undefined && parcial !== null && parcial >= 6) {
+              console.log(`[DEBUG] Push parcial (>=6): ${parcial}`)
               notasAUsar.push(parcial)
             } else if (rec < 6) {
+              console.log(`[DEBUG] Return rec (<6): ${rec}`)
               return rec as any
             } else {
+              console.log(`[DEBUG] Push rec: ${rec}`)
               notasAUsar.push(rec)
             }
           }
+        } else {
+          console.log(`[DEBUG] BASE NO ENCONTRADO: ${baseName}`)
         }
       } else {
-        // Es un Parcial directo (sin Recuperatorio en la selección)
-        const parcialRaw = getDisplayGrade(enrollmentId, i)
-        const parcial = typeof parcialRaw === 'string' ? parseFloat(parcialRaw) : parcialRaw
+        // Es un Parcial/TP directo
+        const gradeRaw = getDisplayGrade(enrollmentId, i)
+        const grade = typeof gradeRaw === 'string' ? parseFloat(gradeRaw) : gradeRaw
         
-        if (parcial !== undefined && parcial !== null) {
-          notasAUsar.push(parcial)
+        console.log(`[DEBUG] Parcial directo ${i} (${labelActual}): ${grade}`)
+        
+        if (grade !== undefined && grade !== null) {
+          notasAUsar.push(grade)
         }
       }
     })
 
-    // Si no hay notas válidas, retorna null
+    console.log(`[DEBUG] notasAUsar: ${JSON.stringify(notasAUsar)}`)
+
     if (notasAUsar.length === 0) {
       return null
     }
 
-    // Promediar todas las notas recolectadas
     const sum = notasAUsar.reduce((a, b) => a + b, 0)
-    return Math.round((sum / notasAUsar.length) * 10) / 10
+    const promedio = Math.round((sum / notasAUsar.length) * 10) / 10
+    console.log(`[DEBUG] Promedio final: ${promedio}`)
+    return promedio
   }
 
   const getPartialStatus = (partialGrade: number | null): string | null => {
