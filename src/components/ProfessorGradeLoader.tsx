@@ -196,7 +196,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   }
 
   const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): number | null => {
-    console.log(`[DEBUG] globalGradeLabels al inicio:`, globalGradeLabels)
     const notasAUsar: number[] = []
 
     selectedIndices.forEach(i => {
@@ -205,16 +204,18 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       const esRecuperatorio = labelActual && labelActual.startsWith('Recuperatorio')
       
       if (esRecuperatorio) {
-        // Determinar qué tipo de base buscar (TP 1, TP 2, Parcial 1, etc)
+        // Extraer el tipo de base buscando PRIMERO TP, luego P
         let baseName = ''
-        if (labelActual.includes('P1')) baseName = 'Parcial 1'
+        if (labelActual.includes('TP1')) baseName = 'TP 1'
+        else if (labelActual.includes('TP2')) baseName = 'TP 2'
+        else if (labelActual.includes('P1')) baseName = 'Parcial 1'
         else if (labelActual.includes('P2')) baseName = 'Parcial 2'
         else if (labelActual.includes('P3')) baseName = 'Parcial 3'
         else if (labelActual.includes('P4')) baseName = 'Parcial 4'
-        else if (labelActual.includes('TP1')) baseName = 'TP 1'
-        else if (labelActual.includes('TP2')) baseName = 'TP 2'
 
-        // Buscar el índice del Parcial/TP base en globalGradeLabels
+        console.log(`[DEBUG] Recuperatorio ${i} (${labelActual}): Busca base="${baseName}"`)
+
+        // Buscar el índice del base en globalGradeLabels
         const baseIndex = Object.entries(globalGradeLabels).find(
           ([_, label]) => (label || '').trim() === baseName.trim()
         )?.[0]
@@ -226,18 +227,18 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           const recRaw = getDisplayGrade(enrollmentId, i)
           const rec = typeof recRaw === 'string' ? parseFloat(recRaw) : recRaw
 
-          console.log(`[DEBUG] Recuperatorio ${i} (${labelActual}): Busca base="${baseName}" en índice ${baseIdx}. Base=${parcial}, Rec=${rec}`)
+          console.log(`[DEBUG] ENCONTRADO: Índice ${baseIdx} tiene label "${baseName}". Base=${parcial}, Rec=${rec}`)
 
-          // Si NO existe Recuperatorio, usar Parcial/TP
+          // Si NO existe Recuperatorio, usar base
           if (rec === undefined || rec === null) {
             if (parcial !== undefined && parcial !== null) {
-              console.log(`[DEBUG] Push parcial: ${parcial}`)
+              console.log(`[DEBUG] Push base: ${parcial}`)
               notasAUsar.push(parcial)
             }
           } else {
             // Existe Recuperatorio, comparar
             if (parcial !== undefined && parcial !== null && parcial >= 6) {
-              console.log(`[DEBUG] Push parcial (>=6): ${parcial}`)
+              console.log(`[DEBUG] Push base (>=6): ${parcial}`)
               notasAUsar.push(parcial)
             } else if (rec < 6) {
               console.log(`[DEBUG] Return rec (<6): ${rec}`)
@@ -254,8 +255,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         // Es un Parcial/TP directo
         const gradeRaw = getDisplayGrade(enrollmentId, i)
         const grade = typeof gradeRaw === 'string' ? parseFloat(gradeRaw) : gradeRaw
-        
-        console.log(`[DEBUG] Parcial directo ${i} (${labelActual}): ${grade}`)
         
         if (grade !== undefined && grade !== null) {
           notasAUsar.push(grade)
