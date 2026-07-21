@@ -236,19 +236,18 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           const recRaw = getDisplayGrade(enrollmentId, i)
           const rec = typeof recRaw === 'string' ? parseFloat(recRaw) : recRaw
 
-          if (parcial !== undefined && parcial !== null && parcial >= 6) {
-            // Parcial >= 6, usa Parcial
-            notasAUsar.push(parcial)
-          } else if (rec !== undefined && rec !== null) {
-            // Parcial < 6, usa Recuperatorio
-            if (rec < 6) {
-              // Recuperatorio < 6: RETORNA directamente
-              return rec as any // Fuerza retorno de la función
+          if (rec !== undefined && rec !== null) {
+            if (parcial !== undefined && parcial !== null && parcial >= 6) {
+              notasAUsar.push(parcial)
+            } else if (rec < 6) {
+              return rec as any
+            } else {
+              notasAUsar.push(rec)
             }
-            notasAUsar.push(rec)
-          } else if (parcial !== undefined && parcial !== null) {
-            // No hay Rec, usa Parcial (aunque sea < 6)
-            notasAUsar.push(parcial)
+          } else {
+            if (parcial !== undefined && parcial !== null) {
+              notasAUsar.push(parcial)
+            }
           }
         }
       } else {
