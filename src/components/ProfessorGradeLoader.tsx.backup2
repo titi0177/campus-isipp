@@ -114,6 +114,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       const finalizationStatusMap: Record<string, boolean> = {}
       const completedEnrollmentIds = new Set<string>()
       const globalLabelsFromDB: Record<number, GradeLabel> = {}
+      let maxGradesFromDB = 3 // Default fallback
 
       if (gradesData && gradesData.length > 0) {
         gradesData.forEach(g => {
@@ -134,14 +135,18 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             try {
               const labelsObj = typeof g.grade_labels === 'string' ? JSON.parse(g.grade_labels) : g.grade_labels
               const labelsMap: Record<number, GradeLabel> = {}
+              let maxGradeNumInThisRecord = 0
               Object.entries(labelsObj).forEach(([key, value]) => {
                 if (value) {
                   const gradeNum = parseInt(key.replace('grade_', ''))
                   labelsMap[gradeNum] = value as GradeLabel
                   globalLabelsFromDB[gradeNum] = value as GradeLabel
+                  maxGradeNumInThisRecord = Math.max(maxGradeNumInThisRecord, gradeNum)
                 }
               })
               existingLabelsMap[g.enrollment_id] = labelsMap
+              // Actualizar el máximo número de notas encontrado
+              maxGradesFromDB = Math.max(maxGradesFromDB, maxGradeNumInThisRecord)
             } catch (e) {
               console.error('Error parsing grade labels:', e)
               existingLabelsMap[g.enrollment_id] = {}
@@ -158,6 +163,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       setExistingLabels(existingLabelsMap)
       setExistingIds(existingIdsMap)
       setExistingFinalizationStatus(finalizationStatusMap)
+      // Actualizar numGrades basado en lo encontrado en BD
+      setNumGrades(maxGradesFromDB)
       if (Object.keys(globalLabelsFromDB).length > 0) {
         setGlobalGradeLabels(globalLabelsFromDB)
       }
