@@ -57,15 +57,18 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   const [undoingStudent, setUndoingStudent] = useState<string | null>(null)
 
   useEffect(() => {
-    loadSubjectSettings()
     filterActiveEnrollments()
   }, [subjectId, enrollments])
+
+  useEffect(() => {
+    loadSubjectSettings()
+  }, [subjectId])
 
   const loadSubjectSettings = async () => {
     try {
       const { data, error: err } = await supabase
         .from('subjects')
-        .select('num_grades, allows_promotion')
+        .select('allows_promotion')
         .eq('id', subjectId)
         .single()
 
@@ -75,7 +78,6 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
       }
 
       if (data) {
-        setNumGrades(data.num_grades || 3)
         setAllowsPromotion(data.allows_promotion || false)
       }
     } catch (err) {
@@ -96,7 +98,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
       const { data: gradesData, error: gradesError } = await supabase
         .from('enrollment_grades')
-        .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status, final_status, final_grade, grade_labels, partial_finalized')
+        .select('id, enrollment_id, grade_1, grade_2, grade_3, grade_4, grade_5, grade_6, partial_grade, partial_status, final_status, final_grade, grade_labels, num_grades, partial_finalized')
         .in('enrollment_id', enrollmentIds)
 
       if (gradesError) {
@@ -130,6 +132,11 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           }
           existingIdsMap[g.enrollment_id] = g.id
           finalizationStatusMap[g.enrollment_id] = g.partial_finalized || false
+
+          // Leer num_grades desde BD (es la fuente de verdad)
+          if (g.num_grades !== null && g.num_grades !== undefined) {
+            maxGradesFromDB = Math.max(maxGradesFromDB, g.num_grades)
+          }
 
           if (g.grade_labels) {
             try {
@@ -399,6 +406,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           labelsObj[`grade_${i}`] = globalGradeLabels[i] || null
         }
         payload.grade_labels = labelsObj
+        payload.num_grades = numGrades
 
         payload.attempt_number = 1
 
