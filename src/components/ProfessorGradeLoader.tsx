@@ -197,6 +197,8 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
   const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): number | null => {
     const notasAUsar: number[] = []
+    let tieneNotaMenorA6 = false
+    let notaMenorA6 = 0
 
     selectedIndices.forEach(i => {
       const labelActual = globalGradeLabels[i]
@@ -229,24 +231,31 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
           console.log(`[DEBUG] ENCONTRADO: Índice ${baseIdx} tiene label "${baseName}". Base=${parcial}, Rec=${rec}`)
 
+          // Determinar qué nota usar
+          let notaAUsar: number | null = null
+          
           // Si NO existe Recuperatorio, usar base
           if (rec === undefined || rec === null) {
-            if (parcial !== undefined && parcial !== null) {
-              console.log(`[DEBUG] Push base: ${parcial}`)
-              notasAUsar.push(parcial)
-            }
+            notaAUsar = parcial ?? null
           } else {
             // Existe Recuperatorio, comparar
             if (parcial !== undefined && parcial !== null && parcial >= 6) {
-              console.log(`[DEBUG] Push base (>=6): ${parcial}`)
-              notasAUsar.push(parcial)
+              notaAUsar = parcial
             } else if (rec < 6) {
-              console.log(`[DEBUG] Return rec (<6): ${rec}`)
-              return rec as any
+              notaAUsar = rec
             } else {
-              console.log(`[DEBUG] Push rec: ${rec}`)
-              notasAUsar.push(rec)
+              notaAUsar = rec
             }
+          }
+
+          // Si la nota es < 6, marcar y retener el valor
+          if (notaAUsar !== null && notaAUsar < 6) {
+            tieneNotaMenorA6 = true
+            notaMenorA6 = notaAUsar
+          }
+
+          if (notaAUsar !== null) {
+            notasAUsar.push(notaAUsar)
           }
         } else {
           console.log(`[DEBUG] BASE NO ENCONTRADO: ${baseName}`)
@@ -257,17 +266,29 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         const grade = typeof gradeRaw === 'string' ? parseFloat(gradeRaw) : gradeRaw
         
         if (grade !== undefined && grade !== null) {
+          // Si la nota es < 6, marcar
+          if (grade < 6) {
+            tieneNotaMenorA6 = true
+            notaMenorA6 = grade
+          }
           notasAUsar.push(grade)
         }
       }
     })
 
-    console.log(`[DEBUG] notasAUsar: ${JSON.stringify(notasAUsar)}`)
+    console.log(`[DEBUG] notasAUsar: ${JSON.stringify(notasAUsar)}, tieneNotaMenorA6: ${tieneNotaMenorA6}`)
 
     if (notasAUsar.length === 0) {
       return null
     }
 
+    // SI HAY ALGUNA NOTA < 6, RETORNAR ESA NOTA DIRECTAMENTE
+    if (tieneNotaMenorA6) {
+      console.log(`[DEBUG] Retorna nota < 6: ${notaMenorA6}`)
+      return notaMenorA6
+    }
+
+    // TODAS >= 6, PROMEDIAR
     const sum = notasAUsar.reduce((a, b) => a + b, 0)
     const promedio = Math.round((sum / notasAUsar.length) * 10) / 10
     console.log(`[DEBUG] Promedio final: ${promedio}`)
