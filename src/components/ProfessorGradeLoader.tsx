@@ -23,6 +23,12 @@ type GradeData = {
 
 type GradeLabel = 'Parcial 1' | 'Parcial 2' | 'Parcial 3' | 'Parcial 4' | 'TP 1' | 'TP 2' | 'Recuperatorio P1' | 'Recuperatorio P2' | 'Recuperatorio P3' | 'Recuperatorio P4' | 'Recuperatorio TP1' | 'Recuperatorio TP2'
 
+type CalculationResult = {
+  grade: number | null
+  usedRecuperatories: boolean
+  allNotasAbove8: boolean
+}
+
 type Props = {
   enrollments: Enrollment[]
   subjectId: string
@@ -195,10 +201,12 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
     return globalGradeLabels[gradeNum]
   }
 
-  const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): number | null => {
+  const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): CalculationResult => {
     const notasAUsar: number[] = []
     let tieneNotaMenorA6 = false
     let notaMenorA6 = 0
+    let usedRecuperatories = false
+    let allNotasAbove8 = true
 
     selectedIndices.forEach(i => {
       const labelActual = globalGradeLabels[i]
@@ -233,6 +241,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
           // Determinar qué nota usar
           let notaAUsar: number | null = null
+          let usedRec = false
           
           // Si NO existe Recuperatorio, usar base
           if (rec === undefined || rec === null) {
@@ -245,7 +254,12 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
               notaAUsar = rec
             } else {
               notaAUsar = rec
+              usedRec = true
             }
+          }
+
+          if (usedRec) {
+            usedRecuperatories = true
           }
 
           // Si la nota es < 6, marcar y retener el valor
@@ -255,6 +269,9 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           }
 
           if (notaAUsar !== null) {
+            if (notaAUsar < 8) {
+              allNotasAbove8 = false
+            }
             notasAUsar.push(notaAUsar)
           }
         } else {
@@ -271,34 +288,44 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             tieneNotaMenorA6 = true
             notaMenorA6 = grade
           }
+          if (grade < 8) {
+            allNotasAbove8 = false
+          }
           notasAUsar.push(grade)
         }
       }
     })
 
-    console.log(`[DEBUG] notasAUsar: ${JSON.stringify(notasAUsar)}, tieneNotaMenorA6: ${tieneNotaMenorA6}`)
+    console.log(`[DEBUG] notasAUsar: ${JSON.stringify(notasAUsar)}, tieneNotaMenorA6: ${tieneNotaMenorA6}, usedRecuperatories: ${usedRecuperatories}`)
 
     if (notasAUsar.length === 0) {
-      return null
+      return { grade: null, usedRecuperatories, allNotasAbove8 }
     }
 
     // SI HAY ALGUNA NOTA < 6, RETORNAR ESA NOTA DIRECTAMENTE
     if (tieneNotaMenorA6) {
       console.log(`[DEBUG] Retorna nota < 6: ${notaMenorA6}`)
-      return notaMenorA6
+      return { grade: notaMenorA6, usedRecuperatories, allNotasAbove8 }
     }
 
     // TODAS >= 6, PROMEDIAR
     const sum = notasAUsar.reduce((a, b) => a + b, 0)
     const promedio = Math.round((sum / notasAUsar.length) * 10) / 10
     console.log(`[DEBUG] Promedio final: ${promedio}`)
-    return promedio
+    return { grade: promedio, usedRecuperatories, allNotasAbove8 }
   }
 
-  const getPartialStatus = (partialGrade: number | null): string | null => {
-    if (partialGrade === null) return null
-    if (partialGrade >= 8 && allowsPromotion) return 'promocionado'
-    if (partialGrade >= 6) return 'regular'
+  const getPartialStatus = (calculationResult: CalculationResult): string | null => {
+    const { grade, usedRecuperatories, allNotasAbove8 } = calculationResult
+    
+    if (grade === null) return null
+    
+    // LÓGICA PARA PROMOCIÓN
+    if (grade >= 8 && allowsPromotion && !usedRecuperatories && allNotasAbove8) {
+      return 'promocionado'
+    }
+    
+    if (grade >= 6) return 'regular'
     return 'desaprobado'
   }
 
@@ -494,18 +521,19 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         : activeEnrollments
 
       for (const enrollment of enrollmentsToClose) {
-        const partialGrade = calculatePartialGradeWithSelection(enrollment.id, globalSelectedGradesForAveraging)
-        if (partialGrade === null) {
+        const calculationResult = calculatePartialGradeWithSelection(enrollment.id, globalSelectedGradesForAveraging)
+        
+        if (calculationResult.grade === null) {
           setError(`Error: No se puede calcular promedio para ${enrollment.student_name}. Verifica las notas seleccionadas.`)
           setClosing(false)
           return
         }
 
-        const partialStatus = getPartialStatus(partialGrade)
+        const partialStatus = getPartialStatus(calculationResult)
         const existingId = existingIds[enrollment.id]
 
         const payload: any = {
-          partial_grade: partialGrade,
+          partial_grade: calculationResult.grade,
           partial_status: partialStatus,
           partial_finalized: true,
           partial_finalized_at: new Date().toISOString(),
@@ -513,7 +541,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         }
 
         if (partialStatus === 'desaprobado') {
-          payload.final_grade = partialGrade
+          payload.final_grade = calculationResult.grade
           payload.final_status = partialStatus
         }
 
@@ -725,10 +753,10 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {displayedEnrollments.map((enrollment, idx) => {
-                    const partialGrade = globalSelectedGradesForAveraging.size > 0
+                    const calculationResult = globalSelectedGradesForAveraging.size > 0
                       ? calculatePartialGradeWithSelection(enrollment.id, globalSelectedGradesForAveraging)
-                      : null
-                    const partialStatus = partialGrade ? getPartialStatus(partialGrade) : null
+                      : { grade: null, usedRecuperatories: false, allNotasAbove8: false }
+                    const partialStatus = calculationResult.grade ? getPartialStatus(calculationResult) : null
                     const isFinalized = existingFinalizationStatus[enrollment.id]
 
                     return (
@@ -769,7 +797,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
                         })}
 
                         <td className="px-2 py-2 text-center font-bold text-gray-900 text-xs">
-                          {partialGrade !== null && partialGrade !== undefined ? partialGrade.toFixed(1) : '-'}
+                          {calculationResult.grade !== null && calculationResult.grade !== undefined ? calculationResult.grade.toFixed(1) : '-'}
                         </td>
                         <td className="px-2 py-2 text-center">
                           {partialStatus && (
