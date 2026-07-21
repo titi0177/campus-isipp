@@ -196,6 +196,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
   }
 
   const calculatePartialGradeWithSelection = (enrollmentId: string, selectedIndices: Set<number>): number | null => {
+    console.log(`[DEBUG] globalGradeLabels al inicio:`, globalGradeLabels)
     const notasAUsar: number[] = []
 
     selectedIndices.forEach(i => {
