@@ -90,29 +90,40 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
   }
 
   const handleUndoFinalize = async (enrollmentGradeId: string, studentName: string) => {
+    console.log(`[UNDO] Iniciando deshacer para ${studentName} (id: ${enrollmentGradeId})`)
     setUndoing(true)
     setUndoingStudent(enrollmentGradeId)
     setError('')
 
     try {
+      console.log(`[UNDO] Llamando RPC con parámetro:`, { p_enrollment_grade_id: enrollmentGradeId })
+      
       const { data, error: rpcError } = await supabase.rpc('undo_finalize_grades', {
         p_enrollment_grade_id: enrollmentGradeId,
       })
 
+      console.log(`[UNDO] Respuesta RPC:`, { data, rpcError })
+
       if (rpcError) {
+        console.error('[UNDO] Error RPC:', rpcError)
         setError(`Error al deshacer: ${rpcError.message}`)
         setUndoing(false)
         setUndoingStudent(null)
         return
       }
 
+      console.log(`[UNDO] Data recibido:`, data)
+
       if (data?.success) {
+        console.log(`[UNDO] Exito, recargando desaprobados...`)
         alert(`Cierre de notas deshecho para ${studentName}. Ahora puedes editar las notas nuevamente desde "Carga de Notas Parciales".`)
         await loadDisapprovedStudents()
       } else {
+        console.log(`[UNDO] Success es false:`, data)
         setError(data?.message || 'Error desconocido')
       }
     } catch (err) {
+      console.error('[UNDO] Error catch:', err)
       setError('Error al deshacer: ' + String(err))
     } finally {
       setUndoing(false)
