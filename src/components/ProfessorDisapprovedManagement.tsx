@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { AlertCircle, Check } from 'lucide-react'
+import { AlertCircle, Check, RotateCcw } from 'lucide-react'
 
 type DisapprovedStudent = {
   id: string
@@ -26,6 +26,8 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
   const [disapprovedStudents, setDisapprovedStudents] = useState<DisapprovedStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [undoing, setUndoing] = useState(false)
+  const [undoingStudent, setUndoingStudent] = useState<string | null>(null)
 
   useEffect(() => {
     loadDisapprovedStudents()
@@ -87,6 +89,37 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
     }
   }
 
+  const handleUndoFinalize = async (enrollmentGradeId: string, studentName: string) => {
+    setUndoing(true)
+    setUndoingStudent(enrollmentGradeId)
+    setError('')
+
+    try {
+      const { data, error: rpcError } = await supabase.rpc('undo_finalize_grades', {
+        p_enrollment_grade_id: enrollmentGradeId,
+      })
+
+      if (rpcError) {
+        setError(`Error al deshacer: ${rpcError.message}`)
+        setUndoing(false)
+        setUndoingStudent(null)
+        return
+      }
+
+      if (data?.success) {
+        alert(`Cierre de notas deshecho para ${studentName}. Ahora puedes editar las notas nuevamente desde "Carga de Notas Parciales".`)
+        await loadDisapprovedStudents()
+      } else {
+        setError(data?.message || 'Error desconocido')
+      }
+    } catch (err) {
+      setError('Error al deshacer: ' + String(err))
+    } finally {
+      setUndoing(false)
+      setUndoingStudent(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="card p-6 text-center">
@@ -128,6 +161,14 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
         </p>
       </div>
 
+      <div className="card p-4 bg-orange-50 border-2 border-orange-200">
+        <h3 className="font-bold text-orange-900 mb-2">Opcion: Deshacer Cierre de Notas</h3>
+        <p className="text-sm text-orange-900">
+          Si seleccionaste mal las notas a promediar, puedes usar el botón <strong>"Deshacer"</strong> para revertir el cierre.
+          Esto te permitira volver a la sección "Carga de Notas Parciales" y reseleccionar las notas correctas.
+        </p>
+      </div>
+
       <div className="card p-0 overflow-hidden rounded-2xl border-2 border-red-200 shadow-lg">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -140,6 +181,7 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                 <th className="px-4 py-3 text-center font-bold">Promedio</th>
                 <th className="px-4 py-3 text-center font-bold">Nota Final</th>
                 <th className="px-4 py-3 text-center font-bold">Estado</th>
+                <th className="px-4 py-3 text-center font-bold">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -168,6 +210,17 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
                       Desaprobado
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    <button
+                      onClick={() => handleUndoFinalize(student.id, student.student_name)}
+                      disabled={undoing || undoingStudent === student.id}
+                      className="px-2 py-1 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded text-xs font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1 mx-auto whitespace-nowrap"
+                      title="Deshacer cierre para volver a editar"
+                    >
+                      <RotateCcw size={12} />
+                      {undoingStudent === student.id ? 'Deshaciendo...' : 'Deshacer'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -182,6 +235,7 @@ export function ProfessorDisapprovedManagement({ subjectId }: Props) {
           <li>Pueden reinscribirse accediendo a su Dashboard → Reinscripcion</li>
           <li>Se crean como recursantes (2do intento) automaticamente</li>
           <li>Conservan su historial del primer intento</li>
+          <li>Usa "Deshacer" si necesitas corregir la selección de notas a promediar</li>
         </ul>
       </div>
     </div>
