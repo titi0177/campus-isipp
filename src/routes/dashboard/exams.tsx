@@ -305,14 +305,17 @@ function ExamsPage() {
 
     if (!dateStr) return true
 
+    // Extraer SOLO la fecha (antes de la T) porque exam_date viene con timestamp completo
+    const dateOnly = dateStr.split('T')[0]
+    
     // Construir datetime: usar exam_time si existe, sino mediodía
     const timeToUse = timeStr && timeStr.trim() ? timeStr : '12:00'
-    const exam = new Date(dateStr + 'T' + timeToUse)
+    const exam = new Date(dateOnly + 'T' + timeToUse)
     const now = new Date()
 
     // Validar que la fecha sea válida
     if (isNaN(exam.getTime())) {
-      console.log('[EXAM CLOSED DEBUG] Invalid date:', { dateStr, timeToUse })
+      console.log('[EXAM CLOSED DEBUG] Invalid date:', { dateStr, dateOnly, timeToUse })
       return true // Asumir cerrada si la fecha es inválida
     }
 
@@ -321,6 +324,7 @@ function ExamsPage() {
 
     console.log('[EXAM CLOSED DEBUG]', {
       dateStr,
+      dateOnly,
       timeStr,
       timeToUse,
       examDateTime: exam.toISOString(),
