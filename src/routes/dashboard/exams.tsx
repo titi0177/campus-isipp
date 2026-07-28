@@ -301,11 +301,13 @@ function ExamsPage() {
     return count || 0
   }
 
-  function examClosed(dateStr: string) {
+  function examClosed(dateStr: string, timeStr?: string) {
 
     if (!dateStr) return true
 
-    const exam = new Date(dateStr + (dateStr.length <= 10 ? 'T12:00:00' : ''))
+    // Construir datetime: usar exam_time si existe, sino mediodía
+    const timeToUse = timeStr && timeStr.trim() ? timeStr : '12:00'
+    const exam = new Date(dateStr + 'T' + timeToUse)
     const now = new Date()
 
     const diff = exam.getTime() - now.getTime()
@@ -448,7 +450,7 @@ function ExamsPage() {
 
                 const registered = isRegistered(exam.id)
                 const when = examDateString(exam)
-                const closed = examClosed(when)
+                const closed = examClosed(when, exam.exam_time)
                 const examEligibility = eligibility.get(exam.id)
                 const canRegister = !registered && !closed && examEligibility?.eligible
 
