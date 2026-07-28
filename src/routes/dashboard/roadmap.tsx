@@ -196,16 +196,11 @@ function RoadmapPage() {
       setSubjects(computed)
 
     } catch (err) {
-      console.error('❌ Error cargando roadmap:', err)
+      console.error('Error cargando roadmap:', err)
     } finally {
       setLoading(false)
     }
   }
-
-  // 🔽 TODO LO DEMÁS (TU UI ORIGINAL) SE MANTIENE IGUAL 🔽
-
-  // 🔽 TODO LO DEMÁS (TU UI ORIGINAL) SE MANTIENE IGUAL 🔽
-  
 
   const getDictationLabel = (subject: SubjectRow) => {
     if (subject.dictation_type === 'cuatrimestral') {
@@ -279,7 +274,7 @@ function RoadmapPage() {
           {programName && (
             <p className="text-xl text-blue-100 font-medium">{programName}</p>
           )}
-          <p className="text-blue-100 mt-4 max-w-2xl">Seguimiento completo de tu progreso académico. Visualiza tus materias, calificaciones y estado de cada asignatura.</p>
+          <p className="text-blue-100 mt-4 max-w-2xl">Seguimiento completo de tu progreso academico. Visualiza tus materias, calificaciones y estado de cada asignatura.</p>
         </div>
       </div>
 
@@ -294,7 +289,7 @@ function RoadmapPage() {
         <div className="card p-4 border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-lg transition-all cursor-pointer">
           <p className="text-xs text-purple-600 font-bold mb-2">PROMOCIONADAS</p>
           <p className="text-3xl font-black text-purple-700">{stats.promoted}</p>
-          <p className="text-xs text-purple-600 mt-1">Nota ≥8</p>
+          <p className="text-xs text-purple-600 mt-1">Nota >= 8</p>
         </div>
         
         <div className="card p-4 border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-cyan-50 hover:shadow-lg transition-all cursor-pointer">
@@ -326,8 +321,8 @@ function RoadmapPage() {
         
         <div className="card p-3 border-t-4 border-t-purple-600 hover:shadow-md transition-all text-center">
           <Award size={24} className="text-purple-600 mx-auto mb-2" />
-          <p className="text-xs font-bold text-gray-900">PROMOCIÓN</p>
-          <p className="text-xs text-gray-600 mt-1">Nota ≥8</p>
+          <p className="text-xs font-bold text-gray-900">PROMOCION</p>
+          <p className="text-xs text-gray-600 mt-1">Nota >= 8</p>
         </div>
         
         <div className="card p-3 border-t-4 border-t-blue-600 hover:shadow-md transition-all text-center">
@@ -345,7 +340,7 @@ function RoadmapPage() {
         <div className="card p-3 border-t-4 border-t-amber-500 hover:shadow-md transition-all text-center">
           <Zap size={24} className="text-amber-600 mx-auto mb-2" />
           <p className="text-xs font-bold text-gray-900">DISPONIBLE</p>
-          <p className="text-xs text-gray-600 mt-1">Podés inscribir</p>
+          <p className="text-xs text-gray-600 mt-1">Podes inscribir</p>
         </div>
         
         <div className="card p-3 border-t-4 border-t-gray-400 hover:shadow-md transition-all text-center">
@@ -355,7 +350,7 @@ function RoadmapPage() {
         </div>
       </div>
 
-      {/* Materias por año */}
+      {/* Materias por ano */}
       {byYear.length > 0 && (
         <div className="space-y-12">
           {byYear.map(([year, list]) => {
@@ -372,7 +367,7 @@ function RoadmapPage() {
                 {/* Year Header */}
                 <div className="flex items-end gap-4 pb-4 border-b-4 border-gradient-to-r from-indigo-600 to-purple-600">
                   <div>
-                    <h2 className="text-4xl font-black text-gray-900">Año {year}</h2>
+                    <h2 className="text-4xl font-black text-gray-900">Ano {year}</h2>
                     <div className="flex gap-4 mt-2 text-sm flex-wrap">
                       <span className="text-emerald-600 font-semibold">{yearStats.done}/{yearStats.total} Aprobadas</span>
                       <span className="text-blue-600 font-semibold">{yearStats.current} En curso</span>
@@ -452,7 +447,7 @@ function RoadmapPage() {
                             </span>
                             {s.allowsPromotion && (
                               <span className="text-xs font-bold px-2 py-1 rounded-full bg-purple-200 text-purple-700">
-                                🎓 Promocional
+                                Promocional
                               </span>
                             )}
                           </div>
@@ -468,18 +463,18 @@ function RoadmapPage() {
                             s.state === 'available' ? 'bg-amber-200 text-amber-900' :
                             'bg-gray-200 text-gray-700'
                           }`}>
-                            {s.state === 'done' && '✓ Aprobada'}
-                            {s.state === 'recursant' && '↻ Recursante'}
-                            {s.state === 'current' && '● En Curso'}
-                            {s.state === 'available' && '⚡ Disponible'}
-                            {s.state === 'locked' && '🔒 Bloqueada'}
+                            {s.state === 'done' && 'Aprobada'}
+                            {s.state === 'recursant' && 'Recursante'}
+                            {s.state === 'current' && 'En Curso'}
+                            {s.state === 'available' && 'Disponible'}
+                            {s.state === 'locked' && 'Bloqueada'}
                           </div>
                         </div>
 
                         {/* Grades Section */}
                         {(s.finalGrade !== undefined || s.partialGrade !== undefined) && (
                           <div className="px-4 py-3 border-t-2 border-gray-200 space-y-3 bg-white/40">
-                            <p className="text-xs text-gray-600 font-bold tracking-wide">CALIFICACIÓN</p>
+                            <p className="text-xs text-gray-600 font-bold tracking-wide">CALIFICACION</p>
                             <div className="grid grid-cols-2 gap-2">
                               {s.partialGrade !== undefined && (
                                 <div className="bg-white rounded-xl p-3 text-center border-2 border-blue-200 shadow-sm">
@@ -539,10 +534,10 @@ function RoadmapPage() {
                                 s.partialStatus === 'desaprobado' ? 'border-red-400 text-red-700' :
                                 'border-blue-400 text-blue-700'
                               }`}>
-                                {s.partialStatus === 'promocionado' && '🎓 Promocionado (parcial)'}
-                                {s.partialStatus === 'regular' && '📖 Regular (en espera de final)'}
-                                {s.partialStatus === 'desaprobado' && '❌ Desaprobado'}
-                                {!s.partialStatus && '⏳ En proceso'}
+                                {s.partialStatus === 'promocionado' && 'Promocionado (parcial)'}
+                                {s.partialStatus === 'regular' && 'Regular (en espera de final)'}
+                                {s.partialStatus === 'desaprobado' && 'Desaprobado'}
+                                {!s.partialStatus && 'En proceso'}
                               </div>
                             )}
                           </div>
@@ -558,7 +553,7 @@ function RoadmapPage() {
                             <div className="space-y-1">
                               {s.blockedByCorrelatives.map((corr) => (
                                 <div key={corr.id} className="text-xs text-amber-900 bg-white/50 px-2 py-1 rounded">
-                                  <span className="font-mono font-bold">{corr.code}</span>
+                                  <span className="font-bold">{corr.name}</span>
                                 </div>
                               ))}
                             </div>
@@ -578,7 +573,7 @@ function RoadmapPage() {
         <div className="card p-16 text-center rounded-3xl bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200">
           <BookOpen size={64} className="mx-auto text-gray-400 mb-6" />
           <p className="text-gray-600 text-xl font-semibold">No hay materias catalogadas</p>
-          <p className="text-gray-500 mt-2">Para tu programa aún no se han registrado asignaturas</p>
+          <p className="text-gray-500 mt-2">Para tu programa aun no se han registrado asignaturas</p>
         </div>
       )}
 
@@ -588,28 +583,28 @@ function RoadmapPage() {
           <div className="grid md:grid-cols-2 gap-8">
             <div>
               <h3 className="text-2xl font-black mb-4 flex items-center gap-2">
-                <span className="text-3xl">📌</span>
+                <span className="text-3xl">Pines</span>
                 Estados
               </h3>
               <ul className="space-y-2 text-indigo-50">
-                <li><strong>✓ Aprobada:</strong> Ya cursaste y aprobaste con nota final</li>
-                <li><strong>● En curso:</strong> Actualmente inscripto sin calificaciones finales</li>
-                <li><strong>⚡ Disponible:</strong> Podés inscribirte ahora</li>
-                <li><strong>↻ Recursante:</strong> Cursaste pero no aprobaste - Nuevo intento</li>
-                <li><strong>🔒 Bloqueada:</strong> Falta correlativa o no es tu año</li>
+                <li><strong>Aprobada:</strong> Ya cursaste y aprobaste con nota final</li>
+                <li><strong>En curso:</strong> Actualmente inscripto sin calificaciones finales</li>
+                <li><strong>Disponible:</strong> Podes inscribirte ahora</li>
+                <li><strong>Recursante:</strong> Cursaste pero no aprobaste - Nuevo intento</li>
+                <li><strong>Bloqueada:</strong> Falta correlativa o no es tu ano</li>
               </ul>
             </div>
             <div>
               <h3 className="text-2xl font-black mb-4 flex items-center gap-2">
-                <span className="text-3xl">📊</span>
+                <span className="text-3xl">Grafico</span>
                 Calificaciones
               </h3>
               <ul className="space-y-2 text-indigo-50">
                 <li><strong>Parcial:</strong> Promedio de trabajos y parciales cargados</li>
-                <li><strong>Final:</strong> Nota del examen final (después que rindas)</li>
-                <li><strong>🎓 Promocionado:</strong> ≥8 en materia que lo permite</li>
-                <li><strong>📖 Regular:</strong> Parcial ≥6 - Pendiente de final</li>
-                <li><strong>Aprobado:</strong> Entre 6-7 ó ≥8 sin promoción</li>
+                <li><strong>Final:</strong> Nota del examen final (despues que rindas)</li>
+                <li><strong>Promocionado:</strong> >= 8 en materia que lo permite</li>
+                <li><strong>Regular:</strong> Parcial >= 6 - Pendiente de final</li>
+                <li><strong>Aprobado:</strong> Entre 6-7 o >= 8 sin promocion</li>
               </ul>
             </div>
           </div>
