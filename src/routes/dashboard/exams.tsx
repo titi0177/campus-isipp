@@ -187,9 +187,11 @@ function ExamsPage() {
           : attendanceGradeData?.enrollment_grades
         
         const partialGrade = gradeRecord?.partial_grade
+        const partialStatus = gradeRecord?.partial_status
 
-        if (!partialGrade || partialGrade < 6) {
-          reasons.push(`Nota parcial insuficiente (actual: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, mínimo: 6)`)
+        // Validar: debe tener NOTA parcial >= 6 O STATUS regular/promocionado
+        if ((!partialGrade || partialGrade < 6) && (!partialStatus || !['regular', 'promocionado'].includes(partialStatus))) {
+          reasons.push(`No tienes regularidad (nota: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, estado: ${partialStatus || '—'})`)
           eligible = false
         }
 
