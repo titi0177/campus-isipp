@@ -229,6 +229,7 @@ function ExamsPage() {
             const requiredStatus = corr.required_status || 'aprobado'
             
             if (requiredStatus === 'aprobado') {
+              // Requiere APROBADA: solo final_status
               if (!finalStatus || !['aprobado', 'promocionado'].includes(finalStatus)) {
                 const { data: subjectName } = await supabase
                   .from('subjects')
@@ -239,14 +240,17 @@ function ExamsPage() {
                 eligible = false
               }
             } else if (requiredStatus === 'regular') {
-              // Para regularidad, buscar en partial_status
-              if (!partialStatus || !['regular', 'promocionado'].includes(partialStatus)) {
+              // Requiere REGULARIZADA: partial_status O final_status (ya aprobado)
+              const hasRegularity = partialStatus && ['regular', 'promocionado'].includes(partialStatus)
+              const hasApproved = finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)
+              
+              if (!hasRegularity && !hasApproved) {
                 const { data: subjectName } = await supabase
                   .from('subjects')
                   .select('name')
                   .eq('id', corr.requires_subject_id)
                   .single()
-                reasons.push(`Requiere REGULARIZADA: ${subjectName?.name} (actual: ${partialStatus || 'Sin cursar'})`)
+                reasons.push(`Requiere REGULARIZADA: ${subjectName?.name} (actual: ${partialStatus || finalStatus || 'Sin cursar'})`)
                 eligible = false
               }
             }
