@@ -310,6 +310,12 @@ function ExamsPage() {
     const exam = new Date(dateStr + 'T' + timeToUse)
     const now = new Date()
 
+    // Validar que la fecha sea válida
+    if (isNaN(exam.getTime())) {
+      console.log('[EXAM CLOSED DEBUG] Invalid date:', { dateStr, timeToUse })
+      return true // Asumir cerrada si la fecha es inválida
+    }
+
     const diff = exam.getTime() - now.getTime()
     const hours = diff / (1000 * 60 * 60)
 
