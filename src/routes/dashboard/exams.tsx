@@ -313,6 +313,17 @@ function ExamsPage() {
     const diff = exam.getTime() - now.getTime()
     const hours = diff / (1000 * 60 * 60)
 
+    console.log('[EXAM CLOSED DEBUG]', {
+      dateStr,
+      timeStr,
+      timeToUse,
+      examDateTime: exam.toISOString(),
+      nowDateTime: now.toISOString(),
+      diffMs: diff,
+      hours: hours.toFixed(2),
+      isClosed: hours < 24
+    })
+
     return hours < 24
   }
 
