@@ -85,51 +85,67 @@ function LegacyGradeLoader() {
   const saveAll = async () => {
     for (const r of rows) {
       const enrollmentGrades = Array.isArray(r.enrollment_grades) ? r.enrollment_grades[0] : r.enrollment_grades
-      const final = r.final_grade ?? r.partial_grade
       
-      // Permitir borrar notas (updates a NULL), pero evitar crear registros completamente vacíos (inserts)
-      if (!enrollmentGrades?.id && (final === null || final === undefined)) {
-        // Es un INSERT nuevo Y no tiene nota → BLOQUEAR
+      // Permitir borrar notas, pero evitar crear registros completamente vacios
+      if (!enrollmentGrades?.id && (r.partial_grade === undefined || r.partial_grade === null) && (r.final_grade === undefined || r.final_grade === null)) {
         continue
       }
       
-      // Calcular status solo si hay nota
-      let status = null
-      if (final !== null && final !== undefined) {
-        status = final >= 8 ? 'promocionado' : final >= 6 ? 'aprobado' : 'desaprobado'
-      }
-
       if (enrollmentGrades?.id) {
-        // UPDATE existente - SOLO actualizar campos que fueron editados
-        // Si NINGÚN campo fue editado, no hacer UPDATE
+        // UPDATE existente
         if (r.partial_grade === undefined && r.final_grade === undefined) {
-          // Nada fue editado, skip este alumno
           continue
         }
         
         const updates: any = {}
+        
+        // Si se edito parcial, actualizar partial_grade y partial_status
         if (r.partial_grade !== undefined) {
           updates.partial_grade = r.partial_grade ?? null
+          if (r.partial_grade !== null && r.partial_grade !== undefined) {
+            updates.partial_status = r.partial_grade >= 8 ? 'promocionado' : r.partial_grade >= 6 ? 'regular' : 'desaprobado'
+          } else {
+            updates.partial_status = null
+          }
         }
+        
+        // Si se edito final, actualizar final_grade y final_status
         if (r.final_grade !== undefined) {
           updates.final_grade = r.final_grade ?? null
+          if (r.final_grade !== null && r.final_grade !== undefined) {
+            updates.final_status = r.final_grade >= 8 ? 'promocionado' : r.final_grade >= 6 ? 'aprobado' : 'desaprobado'
+          } else {
+            updates.final_status = null
+          }
         }
-        // Siempre actualizar status
-        updates.final_status = status
         
         await supabase
           .from('enrollment_grades')
           .update(updates)
           .eq('id', enrollmentGrades.id)
       } else {
-        // INSERT nuevo (solo si tiene nota)
+        // INSERT nuevo
+        const partial = r.partial_grade ?? null
+        const final = r.final_grade ?? null
+        
+        let partialStatus = null
+        if (partial !== null && partial !== undefined) {
+          partialStatus = partial >= 8 ? 'promocionado' : partial >= 6 ? 'regular' : 'desaprobado'
+        }
+        
+        let finalStatus = null
+        if (final !== null && final !== undefined) {
+          finalStatus = final >= 8 ? 'promocionado' : final >= 6 ? 'aprobado' : 'desaprobado'
+        }
+        
         await supabase
           .from('enrollment_grades')
           .insert({
             enrollment_id: r.id,
-            partial_grade: r.partial_grade ?? null,
-            final_grade: r.final_grade ?? null,
-            final_status: status,
+            partial_grade: partial,
+            partial_status: partialStatus,
+            final_grade: final,
+            final_status: finalStatus,
           })
       }
     }
@@ -146,19 +162,20 @@ function LegacyGradeLoader() {
       return
     }
 
-    if (confirm('¿Estás seguro de que quieres borrar esta nota?')) {
+    if (confirm('Estas seguro de que quieres borrar esta nota?')) {
       try {
         await supabase
           .from('enrollment_grades')
           .update({
             partial_grade: null,
+            partial_status: null,
             final_grade: null,
             final_status: null,
           })
           .eq('id', enrollmentGrades.id)
         
         alert('Nota borrada correctamente')
-        void loadStudents(selected)  // Recargar datos
+        void loadStudents(selected)
       } catch (err) {
         alert('Error al borrar la nota: ' + String(err))
       }
@@ -196,7 +213,7 @@ function LegacyGradeLoader() {
                 <th className="border border-gray-200 px-4 py-2 text-center">Parcial</th>
                 <th className="border border-gray-200 px-4 py-2 text-center">Final</th>
                 <th className="border border-gray-200 px-4 py-2 text-center">Nota</th>
-                <th className="border border-gray-200 px-4 py-2 text-center">Acción</th>
+                <th className="border border-gray-200 px-4 py-2 text-center">Accion</th>
               </tr>
             </thead>
             <tbody>
