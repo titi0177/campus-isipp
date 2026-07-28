@@ -289,7 +289,7 @@ function RoadmapPage() {
         <div className="card p-4 border-l-4 border-l-purple-600 bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-lg transition-all cursor-pointer">
           <p className="text-xs text-purple-600 font-bold mb-2">PROMOCIONADAS</p>
           <p className="text-3xl font-black text-purple-700">{stats.promoted}</p>
-          <p className="text-xs text-purple-600 mt-1">Nota >= 8</p>
+          <p className="text-xs text-purple-600 mt-1">Nota &gt;= 8</p>
         </div>
         
         <div className="card p-4 border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-cyan-50 hover:shadow-lg transition-all cursor-pointer">
@@ -322,7 +322,7 @@ function RoadmapPage() {
         <div className="card p-3 border-t-4 border-t-purple-600 hover:shadow-md transition-all text-center">
           <Award size={24} className="text-purple-600 mx-auto mb-2" />
           <p className="text-xs font-bold text-gray-900">PROMOCION</p>
-          <p className="text-xs text-gray-600 mt-1">Nota >= 8</p>
+          <p className="text-xs text-gray-600 mt-1">Nota &gt;= 8</p>
         </div>
         
         <div className="card p-3 border-t-4 border-t-blue-600 hover:shadow-md transition-all text-center">
@@ -602,9 +602,9 @@ function RoadmapPage() {
               <ul className="space-y-2 text-indigo-50">
                 <li><strong>Parcial:</strong> Promedio de trabajos y parciales cargados</li>
                 <li><strong>Final:</strong> Nota del examen final (despues que rindas)</li>
-                <li><strong>Promocionado:</strong> >= 8 en materia que lo permite</li>
-                <li><strong>Regular:</strong> Parcial >= 6 - Pendiente de final</li>
-                <li><strong>Aprobado:</strong> Entre 6-7 o >= 8 sin promocion</li>
+                <li><strong>Promocionado:</strong> &gt;= 8 en materia que lo permite</li>
+                <li><strong>Regular:</strong> Parcial &gt;= 6 - Pendiente de final</li>
+                <li><strong>Aprobado:</strong> Entre 6-7 o &gt;= 8 sin promocion</li>
               </ul>
             </div>
           </div>
