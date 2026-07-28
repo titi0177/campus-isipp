@@ -168,7 +168,7 @@ function ExamsPage() {
         // 1. Verificar asistencia y parcial en una sola query
         const { data: attendanceGradeData } = await supabase
           .from('enrollments')
-          .select('attendance(percentage), enrollment_grades(partial_grade)')
+          .select('attendance(percentage), enrollment_grades(partial_grade, partial_status)')
           .eq('student_id', studentData.id)
           .eq('subject_id', subjectId)
           .single()
@@ -207,7 +207,7 @@ function ExamsPage() {
             correlativesData.map(async (corr) => {
               const { data: corrEnrollmentData } = await supabase
                 .from('enrollments')
-                .select('enrollment_grades(final_status)')
+                .select('enrollment_grades(final_status, partial_status)')
                 .eq('student_id', studentData.id)
                 .eq('subject_id', corr.requires_subject_id)
                 .single()
@@ -216,12 +216,16 @@ function ExamsPage() {
                 ? corrEnrollmentData?.enrollment_grades[0]?.final_status
                 : corrEnrollmentData?.enrollment_grades?.final_status
 
-              return { corr, finalStatus }
+              const partialStatus = Array.isArray(corrEnrollmentData?.enrollment_grades)
+                ? corrEnrollmentData?.enrollment_grades[0]?.partial_status
+                : corrEnrollmentData?.enrollment_grades?.partial_status
+
+              return { corr, finalStatus, partialStatus }
             })
           )
 
           // Validar según required_status
-          for (const { corr, finalStatus } of correlativeStatuses) {
+          for (const { corr, finalStatus, partialStatus } of correlativeStatuses) {
             const requiredStatus = corr.required_status || 'aprobado'
             
             if (requiredStatus === 'aprobado') {
@@ -235,13 +239,14 @@ function ExamsPage() {
                 eligible = false
               }
             } else if (requiredStatus === 'regular') {
-              if (!finalStatus || !['aprobado', 'promocionado', 'regular'].includes(finalStatus)) {
+              // Para regularidad, buscar en partial_status
+              if (!partialStatus || !['regular', 'promocionado'].includes(partialStatus)) {
                 const { data: subjectName } = await supabase
                   .from('subjects')
                   .select('name')
                   .eq('id', corr.requires_subject_id)
                   .single()
-                reasons.push(`Requiere REGULARIZADA: ${subjectName?.name} (actual: ${finalStatus || 'Sin cursar'})`)
+                reasons.push(`Requiere REGULARIZADA: ${subjectName?.name} (actual: ${partialStatus || 'Sin cursar'})`)
                 eligible = false
               }
             }
