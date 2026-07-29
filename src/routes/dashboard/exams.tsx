@@ -16,6 +16,13 @@ function formatExamDate(exam: any) {
   return date.toLocaleDateString('es-AR')
 }
 
+const getNextConvocation = () => {
+  const month = new Date().getMonth() + 1
+  if (month >= 1 && month <= 6) return 'JULIO'
+  if (month >= 7 && month <= 10) return 'NOVIEMBRE-DICIEMBRE'
+  return 'FEBRERO-MARZO'
+}
+
 export const Route = createFileRoute('/dashboard/exams')({
   component: ExamsPage,
 })
@@ -53,7 +60,7 @@ function ExamsPage() {
         .single()
 
       if (studentError || !studentData) {
-        showToast('No se encontró el estudiante', 'error')
+        showToast('No se encontro el estudiante', 'error')
         return
       }
 
@@ -68,6 +75,7 @@ function ExamsPage() {
             subject:subjects(id, name, professor_id, program_id, year, professor:professors(name))
           `)
           .eq('subject.program_id', studentData.program_id)
+          .eq('is_enabled', true)
           .order('exam_date', { ascending: true }),
         supabase
           .from('payments')
@@ -86,13 +94,11 @@ function ExamsPage() {
         setExams([])
       } else {
         console.log('[EXAMS] examsData count:', examsData?.length)
-        // Filtrar solo mesas que corresponden a la carrera del alumno
         const validExams = (examsData || []).filter(exam => exam.subject?.id && exam.subject?.name)
         console.log('[EXAMS] validExams count:', validExams?.length)
         setExams(validExams)
         setPaymentsCache(paymentsResult.data || [])
         
-        // Establecer año seleccionado por defecto
         if (validExams.length > 0) {
           const years = [...new Set(validExams.map(e => e.subject?.year))].sort()
           if (years.length > 0 && years[0]) {
@@ -100,7 +106,6 @@ function ExamsPage() {
           }
         }
         
-        // Verificar elegibilidad en background (no bloquea mesas)
         try {
           console.log('[EXAMS] Starting eligibility check')
           await checkEligibility(studentData, validExams, paymentsResult.data || [])
@@ -136,7 +141,6 @@ function ExamsPage() {
     console.log('[ELIGIBILITY] Starting with exams count:', examsData?.length)
     const eligMap = new Map()
 
-    // Validar todas las mesas en paralelo
     await Promise.all(
       examsData.map(async (exam) => {
         const subjectId = exam.subject?.id
@@ -145,7 +149,6 @@ function ExamsPage() {
         const reasons: string[] = []
         let eligible = true
 
-        // 0. PRIMERO: Verificar si ya está aprobado o promocionado
         const { data: enrollmentData } = await supabase
           .from('enrollments')
           .select('enrollment_grades(final_status)')
@@ -159,13 +162,12 @@ function ExamsPage() {
 
         if (finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)) {
           console.log('[ELIGIBILITY] Subject already approved:', subjectId)
-          reasons.push(`Ya está aprobado - no requiere inscripción`)
+          reasons.push(`Ya esta aprobado - no requiere inscripcion`)
           eligible = false
           eligMap.set(exam.id, { eligible, reasons })
           return
         }
 
-        // 1. Verificar asistencia y parcial en una sola query
         const { data: attendanceGradeData } = await supabase
           .from('enrollments')
           .select('attendance(percentage), enrollment_grades(partial_grade, partial_status)')
@@ -178,7 +180,7 @@ function ExamsPage() {
           : attendanceGradeData?.attendance?.percentage
 
         if (!attendance || attendance < 60) {
-          reasons.push(`Asistencia insuficiente (actual: ${attendance ?? 0}%, mínimo: 60%)`)
+          reasons.push(`Asistencia insuficiente (actual: ${attendance ?? 0}%, minimo: 60%)`)
           eligible = false
         }
 
@@ -189,20 +191,17 @@ function ExamsPage() {
         const partialGrade = gradeRecord?.partial_grade
         const partialStatus = gradeRecord?.partial_status
 
-        // Validar: debe tener NOTA parcial >= 6 O STATUS regular/promocionado
         if ((!partialGrade || partialGrade < 6) && (!partialStatus || !['regular', 'promocionado'].includes(partialStatus))) {
           reasons.push(`No tienes regularidad (nota: ${partialGrade ? Math.round(partialGrade * 100) / 100 : '—'}, estado: ${partialStatus || '—'})`)
           eligible = false
         }
 
-        // 2. Verificar correlativas
         const { data: correlativesData } = await supabase
           .from('subject_correlatives')
           .select('requires_subject_id, required_status')
           .eq('subject_id', subjectId)
 
         if (correlativesData && correlativesData.length > 0) {
-          // Obtener estado de todas las correlativas en paralelo
           const correlativeStatuses = await Promise.all(
             correlativesData.map(async (corr) => {
               const { data: corrEnrollmentData } = await supabase
@@ -224,12 +223,10 @@ function ExamsPage() {
             })
           )
 
-          // Validar según required_status
           for (const { corr, finalStatus, partialStatus } of correlativeStatuses) {
             const requiredStatus = corr.required_status || 'aprobado'
             
             if (requiredStatus === 'aprobado') {
-              // Requiere APROBADA: solo final_status
               if (!finalStatus || !['aprobado', 'promocionado'].includes(finalStatus)) {
                 const { data: subjectName } = await supabase
                   .from('subjects')
@@ -240,7 +237,6 @@ function ExamsPage() {
                 eligible = false
               }
             } else if (requiredStatus === 'regular') {
-              // Requiere REGULARIZADA: partial_status O final_status (ya aprobado)
               const hasRegularity = partialStatus && ['regular', 'promocionado'].includes(partialStatus)
               const hasApproved = finalStatus && ['aprobado', 'promocionado'].includes(finalStatus)
               
@@ -257,7 +253,6 @@ function ExamsPage() {
           }
         }
 
-        // 3. Verificar pagos (usando cache)
         if (exam.exam_date) {
           const examDate = new Date(exam.exam_date)
           const examMonth = examDate.getMonth() + 1
@@ -305,17 +300,14 @@ function ExamsPage() {
 
     if (!dateStr) return true
 
-    // Extraer SOLO la fecha (antes de la T) porque exam_date viene con timestamp completo
     const dateOnly = dateStr.split('T')[0]
     
-    // Construir datetime: usar exam_time si existe, sino mediodía
     const timeToUse = timeStr && timeStr.trim() ? timeStr : '12:00'
     const exam = new Date(dateOnly + 'T' + timeToUse)
     const now = new Date()
 
-    // Validar que la fecha sea válida
     if (isNaN(exam.getTime())) {
-      return true // Asumir cerrada si la fecha es inválida
+      return true
     }
 
     const diff = exam.getTime() - now.getTime()
@@ -329,13 +321,13 @@ function ExamsPage() {
     if (!student) return
 
     if (isRegistered(exam.id)) {
-      showToast('Ya estás inscripto', 'info')
+      showToast('Ya estas inscripto', 'info')
       return
     }
 
     const when = examDateString(exam)
     if (examClosed(when)) {
-      showToast('La inscripción cierra 24 hs antes del examen', 'error')
+      showToast('La inscripcion cierra 24 hs antes del examen', 'error')
       return
     }
 
@@ -348,7 +340,6 @@ function ExamsPage() {
       }
     }
 
-    // Verificar elegibilidad
     const examEligibility = eligibility.get(exam.id)
     if (!examEligibility?.eligible) {
       const reasons = examEligibility?.reasons || ['Requisitos no cumplidos']
@@ -370,7 +361,7 @@ function ExamsPage() {
       return
     }
 
-    showToast('Inscripción realizada')
+    showToast('Inscripcion realizada')
 
     loadData()
   }
@@ -387,12 +378,12 @@ function ExamsPage() {
 
     if (error) {
 
-      showToast('Error cancelando inscripción', 'error')
+      showToast('Error cancelando inscripcion', 'error')
 
       return
     }
 
-    showToast('Inscripción cancelada')
+    showToast('Inscripcion cancelada')
 
     loadData()
   }
@@ -401,7 +392,6 @@ function ExamsPage() {
     return <p>Cargando mesas...</p>
   }
 
-  // Agrupar mesas por año
   const examsByYear = exams.reduce((acc: Record<number, any[]>, exam: any) => {
     const year = exam.subject?.year || 0
     if (!acc[year]) acc[year] = []
@@ -424,12 +414,18 @@ function ExamsPage() {
       </h1>
 
       {exams.length === 0 && (
-        <p>No hay mesas disponibles</p>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+          <p className="text-yellow-900 font-semibold text-lg mb-2">
+            MESAS DESHABILITADAS - PROXIMA MESA ({getNextConvocation()})
+          </p>
+          <p className="text-yellow-800 text-sm">
+            Proximamente se habilitaran nuevas mesas de examen. Vuelve pronto para inscribirte.
+          </p>
+        </div>
       )}
 
       {yearsAvailable.length > 0 && (
         <>
-          {/* Tabs por año */}
           <div className="flex gap-2 border-b border-gray-200 flex-wrap">
             {yearsAvailable.map(year => {
               const yearExamsCount = examsByYear[year]?.length || 0
@@ -443,16 +439,15 @@ function ExamsPage() {
                       : 'border-b-transparent text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Año {year} <span className="text-xs ml-2 px-2 py-0.5 rounded-full bg-gray-200">({yearExamsCount})</span>
+                  Ano {year} <span className="text-xs ml-2 px-2 py-0.5 rounded-full bg-gray-200">({yearExamsCount})</span>
                 </button>
               )
             })}
           </div>
 
-          {/* Mesas del año seleccionado */}
           <div className="space-y-4">
             {examsForSelectedYear.length === 0 ? (
-              <p className="text-gray-600 text-center py-8">No hay mesas disponibles para este año</p>
+              <p className="text-gray-600 text-center py-8">No hay mesas disponibles para este ano</p>
             ) : (
               examsForSelectedYear.map(exam => {
 
@@ -480,12 +475,12 @@ function ExamsPage() {
 
                           <span className="flex items-center gap-1">
                             <Calendar size={14} />
-                            {formatExamDate(exam) || '—'}
+                            {formatExamDate(exam) || 'Dash'}
                           </span>
 
                           <span className="flex items-center gap-1">
                             <Clock size={14} />
-                            {exam.exam_time || '—'}
+                            {exam.exam_time || 'Dash'}
                           </span>
 
                           <span className="flex items-center gap-1">
@@ -497,7 +492,7 @@ function ExamsPage() {
 
                         <p className="text-sm text-gray-500 flex items-center gap-1">
                           <User size={14} />
-                          {exam.subject?.professor?.name || '—'}
+                          {exam.subject?.professor?.name || 'Dash'}
                         </p>
 
                       </div>
@@ -509,13 +504,13 @@ function ExamsPage() {
                           onClick={() => cancelRegistration(exam.id)}
                           className="btn-secondary px-4 py-2 text-slate-700 whitespace-nowrap"
                         >
-                          Cancelar inscripción
+                          Cancelar inscripcion
                         </button>
 
                       ) : closed ? (
 
                         <span className="text-red-600 font-semibold whitespace-nowrap">
-                          Inscripción cerrada
+                          Inscripcion cerrada
                         </span>
 
                       ) : (
@@ -536,7 +531,6 @@ function ExamsPage() {
                       )}
                     </div>
 
-                    {/* Mostrar requisitos no cumplidos */}
                     {!registered && !closed && !examEligibility?.eligible && (
                       <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700 space-y-1">
                         <div className="flex items-center gap-2 font-semibold">

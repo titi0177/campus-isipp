@@ -16,6 +16,8 @@ function FinalExamsPage() {
   const [professors, setProfessors] = useState<any[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<any>({})
+  const [globalEnabled, setGlobalEnabled] = useState(true)
+  const [confirmModal, setConfirmModal] = useState(false)
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -59,6 +61,9 @@ function FinalExamsPage() {
       setExams(examsData || [])
       setSubjects(subjectsData || [])
       setProfessors(professorsData || [])
+      
+      const anyDisabled = examsData?.some((e: any) => e.is_enabled === false)
+      setGlobalEnabled(!anyDisabled)
 
     } catch (err) {
       console.error(err)
@@ -68,7 +73,7 @@ function FinalExamsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const { id, created_at, subject, professor, president, vocal1, vocal2, date, exam_date, exam_time, ...rest } = editing
+    const { id, created_at, subject, professor, president, vocal1, vocal2, date, exam_date, exam_time, is_enabled, ...rest } = editing
     const when = exam_date ?? date
     const payload: Record<string, unknown> = {
       ...rest,
@@ -78,6 +83,7 @@ function FinalExamsPage() {
       president_id: editing.president_id || null,
       vocal1_id: editing.vocal1_id || null,
       vocal2_id: editing.vocal2_id || null,
+      is_enabled: true,
     }
     delete payload.date
 
@@ -123,6 +129,34 @@ function FinalExamsPage() {
     load()
   }
 
+  const getNextConvocation = () => {
+    const month = new Date().getMonth() + 1
+    if (month >= 1 && month <= 6) return 'JULIO'
+    if (month >= 7 && month <= 10) return 'NOVIEMBRE-DICIEMBRE'
+    return 'FEBRERO-MARZO'
+  }
+
+  const toggleGlobalExams = async (enable: boolean) => {
+    try {
+      if (enable) {
+        const { error } = await supabase.rpc('enable_all_exam_tables')
+        if (error) throw error
+        showToast('Todas las mesas habilitadas')
+        setGlobalEnabled(true)
+      } else {
+        const { error } = await supabase.rpc('disable_all_exam_tables')
+        if (error) throw error
+        showToast('Todas las mesas deshabilitadas y registros limpios')
+        setGlobalEnabled(false)
+      }
+      setConfirmModal(false)
+      await load()
+    } catch (err) {
+      console.error(err)
+      showToast('Error al cambiar estado de mesas', 'error')
+    }
+  }
+
   return (
     <div className="space-y-6">
 
@@ -131,16 +165,29 @@ function FinalExamsPage() {
           Exámenes Finales
         </h1>
 
-        <button
-          onClick={() => {
-            setEditing({ location: '', exam_time: '09:00' })
-            setModalOpen(true)
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Nueva Mesa
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setConfirmModal(true)}
+            className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+              globalEnabled
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+          >
+            GLOBAL: {globalEnabled ? 'HABILITADO' : 'DESHABILITADO'}
+          </button>
+
+          <button
+            onClick={() => {
+              setEditing({ location: '', exam_time: '09:00' })
+              setModalOpen(true)
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Nueva Mesa
+          </button>
+        </div>
       </div>
 
       <DataTable
@@ -152,7 +199,7 @@ function FinalExamsPage() {
           },
           {
             key: 'code',
-            label: 'Código',
+            label: 'Codigo',
             render: (r: any) => r.subject?.code
           },
           {
@@ -295,7 +342,7 @@ function FinalExamsPage() {
             </div>
 
             <div>
-              <label className="form-label">Cupos máximos</label>
+              <label className="form-label">Cupos maximos</label>
               <input
                 type="number"
                 min={1}
@@ -307,14 +354,14 @@ function FinalExamsPage() {
                     max_students: e.target.value === '' ? null : +e.target.value
                   }))
                 }
-                placeholder="Sin límite"
+                placeholder="Sin limite"
               />
             </div>
 
           </div>
 
           <div className="space-y-3 border-t pt-4">
-            <h3 className="font-semibold text-gray-900">Composición de Mesa</h3>
+            <h3 className="font-semibold text-gray-900">Composicion de Mesa</h3>
 
             <div>
               <label className="form-label">Presidente de Mesa *</label>
@@ -403,6 +450,70 @@ function FinalExamsPage() {
 
         </form>
 
+      </Modal>
+
+      <Modal
+        open={confirmModal}
+        onClose={() => setConfirmModal(false)}
+        title={globalEnabled ? 'Deshabilitar Mesas' : 'Habilitar Mesas'}
+      >
+        <div className="space-y-4">
+          {globalEnabled ? (
+            <>
+              <p className="text-gray-900 font-semibold">
+                ¿Deshabilitar TODAS las mesas de examen?
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-red-900 font-semibold">
+                  ADVERTENCIA:
+                </p>
+                <ul className="text-sm text-red-800 space-y-1">
+                  <li>- Se deshabilitaran todas las mesas</li>
+                  <li>- Se limparan TODOS los registros de inscripcion</li>
+                  <li>- Se limparan TODAS las actas de examen</li>
+                  <li>- Esta accion NO se puede deshacer</li>
+                </ul>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmModal(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => toggleGlobalExams(false)}
+                  className="btn-primary flex-1 bg-red-600 hover:bg-red-700"
+                >
+                  Confirmar Deshabilitar
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-900 font-semibold">
+                ¿Habilitar TODAS las mesas de examen?
+              </p>
+              <p className="text-sm text-gray-600">
+                Las mesas estaran disponibles para que los alumnos se inscriban.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmModal(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => toggleGlobalExams(true)}
+                  className="btn-primary flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  Confirmar Habilitar
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </Modal>
 
     </div>
