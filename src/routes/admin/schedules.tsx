@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/components/Toast'
-import { Trash2, Plus, Clock } from 'lucide-react'
+import { Trash2, Plus, Clock, Edit } from 'lucide-react'
 import { ScheduleViewByProfessor } from '@/components/ScheduleViewByProfessor'
 import { ScheduleViewByDay } from '@/components/ScheduleViewByDay'
 import { ScheduleViewByYear } from '@/components/ScheduleViewByYear'
@@ -32,7 +32,7 @@ type Professor = { id: string; name: string }
 type Subject = { id: string; name: string; code: string; year: number }
 type Program = { id: string; name: string }
 
-const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const DAYS = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado']
 const DIVISIONS = ['A', 'B']
 
 const SCHEDULE_BLOCKS: Record<string, Record<string, Array<{ start: string; end: string }>>> = {
@@ -86,6 +86,7 @@ function AdminSchedulesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [viewMode, setViewMode] = useState<'professor' | 'day' | 'year'>('professor')
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null)
 
   const [formData, setFormData] = useState({
     professor_id: '',
@@ -144,7 +145,6 @@ function AdminSchedulesPage() {
       const { data: progsData } = await supabase.from('programs').select('id, name').order('name')
       setPrograms(progsData || [])
 
-      // Select string sin multiline para evitar problemas con Supabase PostgREST
       const selectStr = 'id,subject_id,subject:subjects(name,code,year),professor_id,professor:professors(name),program_id,program:programs(name),division,day,start_time,end_time,classroom'
       
       const { data } = await supabase
@@ -223,7 +223,7 @@ function AdminSchedulesPage() {
     }
 
     if (formData.selectedBlocks.length > 3) {
-      showToast('Máximo 3 bloques por día', 'error')
+      showToast('Maximo 3 bloques por dia', 'error')
       return
     }
 
@@ -286,6 +286,33 @@ function AdminSchedulesPage() {
     }
   }
 
+  async function updateSchedule(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingSchedule) return
+
+    try {
+      const { error } = await supabase
+        .from('schedules')
+        .update({
+          day: editingSchedule.day,
+          start_time: editingSchedule.start_time,
+          end_time: editingSchedule.end_time,
+          classroom: editingSchedule.classroom,
+          professor_id: editingSchedule.professor_id,
+        })
+        .eq('id', editingSchedule.id)
+
+      if (error) throw error
+
+      showToast('Horario actualizado correctamente')
+      setEditingSchedule(null)
+      await loadData()
+    } catch (err) {
+      console.error('Error:', err)
+      showToast('Error al actualizar horario', 'error')
+    }
+  }
+
   const getAvailableShifts = (programId?: string) => {
     const pId = programId || formData.program_id
     if (!pId) return []
@@ -311,7 +338,7 @@ function AdminSchedulesPage() {
       newSelected.splice(newSelected.indexOf(index), 1)
     } else {
       if (newSelected.length >= 3) {
-        showToast('Máximo 3 bloques por día', 'error')
+        showToast('Maximo 3 bloques por dia', 'error')
         return
       }
       newSelected.push(index)
@@ -340,10 +367,10 @@ function AdminSchedulesPage() {
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Clock size={28} />
-          Gestión de Horarios
+          Gestion de Horarios
         </h1>
         <p className="text-slate-600 text-sm mt-1">
-          Carga horarios por profesor, materia y carrera. Permite hasta 3 bloques consecutivos por día.
+          Carga horarios por profesor, materia y carrera. Permite hasta 3 bloques consecutivos por dia.
         </p>
       </div>
 
@@ -409,7 +436,7 @@ function AdminSchedulesPage() {
               {formData.program_id && (getAvailableShifts().length > 1 || formData.shift) && (
                 <div>
                   <label htmlFor="shift-select" className="form-label">
-                    Turno {getAvailableShifts().length === 1 ? '(Único)' : ''} *
+                    Turno {getAvailableShifts().length === 1 ? '(Unico)' : ''} *
                   </label>
                   <select
                     id="shift-select"
@@ -420,7 +447,7 @@ function AdminSchedulesPage() {
                     <option value="">-- Selecciona turno --</option>
                     {getAvailableShifts().map(shift => (
                       <option key={shift} value={shift}>
-                        {shift === 'manana' ? 'Mañana' : 'Tarde'}
+                        {shift === 'manana' ? 'Manana' : 'Tarde'}
                       </option>
                     ))}
                   </select>
@@ -430,7 +457,7 @@ function AdminSchedulesPage() {
               {formData.program_id && (
                 <div>
                   <label htmlFor="year-select" className="form-label">
-                    Año *
+                    Ano *
                   </label>
                   <select
                     id="year-select"
@@ -438,12 +465,12 @@ function AdminSchedulesPage() {
                     onChange={e => setFormData({ ...formData, year: e.target.value, subject_id: '', division: '' })}
                     className="form-input"
                   >
-                    <option value="">-- Selecciona año --</option>
-                    <option value="1">1° Año</option>
-                    <option value="2">2° Año</option>
-                    <option value="3">3° Año</option>
-                    <option value="4">4° Año</option>
-                    <option value="5">5° Año</option>
+                    <option value="">-- Selecciona ano --</option>
+                    <option value="1">1° Ano</option>
+                    <option value="2">2° Ano</option>
+                    <option value="3">3° Ano</option>
+                    <option value="4">4° Ano</option>
+                    <option value="5">5° Ano</option>
                   </select>
                 </div>
               )}
@@ -451,7 +478,7 @@ function AdminSchedulesPage() {
               {showDivision && (
                 <div>
                   <label htmlFor="division-select" className="form-label">
-                    División *
+                    Division *
                   </label>
                   <select
                     id="division-select"
@@ -459,10 +486,10 @@ function AdminSchedulesPage() {
                     onChange={e => setFormData({ ...formData, division: e.target.value })}
                     className="form-input"
                   >
-                    <option value="">-- Selecciona división --</option>
+                    <option value="">-- Selecciona division --</option>
                     {DIVISIONS.map(d => (
                       <option key={d} value={d}>
-                        División {d}
+                        Division {d}
                       </option>
                     ))}
                   </select>
@@ -493,14 +520,14 @@ function AdminSchedulesPage() {
               {formData.year && subjects.length === 0 && (
                 <div className="col-span-2">
                   <p className="text-sm text-yellow-700 bg-yellow-50 p-3 rounded">
-                    No hay materias disponibles para {formData.year}° año en esta carrera
+                    No hay materias disponibles para {formData.year}° ano en esta carrera
                   </p>
                 </div>
               )}
 
               <div>
                 <label htmlFor="day-select" className="form-label">
-                  Día *
+                  Dia *
                 </label>
                 <select
                   id="day-select"
@@ -508,7 +535,7 @@ function AdminSchedulesPage() {
                   onChange={e => setFormData({ ...formData, day: e.target.value })}
                   className="form-input"
                 >
-                  <option value="">-- Selecciona día --</option>
+                  <option value="">-- Selecciona dia --</option>
                   {DAYS.map(d => (
                     <option key={d} value={d}>
                       {d}
@@ -520,7 +547,7 @@ function AdminSchedulesPage() {
               {formData.program_id && formData.shift && getScheduleBlocks().length > 0 && (
                 <div className="col-span-2">
                   <label className="form-label mb-3 block">
-                    Bloques de horario * (máximo 3 consecutivos)
+                    Bloques de horario * (maximo 3 consecutivos)
                   </label>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                     {getScheduleBlocks().map((block, idx) => (
@@ -550,7 +577,7 @@ function AdminSchedulesPage() {
 
               <div>
                 <label htmlFor="classroom-input" className="form-label">
-                  Aula/Salón *
+                  Aula/Salon *
                 </label>
                 <input
                   id="classroom-input"
@@ -596,7 +623,7 @@ function AdminSchedulesPage() {
                   : 'text-slate-600 border-b-transparent hover:text-slate-900'
               }`}
             >
-              Por Día
+              Por Dia
             </button>
             <button
               onClick={() => setViewMode('year')}
@@ -606,17 +633,101 @@ function AdminSchedulesPage() {
                   : 'text-slate-600 border-b-transparent hover:text-slate-900'
               }`}
             >
-              Por Año
+              Por Ano
             </button>
           </div>
 
-          {viewMode === 'professor' && <ScheduleViewByProfessor schedules={schedules} onDelete={deleteSchedule} />}
-          {viewMode === 'day' && <ScheduleViewByDay schedules={schedules} onDelete={deleteSchedule} />}
-          {viewMode === 'year' && <ScheduleViewByYear schedules={schedules} onDelete={deleteSchedule} />}
+          {viewMode === 'professor' && <ScheduleViewByProfessor schedules={schedules} onDelete={deleteSchedule} onEdit={setEditingSchedule} />}
+          {viewMode === 'day' && <ScheduleViewByDay schedules={schedules} onDelete={deleteSchedule} onEdit={setEditingSchedule} />}
+          {viewMode === 'year' && <ScheduleViewByYear schedules={schedules} onDelete={deleteSchedule} onEdit={setEditingSchedule} />}
         </div>
       ) : (
         <div className="card p-6 text-center">
           <p className="text-slate-500">No hay horarios cargados. Agrega uno usando el formulario arriba.</p>
+        </div>
+      )}
+
+      {editingSchedule && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="card p-6 max-w-md mx-4 rounded-2xl">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Editar Horario</h2>
+            <form onSubmit={updateSchedule} className="space-y-4">
+              <div>
+                <label className="form-label">Profesor</label>
+                <select
+                  value={editingSchedule.professor_id || ''}
+                  onChange={e => setEditingSchedule({ ...editingSchedule, professor_id: e.target.value })}
+                  className="form-input"
+                >
+                  <option value="">-- Selecciona profesor --</option>
+                  {professors.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Dia</label>
+                <select
+                  value={editingSchedule.day}
+                  onChange={e => setEditingSchedule({ ...editingSchedule, day: e.target.value })}
+                  className="form-input"
+                >
+                  {DAYS.map(d => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Hora Inicio</label>
+                <input
+                  type="time"
+                  value={editingSchedule.start_time}
+                  onChange={e => setEditingSchedule({ ...editingSchedule, start_time: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Hora Fin</label>
+                <input
+                  type="time"
+                  value={editingSchedule.end_time}
+                  onChange={e => setEditingSchedule({ ...editingSchedule, end_time: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Aula/Salon</label>
+                <input
+                  type="text"
+                  value={editingSchedule.classroom}
+                  onChange={e => setEditingSchedule({ ...editingSchedule, classroom: e.target.value })}
+                  placeholder="ej: 101"
+                  className="form-input"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button type="submit" className="btn-primary flex-1">
+                  Actualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingSchedule(null)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

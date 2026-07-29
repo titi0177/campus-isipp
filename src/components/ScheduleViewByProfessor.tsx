@@ -21,9 +21,10 @@ type Schedule = {
 type Props = {
   schedules: Schedule[]
   onDelete: (id: string) => void
+  onEdit: (schedule: Schedule) => void
 }
 
-export function ScheduleViewByProfessor({ schedules, onDelete }: Props) {
+export function ScheduleViewByProfessor({ schedules, onDelete, onEdit }: Props) {
   const [expandedProfessor, setExpandedProfessor] = useState<string | null>(null)
 
   const byProfessor: Record<string, Schedule[]> = {}
@@ -81,7 +82,14 @@ export function ScheduleViewByProfessor({ schedules, onDelete }: Props) {
                           {s.start_time} - {s.end_time}
                         </td>
                         <td className="px-4 py-3">{s.classroom}</td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-4 py-3 text-center space-x-2">
+                          <button
+                            onClick={() => onEdit(s)}
+                            className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                            title="Editar"
+                          >
+                            ✎
+                          </button>
                           <button
                             onClick={() => onDelete(s.id)}
                             className="text-red-600 hover:text-red-800 font-medium text-sm"
