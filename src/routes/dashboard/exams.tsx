@@ -326,7 +326,7 @@ function ExamsPage() {
     }
 
     const when = examDateString(exam)
-    if (examClosed(when)) {
+    if (examClosed(when, exam.exam_time)) {
       showToast('La inscripcion cierra 24 hs antes del examen', 'error')
       return
     }
