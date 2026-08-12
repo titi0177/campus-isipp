@@ -97,7 +97,7 @@ function EnrollSubjectsPage() {
 
       const { data: allEnrollments } = await supabase
         .from('enrollments')
-        .select('subject_id, enrollment_grades(final_status, partial_status), academic_year')
+        .select('subject_id, enrollment_grades(final_status), academic_year')
         .eq('student_id', studentData.id)
 
       // Get current division from database
