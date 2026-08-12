@@ -66,8 +66,6 @@ function EnrollmentsPage() {
     status: 'active'
   })
 
-  const [adminBypassValidations, setAdminBypassValidations] = useState(false)
-
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -110,14 +108,12 @@ function EnrollmentsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validar correlativas solo si Admin Mode NO esta activado
-    if (correlativeWarnings.length > 0 && !adminBypassValidations) {
+    if (correlativeWarnings.length > 0) {
       showToast('Por favor, resuelve los requisitos de correlativas antes de inscribir.', 'error')
       return
     }
 
-    // Validar year mismatch solo si Admin Mode NO esta activado
-    if (yearMismatchWarning && !adminBypassValidations) {
+    if (yearMismatchWarning) {
       showToast('El año de la materia no coincide con el año del alumno.', 'error')
       return
     }
@@ -166,7 +162,6 @@ function EnrollmentsPage() {
     setPreviousAttempts([])
     setSelectedProgram('')
     setSelectedYear('')
-    setAdminBypassValidations(false)
     setModalOpen(false)
     await load()
   }
@@ -177,7 +172,6 @@ function EnrollmentsPage() {
     await supabase.from('enrollments').delete().eq('id', id)
 
     showToast('Inscripción eliminada.', 'info')
-    setAdminBypassValidations(false)
     await load()
   }
 
@@ -626,38 +620,18 @@ function EnrollmentsPage() {
             </select>
           </div>
 
-          {/* Admin Mode Bypass */}
-          {(correlativeWarnings.length > 0 || yearMismatchWarning) && (
-            <div className="p-4 bg-orange-50 border-2 border-orange-300 rounded-lg">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={adminBypassValidations}
-                  onChange={e => setAdminBypassValidations(e.target.checked)}
-                  className="w-5 h-5 rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                />
-                <span className="text-sm font-semibold text-orange-900">
-                  ⚠️ Modo Admin: Omitir validaciones de correlativas y año
-                </span>
-              </label>
-            </div>
-          )}
-
           {/* Botones */}
           <div className="flex gap-3 pt-2">
             <button 
               type="submit" 
               className="btn-primary flex-1"
-              disabled={(correlativeWarnings.length > 0 || !!yearMismatchWarning) && !adminBypassValidations}
+              disabled={correlativeWarnings.length > 0 || !!yearMismatchWarning}
             >
               Inscribir
             </button>
             <button
               type="button"
-              onClick={() => {
-                setModalOpen(false)
-                setAdminBypassValidations(false)
-              }}
+              onClick={() => setModalOpen(false)}
               className="btn-secondary flex-1"
             >
               Cancelar
