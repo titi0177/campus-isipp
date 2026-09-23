@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, UserCheck,
   ClipboardList, Star, Calendar, FileText, Bell, Settings,
   ChevronRight, LogOut, BookMarked, BarChart3, ClipboardCheck,
-  Link2, MessageCircle, DollarSign, Award, AlertCircle
+  Link2, MessageCircle, DollarSign, Award, AlertCircle, Clock
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUnreadMessages } from '@/hooks/useUnreadMessages'
@@ -50,6 +50,7 @@ const adminNav: NavItem[] = [
   { label: 'Novedades', href: '/admin/announcements', icon: <Bell size={18} /> },
   { label: 'Reportes y estadísticas', href: '/admin/reports', icon: <BarChart3 size={18} /> },
   { label: 'Tesorera', href: '/treasurer', icon: <DollarSign size={18} /> },
+  { label: '⏰ Avance de Año', href: '/admin/year-advancement', icon: <Clock size={18} /> },
   { label: 'Parámetros / Seguridad', href: '/admin/settings', icon: <Settings size={18} /> },
 ]
 
