@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { DataTable } from '@/components/DataTable'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/components/Toast'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Filter } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/final-exams')({
   component: FinalExamsPage,
@@ -18,6 +18,8 @@ function FinalExamsPage() {
   const [editing, setEditing] = useState<any>({})
   const [globalEnabled, setGlobalEnabled] = useState(true)
   const [confirmModal, setConfirmModal] = useState(false)
+  const [filterCareer, setFilterCareer] = useState<string>('')
+  const [filterYear, setFilterYear] = useState<number | null>(null)
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -30,7 +32,7 @@ function FinalExamsPage() {
         .from('final_exams')
         .select(`
           *,
-          subject:subjects(name, code)
+          subject:subjects(name, code, year, program_id, program:programs(name))
         `)
         .order('exam_date', { ascending: false })
 
@@ -69,6 +71,20 @@ function FinalExamsPage() {
       console.error(err)
     }
   }
+
+  const filteredExams = exams.filter(exam => {
+    if (filterCareer && exam.subject?.program_id !== filterCareer) return false
+    if (filterYear !== null && exam.subject?.year !== filterYear) return false
+    return true
+  })
+
+  const uniqueCareers = Array.from(new Map(
+    exams
+      .filter(e => e.subject?.program_id)
+      .map(e => [e.subject?.program_id, e.subject?.program])
+  ).values())
+
+  const uniqueYears = Array.from(new Set(exams.map(e => e.subject?.year).filter(Boolean))) as number[]
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -190,6 +206,58 @@ function FinalExamsPage() {
         </div>
       </div>
 
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={18} className="text-slate-600" />
+          <h3 className="font-semibold text-slate-900">Filtros</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="form-label text-xs">Por Carrera</label>
+            <select
+              className="form-input text-sm"
+              value={filterCareer}
+              onChange={(e) => setFilterCareer(e.target.value)}
+            >
+              <option value="">Todas las carreras</option>
+              {uniqueCareers.map(career => (
+                <option key={career?.id} value={career?.id}>
+                  {career?.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">Por Año</label>
+            <select
+              className="form-input text-sm"
+              value={filterYear === null ? '' : filterYear}
+              onChange={(e) => setFilterYear(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">Todos los años</option>
+              {uniqueYears.sort((a, b) => a - b).map(year => (
+                <option key={year} value={year}>
+                  {year}° Año
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="form-label text-xs">&nbsp;</label>
+            <button
+              type="button"
+              onClick={() => {
+                setFilterCareer('')
+                setFilterYear(null)
+              }}
+              className="btn-secondary w-full text-sm"
+            >
+              Limpiar
+            </button>
+          </div>
+        </div>
+      </div>
+
       <DataTable
         columns={[
           {
@@ -220,7 +288,7 @@ function FinalExamsPage() {
             label: 'Lugar'
           },
         ]}
-        data={exams}
+        data={filteredExams}
         actions={(row: any) => (
           <div className="flex items-center gap-2 justify-end">
 
