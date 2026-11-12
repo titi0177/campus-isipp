@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { AlertCircle, Download, FileText } from 'lucide-react'
+import { AlertCircle, Download, FileText, File } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 type Subject = {
   id: string
@@ -139,41 +141,108 @@ export function ProfessorGradesReport({ subjectId }: Props) {
     }
   }
 
+  const generatePDF = () => {
+    if (gradesReport.length === 0) {
+      alert('No hay notas finalizadas para exportar')
+      return
+    }
+
+    const doc = new jsPDF('l')
+    const currentDate = new Date().toLocaleDateString('es-AR')
+    const pageWidth = doc.internal.pageSize.getWidth()
+
+    // Header
+    doc.setFontSize(16)
+    doc.text('REPORTE DE CALIFICACIONES FINALIZADAS', pageWidth / 2, 15, { align: 'center' })
+
+    doc.setFontSize(11)
+    doc.text(`Materia: ${subject?.code} - ${subject?.name}`, 14, 25)
+    doc.text(`Generado: ${currentDate}`, 14, 31)
+    doc.text(`Total de alumnos: ${gradesReport.length}`, 14, 37)
+
+    // Tabla
+    const tableData = gradesReport.map(grade => {
+      const loadedNotes: string[] = []
+      for (let i = 1; i <= 6; i++) {
+        const value = grade[`grade_${i}` as keyof typeof grade]
+        if (typeof value === 'number') {
+          loadedNotes.push(`${grade[`grade_${i}_label` as keyof typeof grade] || `Nota ${i}`}: ${value}`)
+        }
+      }
+      return [
+        grade.legajo,
+        grade.student_name,
+        loadedNotes.join(' | '),
+        grade.partial_grade?.toFixed(1) || '-',
+        grade.partial_status || '-',
+      ]
+    })
+
+    autoTable(doc, {
+      head: [['Legajo', 'Estudiante', 'Notas Cargadas', 'Promedio', 'Estado']],
+      body: tableData,
+      startY: 45,
+      margin: 10,
+      headStyles: { fillColor: [16, 185, 129], fontSize: 10 },
+      bodyStyles: { fontSize: 8 },
+      alternateRowStyles: { fillColor: [240, 253, 250] },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 65 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 20 },
+      },
+    })
+
+    doc.save(`reporte_notas_${subject?.code}_${new Date().getTime()}.pdf`)
+  }
+
   const generateExcel = () => {
     if (gradesReport.length === 0) {
       alert('No hay notas finalizadas para exportar')
       return
     }
 
-    // Crear CSV
-    let csv = 'REPORTE DE CALIFICACIONES FINALIZADAS\n'
-    csv += `Materia: ${subject?.code} - ${subject?.name}\n`
-    csv += `Fecha de generación: ${new Date().toLocaleDateString()}\n\n`
+    // Headers mejorados
+    const headers = ['Legajo', 'Estudiante', 'Nota 1', 'Tipo 1', 'Nota 2', 'Tipo 2', 'Nota 3', 'Tipo 3', 'Nota 4', 'Tipo 4', 'Nota 5', 'Tipo 5', 'Nota 6', 'Tipo 6', 'Promedio Parcial', 'Estado Parcial']
+    
+    const rows = gradesReport.map(grade => [
+      grade.legajo,
+      grade.student_name,
+      grade.grade_1?.toFixed(1) || '',
+      grade.grade_1_label || '',
+      grade.grade_2?.toFixed(1) || '',
+      grade.grade_2_label || '',
+      grade.grade_3?.toFixed(1) || '',
+      grade.grade_3_label || '',
+      grade.grade_4?.toFixed(1) || '',
+      grade.grade_4_label || '',
+      grade.grade_5?.toFixed(1) || '',
+      grade.grade_5_label || '',
+      grade.grade_6?.toFixed(1) || '',
+      grade.grade_6_label || '',
+      grade.partial_grade?.toFixed(1) || '',
+      grade.partial_status || '',
+    ])
 
-    csv += 'Legajo,Estudiante,Nota 1,Tipo 1,Nota 2,Tipo 2,Nota 3,Tipo 3,Nota 4,Tipo 4,Nota 5,Tipo 5,Nota 6,Tipo 6,Promedio Parcial,Estado Parcial,Notas Utilizadas\n'
-
-    gradesReport.forEach(grade => {
-      const notasUtilizadas = grade.selected_grades.join(';')
-      
-      csv += `"${grade.legajo}","${grade.student_name}",`
-      csv += `${grade.grade_1 ?? ''},${grade.grade_1_label ?? ''},`
-      csv += `${grade.grade_2 ?? ''},${grade.grade_2_label ?? ''},`
-      csv += `${grade.grade_3 ?? ''},${grade.grade_3_label ?? ''},`
-      csv += `${grade.grade_4 ?? ''},${grade.grade_4_label ?? ''},`
-      csv += `${grade.grade_5 ?? ''},${grade.grade_5_label ?? ''},`
-      csv += `${grade.grade_6 ?? ''},${grade.grade_6_label ?? ''},`
-      csv += `${grade.partial_grade ?? ''},${grade.partial_status ?? ''},`
-      csv += `"${notasUtilizadas}"\n`
-    })
+    // Crear CSV con BOM para Excel y acentos
+    const csv = [
+      '\uFEFF',
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
 
     // Descargar
-    const element = document.createElement('a')
-    element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv))
-    element.setAttribute('download', `calificaciones_${subject?.code}_${new Date().getTime()}.csv`)
-    element.style.display = 'none'
-    document.body.appendChild(element)
-    element.click()
-    document.body.removeChild(element)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `reporte_notas_${subject?.code}_${new Date().getTime()}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const getStatusColor = (status: string) => {
@@ -314,14 +383,21 @@ export function ProfessorGradesReport({ subjectId }: Props) {
             </div>
           </div>
 
-          {/* Botón Descargar */}
-          <div className="flex justify-end">
+          {/* Botones Descargar */}
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={generatePDF}
+              className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
+            >
+              <FileText size={20} />
+              Descargar PDF
+            </button>
             <button
               onClick={generateExcel}
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:shadow-lg text-white font-bold py-3 px-6 rounded-lg transition-all flex items-center justify-center gap-2"
+              className="flex-1 bg-gradient-to-r from-green-600 to-emerald-700 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
             >
               <Download size={20} />
-              Descargar como CSV
+              Descargar CSV (Excel)
             </button>
           </div>
 
