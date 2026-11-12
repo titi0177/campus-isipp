@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Download, Filter } from 'lucide-react'
+import { Download, Filter, FileText, File } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -167,6 +167,38 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
     })
   }
 
+  const generateCSV = () => {
+    const headers = ['Legajo', 'Alumno', 'DNI', 'Prom. Parcial', 'Est. Parcial', 'Nota Final', 'Estado Final', 'Fecha Carga']
+    const rows = filteredStudents.map(s => [
+      s.legajo,
+      s.student_name,
+      s.dni,
+      s.partial_grade !== null && s.partial_grade !== undefined ? Number(s.partial_grade).toFixed(1) : '-',
+      s.partial_status || '-',
+      s.final_grade !== null && s.final_grade !== undefined ? Number(s.final_grade).toFixed(1) : '-',
+      s.final_status ? getStatusLabel(s.final_status) : (s.partial_status ? getStatusLabel(s.partial_status) : '-'),
+      new Date(s.created_at).toLocaleDateString('es-AR'),
+    ])
+
+    // Crear CSV con BOM para Excel
+    const csv = [
+      '\uFEFF',
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    // Descargar
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `calificaciones_${subjectName.replace(/\s+/g, '_')}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   if (loading) {
     return (
       <div className="card p-6 text-center">
@@ -274,14 +306,23 @@ export function ProfessorApprovedHistory({ subjectId, subjectName }: Props) {
         </div>
       </div>
 
-      {/* Botón Descargar */}
-      <button
-        onClick={generatePDF}
-        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
-      >
-        <Download size={20} />
-        Descargar Actas en PDF (divididas por 27 alumnos)
-      </button>
+      {/* Botones Descargar */}
+      <div className="flex gap-3 flex-wrap">
+        <button
+          onClick={generatePDF}
+          className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
+        >
+          <FileText size={20} />
+          Descargar PDF (Actas por 27 alumnos)
+        </button>
+        <button
+          onClick={generateCSV}
+          className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:shadow-lg text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
+        >
+          <Download size={20} />
+          Descargar CSV (Excel)
+        </button>
+      </div>
     </div>
   )
 }
