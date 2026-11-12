@@ -283,15 +283,26 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
         const grade = typeof gradeRaw === 'string' ? parseFloat(gradeRaw) : gradeRaw
         
         if (grade !== undefined && grade !== null) {
-          // Si la nota es < 6, marcar
+          // LÓGICA FLEXIBLE: TP bajos se incluyen, parciales bajos se rechazan
+          const esTP = labelActual?.includes('TP')
+          
           if (grade < 6) {
-            tieneNotaMenorA6 = true
-            notaMenorA6 = grade
+            if (esTP) {
+              // TP bajo: SÍ se incluye en promedio
+              notasAUsar.push(grade)
+            } else {
+              // Parcial bajo: RECHAZA TODO
+              tieneNotaMenorA6 = true
+              notaMenorA6 = grade
+            }
+          } else {
+            // Nota >= 6: siempre se incluye
+            notasAUsar.push(grade)
           }
+          
           if (grade < 8) {
             allNotasAbove8 = false
           }
-          notasAUsar.push(grade)
         }
       }
     })
