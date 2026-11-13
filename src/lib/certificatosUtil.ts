@@ -22,6 +22,7 @@ export interface GradeData {
   materia: string
   parcial: number | null
   final: number | null
+  final_status?: string
   estado: string
   condicion: string
   año: number
@@ -266,85 +267,60 @@ export function generateApprovedCertificate(student: StudentData, grades: GradeD
 
   yPos += 12
 
-  // ============ TÍTULO ============
-  doc.setFontSize(12)
-  doc.setFont(undefined, 'bold')
-  doc.text('CERTIFICADO DE MATERIAS APROBADAS', pageWidth / 2, yPos, { align: 'center' })
-
-  yPos += 10
-
-  // ============ DATOS DEL ALUMNO ============
-  doc.setFontSize(9)
+  // ============ CUERPO NARRATIVO CON RESOLUCIÓN DINÁMICA ============
+  doc.setFontSize(10)
   doc.setFont(undefined, 'normal')
 
   const fullName = `${student.apellido.toUpperCase()} ${student.nombre.toUpperCase()}`
-  doc.text(`Alumno: ${fullName}`, 20, yPos)
-  yPos += 4
-  doc.text(`DNI: ${student.dni}`, 20, yPos)
-  yPos += 4
-  doc.text(`Legajo: ${student.legajo}`, 20, yPos)
-  yPos += 4
-  doc.text(`Carrera: ${student.carrera}`, 20, yPos)
+  const resolucion = getResolucionByCarrera(student.carrera)
 
-  yPos += 10
+  const textoCuerpo = `El Instituto Superior de Informática Cod.1206 de Puerto Piray-Misiones, hace constar que ${fullName} DNI ${student.dni} aprobó las asignaturas que a continuación se detallan y que corresponde al plan de Estudios de la Carrera de ${student.carrera}; ${resolucion}`
+
+  doc.text(textoCuerpo, 20, yPos, { maxWidth: pageWidth - 40 })
+
+  yPos += 25
 
   // ============ TABLA DE CALIFICACIONES ============
-  // Agrupar por año
-  const gradesByYear = grades.reduce(
-    (acc, grade) => {
-      const key = grade.año
-      if (!acc[key]) acc[key] = []
-      acc[key].push(grade)
-      return acc
+  const tableData = grades.map((g) => {
+    const fechaObj = new Date(g.created_at || new Date())
+    const mes = getMonthName(fechaObj.getMonth())
+    const año = fechaObj.getFullYear()
+    const calificacionFormato = formatNoteWithNumeral(g.final)
+    const condicion = g.final_status === 'promocionado' ? 'PROMOCIONADO' : 'REGULAR'
+
+    return [g.materia, calificacionFormato, condicion, mes, año.toString()]
+  })
+
+  autoTable(doc, {
+    head: [['ASIGNATURA', 'CALIFICACION', 'CONDICION', 'MES', 'AÑO']],
+    body: tableData,
+    startY: yPos,
+    margin: { left: 20, right: 20 },
+    headStyles: {
+      fillColor: [88, 44, 49],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 9,
+      halign: 'center',
     },
-    {} as Record<number, GradeData[]>
-  )
+    bodyStyles: {
+      fontSize: 8,
+      halign: 'left',
+    },
+    alternateRowStyles: {
+      fillColor: [240, 240, 240],
+    },
+    columnStyles: {
+      1: { halign: 'center' },
+      2: { halign: 'center' },
+      3: { halign: 'center' },
+      4: { halign: 'center' },
+    },
+  })
 
-  // Procesar cada año
-  Object.keys(gradesByYear)
-    .sort((a, b) => parseInt(a) - parseInt(b))
-    .forEach((year) => {
-      const yearGrades = gradesByYear[year]
+  yPos = (doc as any).lastAutoTable.finalY + 8
 
-      const tableData = yearGrades.map((g) => [
-        g.codigo,
-        g.materia,
-        g.final !== null ? g.final.toString() : '—',
-        getCondicion(g.final, g.allows_promotion),
-        g.created_at ? formatDateForPdf(g.created_at) : '—',
-      ])
-
-      autoTable(doc, {
-        head: [['CÓDIGO', 'MATERIA', 'NOTA', 'RESULTADO', 'FECHA APROBACIÓN']],
-        body: tableData,
-        startY: yPos,
-        margin: { left: 20, right: 20 },
-        headStyles: {
-          fillColor: [88, 44, 49],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 9,
-          halign: 'center',
-        },
-        bodyStyles: {
-          fontSize: 8,
-          halign: 'left',
-        },
-        alternateRowStyles: {
-          fillColor: [240, 240, 240],
-        },
-        columnStyles: {
-          0: { halign: 'center' },
-          2: { halign: 'center' },
-          3: { halign: 'center' },
-          4: { halign: 'center' },
-        },
-      })
-
-      yPos = (doc as any).lastAutoTable.finalY + 8
-    })
-
-  // ============ PIE DE PÁGINA ============
+  // ============ PIE DE PÁGINA CON FECHA COMPLETA ============
   doc.setFont(undefined, 'normal')
   doc.setFontSize(9)
 
@@ -354,7 +330,7 @@ export function generateApprovedCertificate(student: StudentData, grades: GradeD
   const year = today.getFullYear()
 
   doc.text(
-    `Se extiende la presente, a pedido del interesado, en Puerto Piray a los ${day} días del mes de ${month} del ${year} y para ser presentada ante las autoridades que la requieran.`,
+    `Se extiende la presente, a pedido del interesado, en Puerto Piray a los ${day} de ${month} de ${year} y para ser presentada ante las autoridades que la requieran.`,
     20,
     yPos,
     { maxWidth: pageWidth - 40 }
@@ -516,4 +492,57 @@ function getMonthName(month: number): string {
     'DICIEMBRE',
   ]
   return months[month]
+}
+
+/**
+ * Convierte una nota numérica a su representación con numeral
+ * 10 → "10 (DIEZ)"
+ * 8.5 → "8,50 (OCHO/50)"
+ * 7 → "7 (SIETE)"
+ */
+function formatNoteWithNumeral(nota: number | null): string {
+  if (nota === null || nota === undefined) return '—'
+
+  const numerales: Record<number, string> = {
+    1: 'UNO',
+    2: 'DOS',
+    3: 'TRES',
+    4: 'CUATRO',
+    5: 'CINCO',
+    6: 'SEIS',
+    7: 'SIETE',
+    8: 'OCHO',
+    9: 'NUEVE',
+    10: 'DIEZ',
+  }
+
+  // Si es un número entero
+  if (Number.isInteger(nota)) {
+    const numeral = numerales[nota] || nota.toString()
+    return `${nota} (${numeral})`
+  }
+
+  // Si tiene decimales (ej: 8.5)
+  const notaStr = nota.toString().replace('.', ',')
+  const parteEntera = Math.floor(nota)
+  const parteDecimal = Math.round((nota - parteEntera) * 100)
+
+  const numeralEntero = numerales[parteEntera] || parteEntera.toString()
+  const numeralDecimal = numerales[parteDecimal] || parteDecimal.toString()
+
+  return `${notaStr} (${numeralEntero}/${numeralDecimal})`
+}
+
+/**
+ * Obtiene la resolución correspondiente según la carrera
+ */
+function getResolucionByCarrera(carrera: string): string {
+  const carreraUpper = carrera.toUpperCase()
+
+  if (carreraUpper.includes('HIGIENE')) {
+    return 'aprobado por la Resolución SPEPM 1899/20 Validez Nacional RM EXP Nº 0475/24.-'
+  }
+
+  // Default para ANALISTA DE SISTEMAS
+  return 'aprobado por la Resolución SPEPM 48/2013 Validez Nacional RM EXP Nº 1919/17.-'
 }
