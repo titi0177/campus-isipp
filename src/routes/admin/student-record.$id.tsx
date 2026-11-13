@@ -59,12 +59,8 @@ function StudentRecord() {
 
     // Separar solo aprobadas y promocionadas para certificado
     const approved = formatted.filter((s: any) => {
-      if (!s.final_grade || s.final_grade < 6) return false
-      return (
-        s.final_status === 'promocionado' ||
-        s.final_status === 'regular' ||
-        (s.final_status === 'desaprobado' && s.final_grade >= 6)
-      )
+      // Solo incluir si tiene nota >= 6
+      return s.final_grade && s.final_grade >= 6
     })
     console.log(`[student-record] Total subjects: ${formatted.length}, Approved: ${approved.length}`)
     console.log('[student-record] Approved subjects:', approved.map((s: any) => `${s.name} (${s.final_grade}/${s.final_status})`))
