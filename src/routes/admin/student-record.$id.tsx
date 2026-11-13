@@ -66,6 +66,8 @@ function StudentRecord() {
         (s.final_status === 'desaprobado' && s.final_grade >= 6)
       )
     })
+    console.log(`[student-record] Total subjects: ${formatted.length}, Approved: ${approved.length}`)
+    console.log('[student-record] Approved subjects:', approved.map((s: any) => `${s.name} (${s.final_grade}/${s.final_status})`))
     setApprovedSubjects(approved)
   }
 
