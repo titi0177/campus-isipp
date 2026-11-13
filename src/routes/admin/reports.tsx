@@ -24,17 +24,23 @@ function ReportsPage() {
 
   async function load() {
     const [{ data: grades }, { data: attendance }] = await Promise.all([
-      supabase.from('enrollments').select('subject:subjects(name), grade:grades(final_grade, status)'),
+      supabase.from('enrollment_grades').select(`
+        final_grade,
+        final_status,
+        enrollments!inner(
+          subject:subjects(name)
+        )
+      `),
       supabase.from('enrollments').select('subject:subjects(name), attendance:attendance(percentage)'),
     ])
 
     if (grades) {
       // Average grade per subject
       const subjectGrades: Record<string, number[]> = {}
-      grades.forEach((enr: any) => {
-        const name = enr.subject?.name
+      grades.forEach((grade: any) => {
+        const name = grade.enrollments?.subject?.name
         if (!name) return
-        const fg = enr.grade?.[0]?.final_grade
+        const fg = grade.final_grade
         if (fg != null) {
           if (!subjectGrades[name]) subjectGrades[name] = []
           subjectGrades[name].push(fg)
@@ -57,12 +63,12 @@ function ReportsPage() {
 
       // Pass rates
       const subjectStatus: Record<string, { passed: number; total: number }> = {}
-      grades.forEach((enr: any) => {
-        const name = enr.subject?.name
+      grades.forEach((grade: any) => {
+        const name = grade.enrollments?.subject?.name
         if (!name) return
         if (!subjectStatus[name]) subjectStatus[name] = { passed: 0, total: 0 }
         subjectStatus[name].total++
-        if (['promoted', 'passed'].includes(enr.grade?.[0]?.status)) subjectStatus[name].passed++
+        if (['regular', 'promocionado'].includes(grade.final_status)) subjectStatus[name].passed++
       })
       const srNames = Object.keys(subjectStatus).slice(0, 10)
       const rates = srNames.map(n => Math.round((subjectStatus[n].passed / subjectStatus[n].total) * 100))

@@ -33,18 +33,23 @@ function StudentRecord() {
     setStudent(studentData)
 
     const { data } = await supabase
-      .from('grades')
+      .from('enrollment_grades')
       .select(`
         final_grade,
-        enrollment:enrollments(
-          subject:subjects(name)
+        final_status,
+        enrollment_id,
+        enrollments!inner(
+          student_id,
+          subject_id,
+          subjects!inner(name)
         )
       `)
-      .eq('enrollment.student_id', id)
+      .eq('enrollments.student_id', id)
 
     const formatted = data?.map((g: any) => ({
-      name: g.enrollment.subject.name,
-      final_grade: g.final_grade
+      name: g.enrollments.subjects.name,
+      final_grade: g.final_grade,
+      final_status: g.final_status
     }))
 
     setSubjects(formatted || [])
@@ -105,13 +110,13 @@ function StudentRecord() {
 
               let estado = "Desaprobado"
 
-              if (s.final_grade >= 7) estado = "Promocionado"
-              else if (s.final_grade >= 4) estado = "Aprobado"
+              if (s.final_grade >= 8) estado = "Promocionado"
+              else if (s.final_grade >= 6) estado = "Aprobado"
 
               return (
                 <tr key={i} className="border-b">
                   <td className="py-2">{s.name}</td>
-                  <td>{s.final_grade}</td>
+                  <td>{s.final_grade || '-'}</td>
                   <td>{estado}</td>
                 </tr>
               )

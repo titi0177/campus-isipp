@@ -46,33 +46,40 @@ function CertificatesPage() {
           email: studentData.email,
         })
 
-        // Obtener calificaciones finales aprobadas
-        const { data: enrollmentsData } = await supabase
-          .from('enrollments')
+        // Obtener calificaciones finales aprobadas desde enrollment_grades
+        const { data: gradesData } = await supabase
+          .from('enrollment_grades')
           .select(`
             id,
-            subject:subjects(code, name, year),
-            grades(final_grade_exam, status)
+            final_grade,
+            final_status,
+            created_at,
+            enrollments!inner(
+              student_id,
+              subject_id,
+              subjects!inner(id, name, code, year, allows_promotion)
+            )
           `)
-          .eq('student_id', studentData.id)
+          .eq('enrollments.student_id', studentData.id)
+          .eq('final_status', 'regular')
 
-        if (enrollmentsData && enrollmentsData.length > 0) {
+        if (gradesData && gradesData.length > 0) {
           const approvedGrades: GradeData[] = []
 
-          for (const enrollment of enrollmentsData) {
-            const grade = Array.isArray(enrollment.grades) 
-              ? enrollment.grades[0] 
-              : enrollment.grades
-            
-            if (grade && grade.final_grade_exam && grade.final_grade_exam >= 6) {
+          for (const grade of gradesData) {
+            const enrollment = (grade as any).enrollments
+            const subject = enrollment.subjects
+
+            if (grade.final_grade && grade.final_grade >= 6) {
               approvedGrades.push({
-                codigo: (enrollment.subject as any)?.code || '',
-                materia: (enrollment.subject as any)?.name || '',
+                codigo: subject.code || '',
+                materia: subject.name || '',
                 parcial: null,
-                final: grade.final_grade_exam,
+                final: grade.final_grade,
                 estado: 'REGULAR',
-                condicion: 'APROBADO',
-                año: (enrollment.subject as any)?.year || 1,
+                condicion: getCondicion(grade.final_grade, subject.allows_promotion),
+                año: subject.year || 1,
+                created_at: grade.created_at,
               })
             }
           }
@@ -95,15 +102,14 @@ function CertificatesPage() {
     }
 
     try {
-      // Obtener calificaciones aprobadas (igual que historial)
+      // Obtener calificaciones aprobadas desde enrollment_grades
       const { data: gradesData, error: gradesError } = await supabase
-        .from('grades')
+        .from('enrollment_grades')
         .select(`
           id,
           final_grade,
-          final_grade_exam,
+          final_status,
           created_at,
-          status,
           enrollment_id,
           enrollments!inner(
             student_id,
@@ -111,6 +117,8 @@ function CertificatesPage() {
             subjects!inner(id, name, code, year, allows_promotion)
           )
         `)
+        .eq('enrollments.student_id', studentId)
+        .in('final_status', ['regular', 'promocionado'])
 
       if (gradesError) {
         console.error('Error fetching grades:', gradesError)
@@ -127,30 +135,18 @@ function CertificatesPage() {
 
       for (const grade of gradesData) {
         const enrollment = (grade as any).enrollments
-        
-        // Filtrar solo del estudiante actual
-        if (!enrollment || enrollment.student_id !== studentId) continue
-
         const subject = enrollment.subjects
-        if (!subject) continue
 
-        // Validar nota final >= 6
-        const finalGrade = grade.final_grade ?? grade.final_grade_exam
-        
-        if (
-          finalGrade !== null && 
-          finalGrade !== undefined && 
-          finalGrade >= 6
-        ) {
-          const condicion = getCondicion(finalGrade, subject.allows_promotion)
+        if (grade.final_grade && grade.final_grade >= 6) {
+          const condicion = getCondicion(grade.final_grade, subject.allows_promotion)
 
           approvedGrades.push({
             id: grade.id,
             codigo: subject.code,
             materia: subject.name,
             parcial: null,
-            final: finalGrade,
-            estado: grade.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
+            final: grade.final_grade,
+            estado: grade.final_status === 'promocionado' ? 'PROMOCIONADO' : 'REGULAR',
             condicion,
             año: subject.year,
             created_at: grade.created_at,
@@ -179,15 +175,14 @@ function CertificatesPage() {
     }
 
     try {
-      // Obtener todas las calificaciones para el analítico (igual que historial)
+      // Obtener todas las calificaciones desde enrollment_grades
       const { data: gradesData, error: gradesError } = await supabase
-        .from('grades')
+        .from('enrollment_grades')
         .select(`
           id,
           final_grade,
-          final_grade_exam,
+          final_status,
           created_at,
-          status,
           enrollment_id,
           enrollments!inner(
             student_id,
@@ -195,6 +190,7 @@ function CertificatesPage() {
             subjects!inner(id, name, code, year, allows_promotion)
           )
         `)
+        .eq('enrollments.student_id', studentId)
 
       if (gradesError) {
         console.error('Error fetching grades:', gradesError)
@@ -211,30 +207,18 @@ function CertificatesPage() {
 
       for (const grade of gradesData) {
         const enrollment = (grade as any).enrollments
-        
-        // Filtrar solo del estudiante actual
-        if (!enrollment || enrollment.student_id !== studentId) continue
-
         const subject = enrollment.subjects
-        if (!subject) continue
 
-        // Validar nota final >= 6
-        const finalGrade = grade.final_grade ?? grade.final_grade_exam
-        
-        if (
-          finalGrade !== null && 
-          finalGrade !== undefined && 
-          finalGrade >= 6
-        ) {
-          const condicion = getCondicion(finalGrade, subject.allows_promotion)
+        if (grade.final_grade && grade.final_grade >= 6) {
+          const condicion = getCondicion(grade.final_grade, subject.allows_promotion)
 
           allGrades.push({
             id: grade.id,
             codigo: subject.code,
             materia: subject.name,
             parcial: null,
-            final: finalGrade,
-            estado: grade.status === 'promoted' ? 'PROMOCIONADO' : 'REGULAR',
+            final: grade.final_grade,
+            estado: grade.final_status === 'promocionado' ? 'PROMOCIONADO' : 'REGULAR',
             condicion,
             año: subject.year,
             created_at: grade.created_at,
