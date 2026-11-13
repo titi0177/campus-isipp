@@ -46,7 +46,7 @@ function CertificatesPage() {
           email: studentData.email,
         })
 
-        // Obtener calificaciones finales aprobadas desde enrollment_grades
+        // Obtener calificaciones finales aprobadas y promocionadas desde enrollment_grades
         const { data: gradesData } = await supabase
           .from('enrollment_grades')
           .select(`
@@ -61,7 +61,7 @@ function CertificatesPage() {
             )
           `)
           .eq('enrollments.student_id', studentData.id)
-          .eq('final_status', 'regular')
+          .in('final_status', ['regular', 'promocionado'])
 
         if (gradesData && gradesData.length > 0) {
           const approvedGrades: GradeData[] = []
@@ -76,7 +76,7 @@ function CertificatesPage() {
                 materia: subject.name || '',
                 parcial: null,
                 final: grade.final_grade,
-                estado: 'REGULAR',
+                estado: grade.final_status === 'promocionado' ? 'PROMOCIONADO' : 'REGULAR',
                 condicion: getCondicion(grade.final_grade, subject.allows_promotion),
                 año: subject.year || 1,
                 created_at: grade.created_at,
@@ -102,7 +102,7 @@ function CertificatesPage() {
     }
 
     try {
-      // Obtener calificaciones aprobadas desde enrollment_grades
+      // Obtener calificaciones aprobadas y promocionadas desde enrollment_grades
       const { data: gradesData, error: gradesError } = await supabase
         .from('enrollment_grades')
         .select(`
@@ -175,7 +175,7 @@ function CertificatesPage() {
     }
 
     try {
-      // Obtener todas las calificaciones desde enrollment_grades
+      // Obtener todas las calificaciones aprobadas y promocionadas desde enrollment_grades
       const { data: gradesData, error: gradesError } = await supabase
         .from('enrollment_grades')
         .select(`
@@ -191,6 +191,7 @@ function CertificatesPage() {
           )
         `)
         .eq('enrollments.student_id', studentId)
+        .in('final_status', ['regular', 'promocionado'])
 
       if (gradesError) {
         console.error('Error fetching grades:', gradesError)
@@ -330,7 +331,7 @@ function CertificatesPage() {
           <div className="flex items-start justify-between mb-6">
             <div>
               <h3 className="text-2xl font-black text-gray-900 mb-2">Analítico de Calificaciones</h3>
-              <p className="text-sm text-gray-600">Histórico completo de todas tus calificaciones</p>
+              <p className="text-sm text-gray-600">Histórico completo de todas tus calificaciones aprobadas</p>
             </div>
             <FileText size={40} className="text-blue-600 opacity-30" />
           </div>
@@ -350,7 +351,7 @@ function CertificatesPage() {
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h3 className="text-2xl font-black text-gray-900 mb-2">Certificado de Materias Aprobadas</h3>
-                <p className="text-sm text-gray-600">Listado completo de materias aprobadas con calificaciones y fechas</p>
+                <p className="text-sm text-gray-600">Listado completo de materias aprobadas y promocionadas con calificaciones y fechas</p>
               </div>
               <Award size={40} className="text-purple-600 opacity-30" />
             </div>
@@ -373,10 +374,11 @@ function CertificatesPage() {
         </h3>
         <ul className="text-sm text-amber-900 space-y-2 list-disc list-inside">
           <li><strong>Constancia de Alumno Regular:</strong> Acredita tu condición de alumno activo en el instituto</li>
-          <li><strong>Analítico de Calificaciones:</strong> Documento con todas tus notas parciales y finales</li>
-          <li><strong>Certificado de Materias Aprobadas:</strong> Listado de materias aprobadas con fecha de aprobación</li>
+          <li><strong>Analítico de Calificaciones:</strong> Documento con todas tus materias aprobadas y promocionadas</li>
+          <li><strong>Certificado de Materias Aprobadas:</strong> Listado de materias aprobadas y promocionadas con fecha de aprobación</li>
           <li>Los certificados son válidos para presentar ante autoridades que los requieran</li>
           <li>Se generan automáticamente con la fecha actual de emisión</li>
+          <li><strong>Materias en curso:</strong> No aparecen en los certificados hasta que estén aprobadas o promocionadas</li>
         </ul>
       </div>
     </div>
