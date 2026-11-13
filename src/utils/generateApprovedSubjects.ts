@@ -76,7 +76,13 @@ export function generateApprovedSubjects(student: any, subjects: any[]) {
     const mes = getMonthName(fechaObj.getMonth())
     const año = fechaObj.getFullYear()
     const calificacionFormato = formatNoteWithNumeral(s.final_grade)
-    const condicion = s.final_status === 'promocionado' ? 'PROMOCIONADO' : 'REGULAR'
+    
+    let condicion = 'DESAPROBADO'
+    if (s.final_status === 'promocionado') {
+      condicion = 'PROMOCIONADO'
+    } else if (s.final_grade >= 6) {
+      condicion = 'APROBADO'
+    }
 
     return [s.name, calificacionFormato, condicion, mes, año.toString()]
   })

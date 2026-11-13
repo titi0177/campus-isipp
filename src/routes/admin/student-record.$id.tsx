@@ -58,10 +58,14 @@ function StudentRecord() {
     setSubjects(formatted)
 
     // Separar solo aprobadas y promocionadas para certificado
-    const approved = formatted.filter((s: any) => 
-      (s.final_status === 'regular' || s.final_status === 'promocionado') &&
-      s.final_grade && s.final_grade >= 6
-    )
+    const approved = formatted.filter((s: any) => {
+      if (!s.final_grade || s.final_grade < 6) return false
+      return (
+        s.final_status === 'promocionado' ||
+        s.final_status === 'regular' ||
+        (s.final_status === 'desaprobado' && s.final_grade >= 6)
+      )
+    })
     setApprovedSubjects(approved)
   }
 
@@ -70,14 +74,14 @@ function StudentRecord() {
   const getEstado = (s: any) => {
     if (!s.final_grade) return 'En Curso'
     if (s.final_status === 'promocionado') return 'Promocionado'
-    if (s.final_status === 'regular' && s.final_grade >= 6) return 'Aprobado'
+    if (s.final_grade >= 6) return 'Aprobado'
     return 'Desaprobado'
   }
 
   const getEstadoBadge = (s: any) => {
     if (!s.final_grade) return 'bg-blue-100 text-blue-700'
     if (s.final_status === 'promocionado') return 'bg-green-100 text-green-700'
-    if (s.final_status === 'regular' && s.final_grade >= 6) return 'bg-yellow-100 text-yellow-700'
+    if (s.final_grade >= 6) return 'bg-yellow-100 text-yellow-700'
     return 'bg-red-100 text-red-700'
   }
 
@@ -123,7 +127,7 @@ function StudentRecord() {
   const getCondicion = (s: any): string => {
     if (!s.final_grade) return '—'
     if (s.final_status === 'promocionado') return 'PROMOCIONADO'
-    if (s.final_status === 'regular' && s.final_grade >= 6) return 'REGULAR'
+    if (s.final_grade >= 6) return 'APROBADO'
     return 'DESAPROBADO'
   }
 
