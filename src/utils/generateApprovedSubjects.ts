@@ -2,6 +2,9 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 
 export function generateApprovedSubjects(student: any, subjects: any[]) {
+  console.log(`[generateApprovedSubjects] Recibido ${subjects.length} subjects`)
+  console.log('[generateApprovedSubjects] Subjects:', subjects.map(s => `${s.name} - ${s.final_grade} (${s.final_status})`))
+  
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -71,7 +74,11 @@ export function generateApprovedSubjects(student: any, subjects: any[]) {
   yPos += 25
 
   // ============ TABLA DE CALIFICACIONES ============
-  const tableData = subjects.map((s) => {
+  const tableData = subjects.filter((s) => {
+    // Asegurar que solo incluya aprobados y promocionados
+    if (!s.final_grade || s.final_grade < 6) return false
+    return true
+  }).map((s) => {
     const fechaObj = s.created_at ? new Date(s.created_at) : new Date()
     const mes = getMonthName(fechaObj.getMonth())
     const año = fechaObj.getFullYear()
@@ -84,6 +91,7 @@ export function generateApprovedSubjects(student: any, subjects: any[]) {
       condicion = 'APROBADO'
     }
 
+    console.log(`Generando fila: ${s.name} - ${calificacionFormato} - ${condicion}`)
     return [s.name, calificacionFormato, condicion, mes, año.toString()]
   })
 
