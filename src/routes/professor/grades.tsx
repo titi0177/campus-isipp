@@ -8,6 +8,7 @@ import { ProfessorRegularGrades } from '@/components/ProfessorRegularGrades'
 import { ProfessorApprovedHistory } from '@/components/ProfessorApprovedHistory'
 import { ProfessorDisapprovedManagement } from '@/components/ProfessorDisapprovedManagement'
 import { ProfessorGradesReport } from '@/components/ProfessorGradesReport'
+import { ProfessorExamEnrollments } from '@/components/ProfessorExamEnrollments'
 
 export const Route = createFileRoute('/professor/grades')({
   component: ProfessorGradesPage,
@@ -34,7 +35,7 @@ function ProfessorGradesPage() {
   const [showAllYears, setShowAllYears] = useState(false)
   const [enrollments, setEnrollments] = useState<Enrollment[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history' | 'disapproved' | 'report'>('load')
+  const [activeTab, setActiveTab] = useState<'load' | 'regulars' | 'history' | 'disapproved' | 'report' | 'exams'>('load')
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -227,6 +228,16 @@ function ProfessorGradesPage() {
             >
               Historial de Aprobados
             </button>
+            <button
+              onClick={() => setActiveTab('exams')}
+              className={`px-6 py-3 font-bold text-sm border-b-2 transition-colors ${
+                activeTab === 'exams'
+                  ? 'border-b-cyan-600 text-cyan-600'
+                  : 'border-b-transparent text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Alumnos en Finales
+            </button>
           </div>
 
           {/* Content */}
@@ -282,6 +293,10 @@ function ProfessorGradesPage() {
                 </p>
               </div>
               <ProfessorDisapprovedManagement subjectId={selectedSubject} />
+            </>
+          ) : activeTab === 'exams' ? (
+            <>
+              <ProfessorExamEnrollments subjectId={selectedSubject} />
             </>
           ) : (
             <>
