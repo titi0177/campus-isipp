@@ -573,6 +573,7 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
           console.error('Error closing notes for', enrollment.id, result.error)
           setError(`Error al cerrar notas de ${enrollment.student_name}: ${result.error.message}`)
           setClosing(false)
+          setShowAveragingSelection(true)
           return
         }
 
@@ -877,7 +878,17 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
                 <h3 className="font-bold text-lg text-gray-900 mb-2">Selecciona las notas para calcular promedio</h3>
-                <p className="text-sm text-gray-600 mb-6">Elige cuáles de estas notas se usarán para TODOS los alumnos:</p>
+                <p className="text-sm text-gray-600 mb-4">Elige cuáles de estas notas se usarán para TODOS los alumnos:</p>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex gap-2 mb-4">
+                    <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">Error</p>
+                      <p className="text-xs mt-1">{error}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-lg border-2 border-gray-200">
                   {Array.from({ length: numGrades }, (_, i) => {
@@ -903,15 +914,19 @@ export function ProfessorGradeLoader({ enrollments, subjectId }: Props) {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setShowAveragingSelection(false)}
+                    onClick={() => {
+                      setShowAveragingSelection(false)
+                      setError('')
+                    }}
                     className="flex-1 bg-gray-300 text-gray-900 font-bold py-2 rounded-lg hover:bg-gray-400 transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleCloseNotes}
-                    disabled={!hasSelectionsForClosing || closing}
+                    disabled={!hasSelectionsForClosing || closing || !!error}
                     className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 text-white font-bold py-2 rounded-lg hover:shadow-lg transition-all disabled:opacity-50"
+                    title={error ? 'Hay un error. Cancela e intenta de nuevo.' : ''}
                   >
                     {closing ? 'Finalizando...' : 'Confirmar y Cerrar Notas'}
                   </button>
