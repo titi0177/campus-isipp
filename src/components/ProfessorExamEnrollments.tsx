@@ -5,6 +5,7 @@ import { AlertCircle, Users } from 'lucide-react'
 type ExamStudent = {
   first_name: string
   last_name: string
+  exam_date: string
 }
 
 type Props = {
@@ -15,6 +16,19 @@ export function ProfessorExamEnrollments({ subjectId }: Props) {
   const [students, setStudents] = useState<ExamStudent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  const formatExamDate = (dateString: string): string => {
+    if (!dateString) return '-'
+    const date = new Date(dateString)
+    const day = date.getDate()
+    const monthNames = [
+      'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO',
+      'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'
+    ]
+    const month = monthNames[date.getMonth()]
+    const year = date.getFullYear()
+    return `${day} de ${month} de ${year}`
+  }
 
   useEffect(() => {
     loadExamStudents()
@@ -28,7 +42,7 @@ export function ProfessorExamEnrollments({ subjectId }: Props) {
       const { data, error: err } = await supabase
         .from('exam_enrollments')
         .select(`
-          final_exams!inner(subject_id),
+          final_exams!inner(subject_id, exam_date),
           student:students(first_name, last_name)
         `)
         .eq('final_exams.subject_id', subjectId)
@@ -45,6 +59,7 @@ export function ProfessorExamEnrollments({ subjectId }: Props) {
       const formatted = data?.map(e => ({
         first_name: e.student.first_name,
         last_name: e.student.last_name,
+        exam_date: e.final_exams.exam_date,
       })) || []
 
       setStudents(formatted)
@@ -108,14 +123,21 @@ export function ProfessorExamEnrollments({ subjectId }: Props) {
           {students.map((student, idx) => (
             <div
               key={idx}
-              className="p-4 hover:bg-gray-50 transition-colors flex items-center gap-4"
+              className="p-4 hover:bg-gray-50 transition-colors flex items-center justify-between gap-4"
             >
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white flex items-center justify-center font-bold text-sm">
-                {idx + 1}
+              <div className="flex items-center gap-4 flex-grow">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white flex items-center justify-center font-bold text-sm">
+                  {idx + 1}
+                </div>
+                <div className="flex-grow">
+                  <p className="font-semibold text-gray-900">
+                    {student.last_name}, {student.first_name}
+                  </p>
+                </div>
               </div>
-              <div className="flex-grow">
-                <p className="font-semibold text-gray-900">
-                  {student.last_name}, {student.first_name}
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm font-medium text-gray-600">
+                  {formatExamDate(student.exam_date)}
                 </p>
               </div>
             </div>
